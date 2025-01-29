@@ -54,6 +54,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     },
   });
 
+  // Загрузка существующего вопроса при редактировании
   useEffect(() => {
     if (id) {
       const question = questions.find(q => q.id === parseInt(id));
@@ -75,8 +76,10 @@ export default function QuestionEditor({ id }: { id?: string }) {
         topic: data.topic,
       });
 
+      // Автоматически применяем исправления
       form.setValue("content", result.correctedContent, { shouldValidate: true });
 
+      // Показываем список исправлений
       if (result.suggestions.length > 0) {
         toast({
           title: "Текст исправлен",
@@ -97,7 +100,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       } else {
         toast({
           title: "Проверка завершена",
-          description: "Ошибок не найдено",
+          description: "Ошибок не найдено.",
           duration: null,
         });
       }
@@ -161,14 +164,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
           ...questionData,
         });
         toast({
-          title: "Успешно",
+          title: "Успех",
           description: "Вопрос успешно обновлен",
           duration: null,
         });
       } else {
         await createQuestion(questionData);
         toast({
-          title: "Успешно",
+          title: "Успех",
           description: "Вопрос успешно создан",
           duration: null,
         });
