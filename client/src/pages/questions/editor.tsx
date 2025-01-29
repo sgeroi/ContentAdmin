@@ -237,13 +237,13 @@ export default function QuestionEditor() {
       </Form>
 
       <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-3xl">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {validationResult?.isValid ? "Валидация пройдена" : "Найдены проблемы"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
-              {validationResult?.spellingErrors.length > 0 && (
+              {validationResult?.spellingErrors?.length > 0 && (
                 <div>
                   <p className="font-semibold">Орфографические ошибки:</p>
                   <ul className="list-disc pl-4">
@@ -253,7 +253,7 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
-              {validationResult?.grammarErrors.length > 0 && (
+              {validationResult?.grammarErrors?.length > 0 && (
                 <div>
                   <p className="font-semibold">Грамматические ошибки:</p>
                   <ul className="list-disc pl-4">
@@ -263,7 +263,7 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
-              {validationResult?.punctuationErrors.length > 0 && (
+              {validationResult?.punctuationErrors?.length > 0 && (
                 <div>
                   <p className="font-semibold">Пунктуационные ошибки:</p>
                   <ul className="list-disc pl-4">
@@ -273,7 +273,7 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
-              {validationResult?.factualIssues.length > 0 && (
+              {validationResult?.factualIssues?.length > 0 && (
                 <div>
                   <p className="font-semibold">Фактические неточности:</p>
                   <ul className="list-disc pl-4">
@@ -283,7 +283,7 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
-              {validationResult?.suggestions.length > 0 && (
+              {validationResult?.suggestions?.length > 0 && (
                 <div>
                   <p className="font-semibold">Рекомендации:</p>
                   <ul className="list-disc pl-4">
@@ -293,7 +293,7 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
-              {validationResult?.citations.length > 0 && (
+              {validationResult?.citations?.length > 0 && (
                 <div>
                   <p className="font-semibold">Источники:</p>
                   <ul className="list-disc pl-4">
@@ -307,11 +307,10 @@ export default function QuestionEditor() {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex gap-2">
             <AlertDialogCancel>Закрыть</AlertDialogCancel>
-            {!validationResult?.isValid && (
+            {validationResult && !validationResult.isValid && (
               <Button
                 variant="secondary"
                 onClick={applyCorrections}
-                className="mr-2"
               >
                 Исправить ошибки
               </Button>
