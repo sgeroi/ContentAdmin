@@ -22,6 +22,13 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FormData = {
   title: string;
@@ -47,6 +54,7 @@ export default function QuestionEditor() {
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
+  const [factCheckResult, setFactCheckResult] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -116,11 +124,8 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      // Показываем текстовый ответ от ChatGPT
-      toast({
-        title: "Результат проверки",
-        description: result.suggestions[0],
-      });
+      // Показываем результат в модальном окне
+      setFactCheckResult(result.suggestions[0]);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -282,6 +287,18 @@ export default function QuestionEditor() {
           </div>
         </form>
       </Form>
+
+      <AlertDialog open={factCheckResult !== null} onOpenChange={() => setFactCheckResult(null)}>
+        <AlertDialogContent className="max-w-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Результат проверки фактов</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="mt-4 whitespace-pre-wrap">{factCheckResult}</div>
+          <div className="mt-4 flex justify-end">
+            <AlertDialogCancel>Закрыть</AlertDialogCancel>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
