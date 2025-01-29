@@ -20,7 +20,7 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Loader2, X } from "lucide-react";
 
 type FormData = {
@@ -41,12 +41,15 @@ const topics = [
   "Технологии",
 ];
 
+const TIMEOUT_MS = 30000; // 30 seconds timeout
+
 export default function QuestionEditor() {
   const [, setLocation] = useLocation();
   const { createQuestion, validateQuestion, factCheckQuestion } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -109,12 +112,27 @@ export default function QuestionEditor() {
     }
 
     setIsFactChecking(true);
+
+    // Set a timeout to cancel the operation if it takes too long
+    timeoutRef.current = setTimeout(() => {
+      setIsFactChecking(false);
+      toast({
+        title: "Ошибка",
+        description: "Превышено время ожидания проверки фактов. Попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }, TIMEOUT_MS);
+
     try {
       const result = await factCheckQuestion({
         title: data.title,
         content: data.content,
         topic: data.topic,
       });
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
 
       toast({
         title: "Результат проверки фактов",
@@ -132,6 +150,10 @@ export default function QuestionEditor() {
         duration: Infinity,
       });
     } catch (error: any) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
       toast({
         title: "Ошибка",
         description: error.message,
