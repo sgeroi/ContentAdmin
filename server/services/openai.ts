@@ -19,7 +19,7 @@ function getImageBase64(url: string): string | null {
     }
 
     const imageBuffer = fs.readFileSync(imagePath);
-    return `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+    return imageBuffer.toString('base64');
   } catch (error) {
     console.error('Error reading image:', error);
     return null;
@@ -113,23 +113,34 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
 
     // Add images to the message if they exist
     for (const imageUrl of images) {
+      console.log('Processing image:', imageUrl);
       const base64Image = getImageBase64(imageUrl);
       if (base64Image) {
+        console.log('Successfully encoded image to base64');
         userMessage.content.push({
           type: "image_url",
           image_url: {
-            url: base64Image
+            url: `data:image/jpeg;base64,${base64Image}`
           }
         });
+      } else {
+        console.log('Failed to encode image to base64');
       }
     }
 
     messages.push(userMessage);
 
-    console.log('Sending request to OpenAI with messages:', JSON.stringify(messages, null, 2));
+    console.log('Sending request to OpenAI with messages structure:', 
+      JSON.stringify(messages.map(m => ({
+        role: m.role,
+        contentTypes: Array.isArray(m.content) 
+          ? m.content.map((c: any) => c.type)
+          : typeof m.content
+      })), null, 2)
+    );
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-1106-vision-preview",
       messages,
       temperature: 0.2,
       max_tokens: 1500
