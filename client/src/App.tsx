@@ -33,7 +33,9 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/questions" component={Questions} />
         <Route path="/questions/new" component={QuestionEditor} />
-        <Route path="/questions/:id" component={QuestionEditor} />
+        <Route path="/questions/:id">
+          {(params) => <QuestionEditor id={params.id} />}
+        </Route>
         <Route path="/packages" component={Packages} />
         <Route component={NotFound} />
       </Switch>

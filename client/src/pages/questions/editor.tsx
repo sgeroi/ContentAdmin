@@ -20,7 +20,7 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
@@ -41,9 +41,9 @@ const topics = [
   "Технологии",
 ];
 
-export default function QuestionEditor() {
-  const [, setLocation] = useLocation();
-  const { createQuestion, validateQuestion, factCheckQuestion } = useQuestions();
+export default function QuestionEditor({ id }: { id?: string }) {
+  const [location, setLocation] = useLocation();
+  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, questions } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
@@ -57,6 +57,21 @@ export default function QuestionEditor() {
     },
   });
 
+  // Load existing question data if editing
+  useEffect(() => {
+    if (id) {
+      const question = questions.find(q => q.id === parseInt(id));
+      if (question) {
+        form.reset({
+          title: question.title,
+          content: question.content,
+          topic: question.topic,
+          difficulty: question.difficulty.toString(),
+        });
+      }
+    }
+  }, [id, questions, form]);
+
   const handleValidateAndCorrect = async (data: FormData) => {
     setIsValidating(true);
     try {
@@ -66,7 +81,6 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      // Автоматически применяем исправления
       form.setValue("title", result.correctedTitle, { shouldValidate: true });
       form.setValue("content", result.correctedContent, { shouldValidate: true });
 
@@ -116,7 +130,6 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      // Показываем текстовый ответ от ChatGPT
       toast({
         title: "Результат проверки",
         description: result.suggestions[0],
@@ -134,14 +147,27 @@ export default function QuestionEditor() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await createQuestion({
+      const questionData = {
         ...data,
         difficulty: parseInt(data.difficulty),
-      });
-      toast({
-        title: "Успех",
-        description: "Вопрос успешно сохранен",
-      });
+      };
+
+      if (id) {
+        await updateQuestion({
+          id: parseInt(id),
+          ...questionData,
+        });
+        toast({
+          title: "Успех",
+          description: "Вопрос успешно обновлен",
+        });
+      } else {
+        await createQuestion(questionData);
+        toast({
+          title: "Успех",
+          description: "Вопрос успешно создан",
+        });
+      }
       setLocation("/questions");
     } catch (error: any) {
       toast({
@@ -155,9 +181,11 @@ export default function QuestionEditor() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Создать вопрос</h1>
+        <h1 className="text-3xl font-bold">
+          {id ? "Редактировать вопрос" : "Создать вопрос"}
+        </h1>
         <p className="text-muted-foreground">
-          Создание нового вопроса для викторины
+          {id ? "Редактирование существующего вопроса" : "Создание нового вопроса для викторины"}
         </p>
       </div>
 
@@ -203,7 +231,7 @@ export default function QuestionEditor() {
                   <FormLabel>Тема</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -231,7 +259,7 @@ export default function QuestionEditor() {
                   <FormLabel>Уровень сложности</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -278,7 +306,9 @@ export default function QuestionEditor() {
               {isFactChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Фактчек
             </Button>
-            <Button type="submit">Сохранить</Button>
+            <Button type="submit">
+              {id ? "Сохранить изменения" : "Создать вопрос"}
+            </Button>
           </div>
         </form>
       </Form>
