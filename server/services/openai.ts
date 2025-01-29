@@ -5,6 +5,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 export async function validateQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting validation for:', { title, topic });
@@ -27,13 +28,12 @@ export async function validateQuestion(title: string, content: any, topic: strin
       }
     ];
 
-    // Добавляем изображения из контента, если они есть
+    // Add images and text content from the rich text editor
     if (content.content) {
       for (const node of content.content) {
         if (node.type === 'image' && node.attrs?.src) {
           const imageUrl = node.attrs.src;
           if (imageUrl.startsWith('/uploads/')) {
-            // Преобразуем относительный путь в полный URL
             const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
             messages[1].content.push({
               type: "image_url",
@@ -51,8 +51,10 @@ export async function validateQuestion(title: string, content: any, topic: strin
       }
     }
 
+    console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o",
       messages,
       temperature: 0.3,
       max_tokens: 1000
@@ -122,8 +124,10 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       }
     }
 
+    console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o",
       messages,
       temperature: 0.2,
       max_tokens: 1500
