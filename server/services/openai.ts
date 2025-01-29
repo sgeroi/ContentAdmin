@@ -58,7 +58,7 @@ export async function validateQuestion(title: string, content: string, topic: st
     console.log('Starting validation for:', { title, topic });
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -158,12 +158,11 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       }))
     );
 
-    // Choose model based on presence of images
-    const model = hasValidImages ? "gpt-4o" : "gpt-4-vision";
-    console.log(`Using model: ${model} (hasValidImages: ${hasValidImages})`);
+    // Always use gpt-4o regardless of images presence
+    console.log('Using model: gpt-4o');
 
     const response = await openai.chat.completions.create({
-      model,
+      model: "gpt-4o",
       messages: messages,
       max_tokens: 1000,
       temperature: 0.2
