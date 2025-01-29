@@ -159,7 +159,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     );
 
     // Choose model based on presence of images
-    const model = hasValidImages ? "gpt-4o" : "gpt-4-vision-preview";
+    const model = hasValidImages ? "gpt-4o" : "gpt-4-vision";
     console.log(`Using model: ${model} (hasValidImages: ${hasValidImages})`);
 
     const response = await openai.chat.completions.create({
