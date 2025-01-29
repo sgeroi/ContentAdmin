@@ -11,20 +11,49 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+
+const topics = [
+  "История",
+  "Наука",
+  "География",
+  "Литература",
+  "Искусство",
+  "Музыка",
+  "Спорт",
+  "Технологии",
+];
 
 export default function GenerateQuestions() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<string>("");
 
   const handleGenerate = async () => {
+    if (!selectedTopic) {
+      toast({
+        title: "Выберите тему",
+        description: "Для генерации вопросов необходимо выбрать тему",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const response = await fetch("/api/questions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ count: 10 }),
+        body: JSON.stringify({ count: 10, topic: selectedTopic }),
       });
 
       if (!response.ok) {
@@ -34,7 +63,7 @@ export default function GenerateQuestions() {
       const questions = await response.json();
       toast({
         title: "Успех",
-        description: `Сгенерировано ${questions.length} новых вопросов`,
+        description: `Сгенерировано ${questions.length} новых вопросов по теме "${selectedTopic}"`,
       });
       setLocation("/questions");
     } catch (error: any) {
@@ -63,13 +92,31 @@ export default function GenerateQuestions() {
         <CardHeader>
           <CardTitle>Создание нового пакета вопросов</CardTitle>
           <CardDescription>
-            Будет создано 10 новых вопросов на логику разной сложности и на разные темы
+            Выберите тему для генерации 10 новых вопросов разной сложности
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Тема вопросов</Label>
+            <Select
+              value={selectedTopic}
+              onValueChange={setSelectedTopic}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите тему для вопросов" />
+              </SelectTrigger>
+              <SelectContent>
+                {topics.map((topic) => (
+                  <SelectItem key={topic} value={topic}>
+                    {topic}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating}
+            disabled={isGenerating || !selectedTopic}
             size="lg"
             className="w-full"
           >

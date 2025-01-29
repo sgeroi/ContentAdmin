@@ -4,12 +4,11 @@ import { setupAuth } from "./auth";
 import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { validateQuestion, factCheckQuestion } from './services/openai';
+import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import express from 'express';
-import { generateQuizQuestions } from './services/openai';
 
 // Настройка multer для загрузки изображений
 const upload = multer({
@@ -253,7 +252,8 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/questions/generate", requireAuth, async (req, res) => {
     try {
       const count = req.body.count || 10;
-      const generatedQuestions = await generateQuizQuestions(count);
+      const topic = req.body.topic;
+      const generatedQuestions = await generateQuizQuestions(count, topic);
 
       // Create all questions at once with proper type casting
       const questionsToInsert = generatedQuestions.map(q => ({

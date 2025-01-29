@@ -172,7 +172,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   }
 }
 
-export async function generateQuizQuestions(count: number = 10): Promise<Array<{
+export async function generateQuizQuestions(count: number = 10, topic?: string): Promise<Array<{
   title: string;
   content: any;
   answer: string;
@@ -182,6 +182,10 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
   try {
     console.log('Starting quiz questions generation');
 
+    const topicPrompt = topic ? 
+      `Создай ${count} уникальных вопросов на тему "${topic}" на русском языке.` :
+      `Создай ${count} уникальных вопросов на логику на русском языке.`;
+
     const response = await openai.chat.completions.create({
       // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       model: "gpt-4o",
@@ -189,8 +193,8 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
         {
           role: "system",
           content: `Ты - эксперт по созданию интересных вопросов для викторины. 
-          Создай ${count} уникальных вопросов на логику на русском языке.
-          Вопросы должны быть разной сложности (от 1 до 5) и охватывать разные темы.
+          ${topicPrompt}
+          Вопросы должны быть разной сложности (от 1 до 5) и ${topic ? 'охватывать разные аспекты выбранной темы' : 'охватывать разные темы'}.
           Для каждого вопроса обязательно укажи правильный ответ.
           Верни JSON в формате:
           {
@@ -211,7 +215,7 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
                 ]
               },
               "answer": "правильный ответ на вопрос",
-              "topic": "тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)",
+              "topic": "${topic || 'тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)'}",
               "difficulty": число от 1 до 5
             }]
           }`
@@ -225,6 +229,11 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
 
     if (!result?.questions || !Array.isArray(result.questions)) {
       throw new Error('Некорректный формат ответа от API');
+    }
+
+    // If topic is specified, ensure all questions have that topic
+    if (topic) {
+      result.questions = result.questions.map(q => ({ ...q, topic }));
     }
 
     return result.questions;
