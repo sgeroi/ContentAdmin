@@ -259,10 +259,12 @@ export function registerRoutes(app: Express): Server {
       const questionsToInsert = generatedQuestions.map(q => ({
         title: q.title,
         content: q.content,
+        answer: q.answer,
         topic: q.topic,
         difficulty: q.difficulty,
         authorId: req.user!.id,
-        factChecked: false
+        factChecked: false,
+        isGenerated: true
       }));
 
       const createdQuestions = await db

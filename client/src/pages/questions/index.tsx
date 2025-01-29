@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
 import { Link, useLocation } from "wouter";
-import { Edit, Trash2, Plus, CheckCircle2, Wand2 } from "lucide-react";
+import { Edit, Trash2, Plus, CheckCircle2, Wand2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -103,7 +103,14 @@ export default function Questions() {
                   "focus:bg-muted/50 focus:outline-none"
                 )}
               >
-                <TableCell>{getContentPreview(question.content)}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {question.isGenerated && (
+                      <Sparkles className="h-4 w-4 text-purple-500" title="Сгенерировано ИИ" />
+                    )}
+                    {getContentPreview(question.content)}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="secondary">{question.topic}</Badge>
                 </TableCell>

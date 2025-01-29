@@ -14,11 +14,13 @@ export const questions = pgTable("questions", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   content: json("content").notNull(), // Tiptap JSON content
+  answer: text("answer"),  // New field for question answers
   topic: text("topic").notNull(),
   difficulty: integer("difficulty").notNull(), // 1-5
   authorId: integer("author_id").references(() => users.id).notNull(),
   factChecked: boolean("fact_checked").default(false),
   factCheckDate: timestamp("fact_check_date"),
+  isGenerated: boolean("is_generated").default(false), // New field to track AI-generated questions
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

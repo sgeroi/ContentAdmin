@@ -175,6 +175,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
 export async function generateQuizQuestions(count: number = 10): Promise<Array<{
   title: string;
   content: any;
+  answer: string;
   topic: string;
   difficulty: number;
 }>> {
@@ -190,6 +191,7 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
           content: `Ты - эксперт по созданию интересных вопросов для викторины. 
           Создай ${count} уникальных вопросов на логику на русском языке.
           Вопросы должны быть разной сложности (от 1 до 5) и охватывать разные темы.
+          Для каждого вопроса обязательно укажи правильный ответ.
           Верни JSON в формате:
           {
             "questions": [{
@@ -208,6 +210,7 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
                   }
                 ]
               },
+              "answer": "правильный ответ на вопрос",
               "topic": "тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)",
               "difficulty": число от 1 до 5
             }]
