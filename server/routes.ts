@@ -5,6 +5,38 @@ import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion } from './services/openai';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import express from 'express';
+
+// Настройка multer для загрузки изображений
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: function (req, file, cb) {
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Неподдерживаемый формат файла'));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB
+  }
+});
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -14,6 +46,18 @@ export function registerRoutes(app: Express): Server {
     if (req.isAuthenticated()) return next();
     res.status(401).send("Unauthorized");
   };
+
+  // Static route for serving uploaded files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // Upload image endpoint
+  app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url });
+  });
 
   // Questions API
   app.get("/api/questions", requireAuth, async (req, res) => {

@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
 import { Button } from "./ui/button";
 import {
   Bold,
@@ -10,9 +11,13 @@ import {
   Undo,
   Redo,
   Code,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const extensions = [
   StarterKit.configure({
@@ -23,6 +28,11 @@ const extensions = [
     orderedList: {
       keepMarks: true,
       keepAttributes: false,
+    },
+  }),
+  Image.configure({
+    HTMLAttributes: {
+      class: 'rounded-lg max-w-full h-auto',
     },
   }),
 ];
@@ -61,6 +71,51 @@ export function WysiwygEditor({
   onChange,
   className,
 }: WysiwygEditorProps) {
+  const { toast } = useToast();
+
+  const addImage = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: "Ошибка",
+          description: "Размер файла не должен превышать 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Ошибка загрузки изображения');
+        }
+
+        const { url } = await response.json();
+        editor?.chain().focus().setImage({ src: url }).run();
+      } catch (error: any) {
+        toast({
+          title: "Ошибка",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    };
+    input.click();
+  }, [toast]);
+
   const editor = useEditor({
     extensions,
     content,
@@ -75,10 +130,8 @@ export function WysiwygEditor({
     },
   });
 
-  // Эффект для обновления содержимого редактора при изменении props
   useEffect(() => {
     if (editor && content) {
-      // Проверяем, отличается ли текущий контент от нового
       const currentContent = editor.getJSON();
       if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
         editor.commands.setContent(content);
@@ -128,6 +181,11 @@ export function WysiwygEditor({
           isActive={editor.isActive("codeBlock")}
         >
           <Code className="h-4 w-4" />
+        </MenuButton>
+        <MenuButton
+          onClick={addImage}
+        >
+          <ImageIcon className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}
