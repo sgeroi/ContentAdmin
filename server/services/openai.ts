@@ -50,7 +50,7 @@ function extractImagesFromContent(content: any): string[] {
   return images;
 }
 
-export async function validateQuestion(title: string, content: string, topic: string): Promise<QuestionValidationResult> {
+export async function validateQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting validation for:', { title, topic });
 
@@ -59,22 +59,25 @@ export async function validateQuestion(title: string, content: string, topic: st
       messages: [
         {
           role: "system",
-          content: "Ты - эксперт по русскому языку. Кратко проверь текст вопроса для викторины на наличие ошибок. Дай ответ в 2-3 предложения."
+          content: `Проверь и исправь текст на наличие орфографических, пунктуационных и грамматических ошибок. Верни JSON в формате:
+          {
+            "correctedTitle": "исправленный заголовок",
+            "correctedContent": "исправленное содержание",
+            "corrections": ["список всех внесенных исправлений"]
+          }`
         },
         {
           role: "user",
-          content: `Проверь следующий вопрос для викторины:
+          content: `Исправь следующий текст:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
       ],
-      temperature: 0.3,
-      max_tokens: 1000
+      response_format: { type: "json_object" }
     });
 
-    const resultText = response.choices[0]?.message?.content || '';
-    console.log('Validation response:', resultText);
+    const result = JSON.parse(response.choices[0]?.message?.content || '');
 
     return {
       isValid: true,
@@ -82,10 +85,10 @@ export async function validateQuestion(title: string, content: string, topic: st
       grammarErrors: [],
       punctuationErrors: [],
       factualIssues: [],
-      suggestions: [resultText],
+      suggestions: result.corrections || [],
       citations: [],
-      correctedTitle: title,
-      correctedContent: content
+      correctedTitle: result.correctedTitle || title,
+      correctedContent: result.correctedContent || content
     };
   } catch (error: any) {
     console.error('Error validating question:', error);
