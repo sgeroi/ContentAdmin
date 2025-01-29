@@ -7,6 +7,25 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function getImageBase64(url: string): string | null {
+  try {
+    // Remove /uploads/ prefix from URL and construct full path
+    const imagePath = path.join(process.cwd(), url.replace(/^\/uploads\//, 'uploads/'));
+    console.log('Reading image from:', imagePath);
+
+    if (!fs.existsSync(imagePath)) {
+      console.log('Image file not found');
+      return null;
+    }
+
+    const imageBuffer = fs.readFileSync(imagePath);
+    return `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+  } catch (error) {
+    console.error('Error reading image:', error);
+    return null;
+  }
+}
+
 function extractImagesFromContent(content: any): string[] {
   const images: string[] = [];
   if (content.content) {
@@ -17,10 +36,6 @@ function extractImagesFromContent(content: any): string[] {
     }
   }
   return images;
-}
-
-function getImageDescription(url: string): string {
-  return `[Изображение: ${url.split('/').pop()}]`;
 }
 
 export async function validateQuestion(title: string, content: string, topic: string): Promise<QuestionValidationResult> {
@@ -49,7 +64,6 @@ export async function validateQuestion(title: string, content: string, topic: st
     const resultText = response.choices[0]?.message?.content || '';
     console.log('Validation response:', resultText);
 
-    // Возвращаем простой текстовый ответ в поле suggestions
     return {
       isValid: true,
       spellingErrors: [],
@@ -71,29 +85,52 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   try {
     console.log('Starting fact check for:', { title, topic });
 
-    // Получаем список изображений и добавляем их описания к контенту
+    // Extract images from content
     const images = extractImagesFromContent(content);
-    let contentWithImages = JSON.stringify(content);
-    if (images.length > 0) {
-      contentWithImages += '\n\nИзображения в вопросе:\n' + 
-        images.map(img => getImageDescription(img)).join('\n');
-    }
+    console.log('Found images:', images);
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
+    // Prepare messages array
+    const messages: any[] = [
+      {
+        role: "system",
+        content: "You are a fact-checking expert. Review the quiz question for accuracy, including any images provided. Check historical accuracy, scientific validity, and terminology. Respond in Russian."
+      }
+    ];
+
+    // Add the main content message
+    const userMessage: any = {
+      role: "user",
+      content: [
         {
-          role: "system",
-          content: "Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины. Проверь историческую точность, научную достоверность, актуальность информации и терминологию. Если в вопросе есть изображения, проверь их уместность в контексте вопроса. Дай ответ простым текстом."
-        },
-        {
-          role: "user",
-          content: `Проверь следующий вопрос для викторины:
+          type: "text",
+          text: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
-Содержание: ${contentWithImages}
+Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
-      ],
+      ]
+    };
+
+    // Add images to the message if they exist
+    for (const imageUrl of images) {
+      const base64Image = getImageBase64(imageUrl);
+      if (base64Image) {
+        userMessage.content.push({
+          type: "image_url",
+          image_url: {
+            url: base64Image
+          }
+        });
+      }
+    }
+
+    messages.push(userMessage);
+
+    console.log('Sending request to OpenAI with messages:', JSON.stringify(messages, null, 2));
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-vision-preview",
+      messages,
       temperature: 0.2,
       max_tokens: 1500
     });
@@ -101,7 +138,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     const resultText = response.choices[0]?.message?.content || '';
     console.log('Fact check response:', resultText);
 
-    // Возвращаем простой текстовый ответ в поле suggestions
     return {
       isValid: true,
       spellingErrors: [],
