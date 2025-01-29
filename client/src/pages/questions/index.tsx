@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
 import { Link, useLocation } from "wouter";
-import { Edit, Trash2, Plus, CheckCircle2 } from "lucide-react"; // Added import for CheckCircle2
+import { Edit, Trash2, Plus, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -75,13 +75,13 @@ export default function Questions() {
 
       <div className="rounded-md border">
         <Table>
-          <TableHeader> {/* Updated TableHeader */}
+          <TableHeader>
             <TableRow>
               <TableHead>Содержание</TableHead>
               <TableHead>Тема</TableHead>
               <TableHead>Сложность</TableHead>
               <TableHead>Автор</TableHead>
-              <TableHead>Статус</TableHead> {/* Added Status column */}
+              <TableHead>Статус</TableHead>
               <TableHead className="w-[100px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
@@ -107,7 +107,7 @@ export default function Questions() {
                   </Badge>
                 </TableCell>
                 <TableCell>{question.author?.username}</TableCell>
-                <TableCell> {/* Added fact-check status */}
+                <TableCell>
                   {question.factChecked && (
                     <div className="flex items-center gap-1 text-green-500">
                       <CheckCircle2 className="h-4 w-4" />
@@ -165,7 +165,7 @@ export default function Questions() {
             {questions.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6} {/* Increased colSpan to account for the new column */}
+                  colSpan={6} 
                   className="text-center text-muted-foreground h-24"
                 >
                   {isLoading ? "Загрузка..." : "Вопросы не найдены"}
