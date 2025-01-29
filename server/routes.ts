@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { validateQuestion } from './services/perplexity';
+import { validateQuestion } from './services/openai';
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
