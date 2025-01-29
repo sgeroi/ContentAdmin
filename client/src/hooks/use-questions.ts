@@ -22,7 +22,6 @@ export function useQuestions(id?: string) {
   const { data: questions = [], isLoading: isLoadingList } = useQuery<Question[]>({
     queryKey: ["/api/questions"],
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    cacheTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
   });
 
   // Query for individual question
@@ -30,8 +29,7 @@ export function useQuestions(id?: string) {
     queryKey: ["/api/questions", id],
     enabled: !!id,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    cacheTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
-    initialData: id ? questions.find(q => q.id.toString() === id) : undefined,
+    initialData: id && questions ? questions.find(q => q.id.toString() === id) : undefined,
   });
 
   // Prefetch individual question
@@ -79,7 +77,7 @@ export function useQuestions(id?: string) {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
       queryClient.setQueryData(["/api/questions", data.id.toString()], data);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -111,7 +109,7 @@ export function useQuestions(id?: string) {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
       queryClient.setQueryData(["/api/questions", data.id.toString()], data);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -138,7 +136,7 @@ export function useQuestions(id?: string) {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
       queryClient.removeQueries({ queryKey: ["/api/questions", id.toString()] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Ошибка",
         description: error.message,
