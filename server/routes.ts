@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { validateQuestion } from './services/openai';
+import { validateQuestion, factCheckQuestion } from './services/openai';
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -30,6 +30,16 @@ export function registerRoutes(app: Express): Server {
     try {
       const { title, content, topic } = req.body;
       const validation = await validateQuestion(title, content, topic);
+      res.json(validation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/questions/factcheck", requireAuth, async (req, res) => {
+    try {
+      const { title, content, topic } = req.body;
+      const validation = await factCheckQuestion(title, content, topic);
       res.json(validation);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

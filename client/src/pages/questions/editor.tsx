@@ -43,9 +43,10 @@ const topics = [
 
 export default function QuestionEditor() {
   const [, setLocation] = useLocation();
-  const { createQuestion, validateQuestion } = useQuestions();
+  const { createQuestion, validateQuestion, factCheckQuestion } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
+  const [isFactChecking, setIsFactChecking] = useState(false);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -94,6 +95,49 @@ export default function QuestionEditor() {
       });
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  const handleFactCheck = async (data: FormData) => {
+    setIsFactChecking(true);
+    try {
+      const result = await factCheckQuestion({
+        title: data.title,
+        content: data.content,
+        topic: data.topic,
+      });
+
+      // Автоматически применяем исправления
+      form.setValue("title", result.correctedTitle, { shouldValidate: true });
+      form.setValue("content", result.correctedContent, { shouldValidate: true });
+
+      if (!result.isValid) {
+        toast({
+          title: "Найдены фактические неточности",
+          description: result.factualIssues.join("\n\n"),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Фактчекинг пройден",
+          description: "Информация в вопросе корректна.",
+        });
+      }
+
+      if (result.suggestions.length > 0) {
+        toast({
+          title: "Предложения по улучшению",
+          description: result.suggestions.join("\n\n"),
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsFactChecking(false);
     }
   };
 
@@ -233,6 +277,15 @@ export default function QuestionEditor() {
             >
               {isValidating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Проверить
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={form.handleSubmit(handleFactCheck)}
+              disabled={isFactChecking}
+            >
+              {isFactChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Фактчек
             </Button>
             <Button type="submit">Сохранить</Button>
           </div>

@@ -149,10 +149,28 @@ export function useQuestions() {
     },
   });
 
+  const factCheckMutation = useMutation({
+    mutationFn: async (data: { title: string; content: any; topic: string }) => {
+      const response = await fetch("/api/questions/factcheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json() as Promise<ValidationResult>;
+    },
+  });
+
   return {
     questions,
     isLoading,
     validateQuestion: validateMutation.mutateAsync,
+    factCheckQuestion: factCheckMutation.mutateAsync,
     createQuestion: createMutation.mutateAsync,
     updateQuestion: updateMutation.mutateAsync,
     deleteQuestion: deleteMutation.mutateAsync,
