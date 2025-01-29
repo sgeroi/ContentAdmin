@@ -16,9 +16,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { usePackages } from "@/hooks/use-packages";
 import { useQuestions } from "@/hooks/use-questions";
-import { Plus, FileDown, Trash2 } from "lucide-react";
+import { Plus, FileDown, Trash2, Eye } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,6 +39,7 @@ export default function Packages() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
 
   const handleCreate = async () => {
     if (!title) return;
@@ -37,11 +48,12 @@ export default function Packages() {
       await createPackage({
         title,
         description,
-        questions: [],
+        questions: questions.filter(q => selectedQuestions.includes(q.id)),
       });
       setIsDialogOpen(false);
       setTitle("");
       setDescription("");
+      setSelectedQuestions([]);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -75,7 +87,7 @@ export default function Packages() {
               New Package
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Package</DialogTitle>
               <DialogDescription>
@@ -101,8 +113,42 @@ export default function Packages() {
                   placeholder="Enter package description"
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Select Questions</Label>
+                <ScrollArea className="h-72 rounded-md border">
+                  <div className="p-4 space-y-4">
+                    {questions.map((question) => (
+                      <div key={question.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`question-${question.id}`}
+                          checked={selectedQuestions.includes(question.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedQuestions([...selectedQuestions, question.id]);
+                            } else {
+                              setSelectedQuestions(selectedQuestions.filter(id => id !== question.id));
+                            }
+                          }}
+                        />
+                        <div className="grid gap-1.5">
+                          <label
+                            htmlFor={`question-${question.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {question.title}
+                          </label>
+                          <div className="flex gap-2">
+                            <Badge>{question.topic}</Badge>
+                            <Badge variant="outline">Level {question.difficulty}</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
               <Button onClick={handleCreate} className="w-full">
-                Create Package
+                Create Package ({selectedQuestions.length} questions selected)
               </Button>
             </div>
           </DialogContent>
@@ -121,7 +167,14 @@ export default function Packages() {
             <CardContent>
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  {pkg.questions?.length || 0} questions
+                  {pkg.questions?.length || 0} questions selected
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {pkg.questions?.map((pq) => (
+                    <Badge key={pq.questionId} variant="outline">
+                      {questions.find(q => q.id === pq.questionId)?.title}
+                    </Badge>
+                  ))}
                 </div>
                 <div className="flex gap-2">
                   <Button
