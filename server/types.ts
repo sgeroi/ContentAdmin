@@ -5,4 +5,5 @@ export interface QuestionValidationResult {
   punctuationErrors: string[];
   factualIssues: string[];
   suggestions: string[];
+  citations: string[];
 }

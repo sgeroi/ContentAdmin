@@ -9,6 +9,7 @@ interface ValidationResult {
   punctuationErrors: string[];
   factualIssues: string[];
   suggestions: string[];
+  citations: string[];
 }
 
 export function useQuestions() {
