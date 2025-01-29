@@ -31,6 +31,18 @@ const difficultyColors: Record<number, string> = {
   5: "bg-red-500",
 };
 
+// Helper function to get preview text from content
+function getContentPreview(content: any): string {
+  try {
+    if (content?.content?.[0]?.content?.[0]?.text) {
+      return content.content[0].content[0].text.slice(0, 15) + '...';
+    }
+    return 'Нет содержания';
+  } catch (error) {
+    return 'Ошибка контента';
+  }
+}
+
 export default function Questions() {
   const { questions, deleteQuestion, isLoading } = useQuestions();
 
@@ -42,15 +54,15 @@ export default function Questions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Questions</h1>
+          <h1 className="text-3xl font-bold">Вопросы</h1>
           <p className="text-muted-foreground">
-            Manage your quiz questions here
+            Управление вопросами для викторины
           </p>
         </div>
         <Link href="/questions/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            New Question
+            Новый вопрос
           </Button>
         </Link>
       </div>
@@ -59,17 +71,17 @@ export default function Questions() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Topic</TableHead>
-              <TableHead>Difficulty</TableHead>
-              <TableHead>Author</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>Содержание</TableHead>
+              <TableHead>Тема</TableHead>
+              <TableHead>Сложность</TableHead>
+              <TableHead>Автор</TableHead>
+              <TableHead className="w-[100px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {questions.map((question) => (
               <TableRow key={question.id}>
-                <TableCell>{question.title}</TableCell>
+                <TableCell>{getContentPreview(question.content)}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{question.topic}</Badge>
                 </TableCell>
@@ -77,7 +89,7 @@ export default function Questions() {
                   <Badge
                     className={difficultyColors[question.difficulty]}
                   >
-                    Level {question.difficulty}
+                    Уровень {question.difficulty}
                   </Badge>
                 </TableCell>
                 <TableCell>{question.author?.username}</TableCell>
@@ -97,18 +109,18 @@ export default function Questions() {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>
-                            Delete Question
+                            Удалить вопрос
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this question? This action cannot be undone.
+                            Вы уверены, что хотите удалить этот вопрос? Это действие нельзя отменить.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>Отмена</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleDelete(question.id)}
                           >
-                            Delete
+                            Удалить
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -123,7 +135,7 @@ export default function Questions() {
                   colSpan={5}
                   className="text-center text-muted-foreground h-24"
                 >
-                  {isLoading ? "Loading..." : "No questions found"}
+                  {isLoading ? "Загрузка..." : "Вопросы не найдены"}
                 </TableCell>
               </TableRow>
             )}
