@@ -37,8 +37,14 @@ const ITEMS_PER_PAGE = 10;
 
 function getContentPreview(content: any): string {
   try {
-    if (content?.content?.[0]?.content?.[0]?.text) {
-      return content.content[0].content[0].text.slice(0, 15) + '...';
+    let preview = '';
+    if (content?.content) {
+      content.content.forEach((node: any) => {
+        if (node.content?.[0]?.text) {
+          preview += (preview ? ' | ' : '') + node.content[0].text;
+        }
+      });
+      return preview.slice(0, 50) + '...';
     }
     return 'Нет содержания';
   } catch (error) {

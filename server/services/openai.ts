@@ -208,7 +208,16 @@ export async function generateQuizQuestions(count: number = 10, topic?: string):
                     "content": [
                       {
                         "type": "text",
-                        "text": "текст вопроса"
+                        "text": "Вопрос: [текст вопроса]"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Ответ: [правильный ответ]"
                       }
                     ]
                   }
