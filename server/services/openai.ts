@@ -5,7 +5,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 export async function validateQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting validation for:', { title, topic });
@@ -34,11 +33,14 @@ export async function validateQuestion(title: string, content: any, topic: strin
         if (node.type === 'image' && node.attrs?.src) {
           const imageUrl = node.attrs.src;
           if (imageUrl.startsWith('/uploads/')) {
-            const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
+            const baseUrl = process.env.REPL_SLUG ? 
+              `${process.env.REPL_SLUG}.replit.dev` : 
+              'localhost:5000';
+            const fullUrl = `https://${baseUrl}${imageUrl}`;
             messages[1].content.push({
               type: "image_url",
               image_url: {
-                url: `https://${fullUrl}`
+                url: fullUrl
               }
             });
           }
@@ -54,7 +56,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
     console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4-vision-preview",
       messages,
       temperature: 0.3,
       max_tokens: 1000
@@ -107,11 +109,14 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
         if (node.type === 'image' && node.attrs?.src) {
           const imageUrl = node.attrs.src;
           if (imageUrl.startsWith('/uploads/')) {
-            const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
+            const baseUrl = process.env.REPL_SLUG ? 
+              `${process.env.REPL_SLUG}.replit.dev` : 
+              'localhost:5000';
+            const fullUrl = `https://${baseUrl}${imageUrl}`;
             messages[1].content.push({
               type: "image_url",
               image_url: {
-                url: `https://${fullUrl}`
+                url: fullUrl
               }
             });
           }
@@ -127,7 +132,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4-vision-preview",
       messages,
       temperature: 0.2,
       max_tokens: 1500
