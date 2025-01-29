@@ -135,7 +135,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       });
 
       toast({
-        title: "Результат проверки",
+        title: "Результаты проверки",
         description: result.suggestions[0],
         duration: null,
       });

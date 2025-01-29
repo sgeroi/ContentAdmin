@@ -180,53 +180,62 @@ export function WysiwygEditor({
         <MenuButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           isActive={editor.isActive("bold")}
+          title="Жирный текст"
         >
           <Bold className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
           isActive={editor.isActive("italic")}
+          title="Курсив"
         >
           <Italic className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           isActive={editor.isActive("bulletList")}
+          title="Маркированный список"
         >
           <List className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           isActive={editor.isActive("orderedList")}
+          title="Нумерованный список"
         >
           <ListOrdered className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           isActive={editor.isActive("blockquote")}
+          title="Цитата"
         >
           <Quote className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           isActive={editor.isActive("codeBlock")}
+          title="Код"
         >
           <Code className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={addImage}
+          title="Добавить изображение"
         >
           <ImageIcon className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
+          title="Отменить"
         >
           <Undo className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
+          title="Повторить"
         >
           <Redo className="h-4 w-4" />
         </MenuButton>
