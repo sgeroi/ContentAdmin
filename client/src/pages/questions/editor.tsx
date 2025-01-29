@@ -41,7 +41,7 @@ const topics = [
 
 export default function QuestionEditor({ id }: { id?: string }) {
   const [, setLocation] = useLocation();
-  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, questions } = useQuestions();
+  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, question } = useQuestions(id);
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
@@ -55,17 +55,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
   });
 
   useEffect(() => {
-    if (id) {
-      const question = questions.find(q => q.id === parseInt(id));
-      if (question) {
-        form.reset({
-          content: question.content,
-          topic: question.topic,
-          difficulty: question.difficulty.toString(),
-        });
-      }
+    if (id && question) {
+      form.reset({
+        content: question.content,
+        topic: question.topic,
+        difficulty: question.difficulty.toString(),
+      });
     }
-  }, [id, questions, form]);
+  }, [id, question, form]);
 
   const handleCancel = () => {
     setLocation("/questions");
