@@ -55,11 +55,12 @@ export async function validateQuestion(title: string, content: any, topic: strin
     console.log('Starting validation for:', { title, topic });
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по русскому языку. Исправь орфографические и пунктуационные ошибки в тексте, сохраняя оригинальное написание слов заглавными буквами (ПРИМЕР, ВАЖНО). Верни JSON в формате:
+          content: `Ты - эксперт по русскому языку. Исправь орфографические, пунктуационные и грамматические ошибки в тексте, сохраняя оригинальное написание слов заглавными буквами (ПРИМЕР, ВАЖНО). Верни JSON в формате:
           {
             "correctedContent": "исправленное содержание",
             "corrections": ["список всех внесенных исправлений"]
