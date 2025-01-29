@@ -14,23 +14,25 @@ export async function validateQuestion(title: string, content: string, topic: st
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по проверке текста. Проверь корректность вопроса для викторины и верни ответ СТРОГО в таком формате JSON (без дополнительного текста):
-{
-  "isValid": boolean,
-  "spellingErrors": string[],
-  "grammarErrors": string[],
-  "punctuationErrors": string[],
-  "suggestions": string[],
-  "correctedTitle": string,
-  "correctedContent": object
-}`
+          content: "Ты помощник для валидации вопросов для викторины. Ты должен отвечать JSON объектом, содержащим результаты проверки и исправления. Никогда не включай markdown форматирование в свой ответ."
         },
         {
           role: "user",
-          content: `Проверь следующий вопрос:
+          content: `Пожалуйста, проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
-Тема: ${topic}`
+Тема: ${topic}
+
+Проверь и верни JSON объект со следующими полями:
+{
+  "isValid": boolean - указывает, допустим ли вопрос,
+  "spellingErrors": массив найденных орфографических ошибок,
+  "grammarErrors": массив грамматических ошибок,
+  "punctuationErrors": массив пунктуационных ошибок,
+  "suggestions": массив предложений по улучшению,
+  "correctedTitle": исправленный заголовок с учетом всех ошибок,
+  "correctedContent": исправленное содержание с учетом всех ошибок
+}`
         }
       ],
       temperature: 0.3,
@@ -42,32 +44,41 @@ export async function validateQuestion(title: string, content: string, topic: st
       throw new Error('Пустой ответ от API');
     }
 
-    console.log('Validation API Response:', resultText);
+    // Log the raw response for debugging
+    console.log('Raw response from OpenAI:', resultText);
 
+    // Extract JSON from the response, cleaning any potential formatting
+    const jsonStr = resultText
+      .replace(/^```json\s*|\s*```$/g, '') // Remove code blocks
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width spaces
+      .trim();
+
+    console.log('Cleaned JSON string:', jsonStr);
+
+    let result;
     try {
-      const result = JSON.parse(resultText);
-      return {
-        isValid: result.isValid || false,
-        spellingErrors: result.spellingErrors || [],
-        grammarErrors: result.grammarErrors || [],
-        punctuationErrors: result.punctuationErrors || [],
-        factualIssues: [],
-        suggestions: result.suggestions || [],
-        citations: [],
-        correctedTitle: result.correctedTitle || title,
-        correctedContent: result.correctedContent || content
-      };
+      result = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Raw response:', resultText);
-      throw new Error('Ошибка при разборе ответа от API: неверный формат JSON');
+      console.error('Attempted to parse:', jsonStr);
+      throw new Error('Ошибка при разборе ответа от API');
     }
+
+    // Ensure all required fields are present with default values if missing
+    return {
+      isValid: result.isValid || false,
+      spellingErrors: result.spellingErrors || [],
+      grammarErrors: result.grammarErrors || [],
+      punctuationErrors: result.punctuationErrors || [],
+      factualIssues: [],
+      suggestions: result.suggestions || [],
+      citations: [],
+      correctedTitle: result.correctedTitle || title,
+      correctedContent: result.correctedContent || content
+    };
   } catch (error: any) {
     console.error('Error validating question:', error);
-    if (error.response) {
-      console.error('API error response:', error.response.data);
-    }
-    throw new Error(`Ошибка валидации: ${error.message}`);
+    throw new Error('Не удалось выполнить валидацию вопроса');
   }
 }
 
@@ -80,23 +91,27 @@ export async function factCheckQuestion(title: string, content: string, topic: s
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины и верни ответ СТРОГО в таком формате JSON (без дополнительного текста):
-{
-  "isValid": boolean,
-  "factualIssues": string[],
-  "suggestions": string[],
-  "correctedTitle": string,
-  "correctedContent": object
-}`
+          content: "Ты помощник для валидации вопросов для викторины. Ты должен отвечать JSON объектом, содержащим результаты проверки и исправления. Никогда не включай markdown форматирование в свой ответ. Обязательно используй достоверные источники для проверки фактов."
         },
         {
           role: "user",
-          content: `Проверь фактическую точность:
+          content: `Пожалуйста, проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}
 
-Проверь: историческую точность, научную достоверность, актуальность информации и терминологию.`
+Проверь и верни JSON объект со следующими полями:
+{
+  "isValid": boolean - указывает, допустим ли вопрос,
+  "spellingErrors": массив найденных орфографических ошибок,
+  "grammarErrors": массив грамматических ошибок,
+  "punctuationErrors": массив пунктуационных ошибок,
+  "factualIssues": массив проблем с фактической точностью,
+  "suggestions": массив предложений по улучшению,
+  "citations": массив ссылок на достоверные источники,
+  "correctedTitle": исправленный заголовок с учетом всех ошибок,
+  "correctedContent": исправленное содержание с учетом всех ошибок
+}`
         }
       ],
       temperature: 0.2,
@@ -108,31 +123,40 @@ export async function factCheckQuestion(title: string, content: string, topic: s
       throw new Error('Пустой ответ от API');
     }
 
-    console.log('Fact Check API Response:', resultText);
+    // Log the raw response for debugging
+    console.log('Raw response from OpenAI:', resultText);
 
+    // Extract JSON from the response, cleaning any potential formatting
+    const jsonStr = resultText
+      .replace(/^```json\s*|\s*```$/g, '') // Remove code blocks
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width spaces
+      .trim();
+
+    console.log('Cleaned JSON string:', jsonStr);
+
+    let result;
     try {
-      const result = JSON.parse(resultText);
-      return {
-        isValid: result.isValid || false,
-        spellingErrors: [],
-        grammarErrors: [],
-        punctuationErrors: [],
-        factualIssues: result.factualIssues || [],
-        suggestions: result.suggestions || [],
-        citations: [],
-        correctedTitle: result.correctedTitle || title,
-        correctedContent: result.correctedContent || content
-      };
+      result = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      console.error('Raw response:', resultText);
-      throw new Error('Ошибка при разборе ответа от API: неверный формат JSON');
+      console.error('Attempted to parse:', jsonStr);
+      throw new Error('Ошибка при разборе ответа от API');
     }
+
+    // Ensure all required fields are present with default values if missing
+    return {
+      isValid: result.isValid || false,
+      spellingErrors: result.spellingErrors || [],
+      grammarErrors: result.grammarErrors || [],
+      punctuationErrors: result.punctuationErrors || [],
+      factualIssues: result.factualIssues || [],
+      suggestions: result.suggestions || [],
+      citations: result.citations || [],
+      correctedTitle: result.correctedTitle || title,
+      correctedContent: result.correctedContent || content
+    };
   } catch (error: any) {
     console.error('Error fact-checking question:', error);
-    if (error.response) {
-      console.error('API error response:', error.response.data);
-    }
-    throw new Error(`Ошибка проверки фактов: ${error.message}`);
+    throw new Error('Не удалось выполнить проверку фактов');
   }
 }
