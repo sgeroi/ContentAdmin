@@ -1,7 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
-import DropCursor from "@tiptap/extension-drop-cursor";
 import { Button } from "./ui/button";
 import {
   Bold,
@@ -28,8 +27,12 @@ const extensions = [
       keepAttributes: false,
     },
   }),
-  Image,
-  DropCursor,
+  Image.configure({
+    allowBase64: true,
+    HTMLAttributes: {
+      class: 'rounded-md max-w-full',
+    },
+  }),
 ];
 
 type WysiwygEditorProps = {
@@ -97,33 +100,37 @@ export function WysiwygEditor({
         class:
           "prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 rounded-md border bg-background",
       },
-      handleDrop: async (view, event, slice, moved) => {
-        if (!moved && event.dataTransfer?.files.length) {
-          const images = Array.from(event.dataTransfer.files).filter((file) =>
-            file.type.startsWith("image/")
-          );
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
 
-          if (images.length > 0) {
-            event.preventDefault();
-            const image = images[0]; // Take only the first image
+        const hasFiles = event.dataTransfer?.files.length;
+        if (!hasFiles) return false;
+
+        event.preventDefault();
+
+        const images = Array.from(event.dataTransfer.files).filter((file) =>
+          file.type.startsWith("image/")
+        );
+
+        if (!images.length) return false;
+
+        const pos = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos || 0;
+
+        Promise.all(
+          images.map(async (image) => {
             const url = await addImage(image);
             if (url) {
-              const { tr } = view.state;
-              const pos = view.posAtCoords({
-                left: event.clientX,
-                top: event.clientY,
-              })?.pos;
-
-              if (typeof pos === "number") {
-                view.dispatch(
-                  tr.insert(pos, editor?.schema.nodes.image.create({ src: url }))
-                );
-              }
+              const node = view.state.schema.nodes.image.create({ src: url });
+              const transaction = view.state.tr.insert(pos, node);
+              view.dispatch(transaction);
             }
-            return true;
-          }
-        }
-        return false;
+          })
+        );
+
+        return true;
       },
     },
     onUpdate: ({ editor }) => {
@@ -151,7 +158,10 @@ export function WysiwygEditor({
       if (file) {
         const url = await addImage(file);
         if (url && editor) {
-          editor.chain().focus().setImage({ src: url }).run();
+          editor.chain().focus().insertContent({
+            type: 'image',
+            attrs: { src: url }
+          }).run();
         }
       }
     };

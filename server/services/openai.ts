@@ -9,26 +9,23 @@ export async function validateQuestion(title: string, content: any, topic: strin
   try {
     console.log('Starting validation for:', { title, topic });
 
-    // Собираем сообщения для API
     const messages: any[] = [
       {
         role: "system",
         content: "Ты - эксперт по русскому языку. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию и грамматику. Если есть изображения, проанализируй их содержание и уместность. Дай ответ простым текстом."
-      }
-    ];
-
-    // Преобразуем контент для анализа изображений
-    const contentMessage = {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: `Проверь следующий вопрос для викторины:
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Тема: ${topic}\n\n`
-        }
-      ]
-    };
+          }
+        ]
+      }
+    ];
 
     // Добавляем изображения из контента, если они есть
     if (content.content) {
@@ -38,23 +35,19 @@ export async function validateQuestion(title: string, content: any, topic: strin
           if (imageUrl.startsWith('/uploads/')) {
             // Преобразуем относительный путь в полный URL
             const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
-            contentMessage.content.push({
+            messages[1].content.push({
               type: "image_url",
-              image_url: {
-                url: `https://${fullUrl}`,
-              }
+              url: `https://${fullUrl}`
             });
           }
         } else if (node.type === 'text' || node.type === 'paragraph') {
-          contentMessage.content.push({
+          messages[1].content.push({
             type: "text",
             text: node.text || JSON.stringify(node)
           });
         }
       }
     }
-
-    messages.push(contentMessage);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-vision-preview",
@@ -91,20 +84,19 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       {
         role: "system",
         content: "Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины. Проверь историческую точность, научную достоверность, актуальность информации и терминологию. Если есть изображения, проанализируй их содержание и уместность. Дай ответ простым текстом."
-      }
-    ];
-
-    const contentMessage = {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: `Проверь следующий вопрос для викторины:
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Тема: ${topic}\n\n`
-        }
-      ]
-    };
+          }
+        ]
+      }
+    ];
 
     if (content.content) {
       for (const node of content.content) {
@@ -112,23 +104,19 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
           const imageUrl = node.attrs.src;
           if (imageUrl.startsWith('/uploads/')) {
             const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
-            contentMessage.content.push({
+            messages[1].content.push({
               type: "image_url",
-              image_url: {
-                url: `https://${fullUrl}`,
-              }
+              url: `https://${fullUrl}`
             });
           }
         } else if (node.type === 'text' || node.type === 'paragraph') {
-          contentMessage.content.push({
+          messages[1].content.push({
             type: "text",
             text: node.text || JSON.stringify(node)
           });
         }
       }
     }
-
-    messages.push(contentMessage);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4-vision-preview",
