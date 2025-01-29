@@ -66,16 +66,10 @@ export default function QuestionEditor() {
       });
 
       // Автоматически применяем исправления
-      form.setValue("title", result.correctedTitle);
-      form.setValue("content", result.correctedContent);
+      form.setValue("title", result.correctedTitle, { shouldValidate: true });
+      form.setValue("content", result.correctedContent, { shouldValidate: true });
 
-      // Показываем уведомление о результатах проверки
-      if (result.isValid) {
-        toast({
-          title: "Проверка пройдена",
-          description: "Вопрос корректен и готов к сохранению",
-        });
-      } else {
+      if (!result.isValid) {
         const corrections = [
           ...result.spellingErrors,
           ...result.grammarErrors,
@@ -84,7 +78,12 @@ export default function QuestionEditor() {
 
         toast({
           title: "Исправления применены",
-          description: `Исправлено ошибок: ${corrections}`,
+          description: `Исправлено ошибок: ${corrections}. Проверьте текст и сохраните вопрос.`,
+        });
+      } else {
+        toast({
+          title: "Проверка пройдена",
+          description: "Вопрос корректен и готов к сохранению.",
         });
       }
     } catch (error: any) {

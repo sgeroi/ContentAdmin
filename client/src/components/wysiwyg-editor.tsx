@@ -12,6 +12,7 @@ import {
   Code,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 
 const extensions = [
   StarterKit.configure({
@@ -73,6 +74,17 @@ export function WysiwygEditor({
       onChange(editor.getJSON());
     },
   });
+
+  // Эффект для обновления содержимого редактора при изменении props
+  useEffect(() => {
+    if (editor && content) {
+      // Проверяем, отличается ли текущий контент от нового
+      const currentContent = editor.getJSON();
+      if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
+        editor.commands.setContent(content);
+      }
+    }
+  }, [editor, content]);
 
   if (!editor) {
     return null;
