@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Package, InsertPackage } from "@db/schema";
+import type { Package, InsertPackage, Question } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
+
+type CreatePackageData = Omit<InsertPackage, "authorId"> & {
+  questions: Question[];
+};
 
 export function usePackages() {
   const queryClient = useQueryClient();
@@ -11,7 +15,7 @@ export function usePackages() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (pkg: Omit<InsertPackage, "authorId">) => {
+    mutationFn: async (pkg: CreatePackageData) => {
       const response = await fetch("/api/packages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -45,7 +49,7 @@ export function usePackages() {
     mutationFn: async ({
       id,
       ...pkg
-    }: Omit<InsertPackage, "authorId"> & { id: number }) => {
+    }: CreatePackageData & { id: number }) => {
       const response = await fetch(`/api/packages/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

@@ -32,6 +32,26 @@ import { Plus, FileDown, Trash2, Eye } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+type Question = {
+  id: number;
+  title: string;
+  topic: string;
+  difficulty: number;
+};
+
+type Package = {
+  id: number;
+  title: string;
+  description?: string;
+  packageQuestions: { questionId: number }[];
+};
+
+type CreatePackageData = {
+  title: string;
+  description?: string;
+  questions: Question[];
+};
+
 export default function Packages() {
   const { packages, createPackage, deletePackage } = usePackages();
   const { questions } = useQuestions();
@@ -45,10 +65,11 @@ export default function Packages() {
     if (!title) return;
 
     try {
+      const selectedQuestionsData = questions.filter(q => selectedQuestions.includes(q.id));
       await createPackage({
         title,
         description,
-        questions: questions.filter(q => selectedQuestions.includes(q.id)),
+        questions: selectedQuestionsData,
       });
       setIsDialogOpen(false);
       setTitle("");
@@ -167,10 +188,10 @@ export default function Packages() {
             <CardContent>
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  {pkg.questions?.length || 0} questions selected
+                  {pkg.packageQuestions?.length || 0} questions selected
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {pkg.questions?.map((pq) => (
+                  {pkg.packageQuestions?.map((pq) => (
                     <Badge key={pq.questionId} variant="outline">
                       {questions.find(q => q.id === pq.questionId)?.title}
                     </Badge>

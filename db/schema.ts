@@ -50,7 +50,7 @@ export const packagesRelations = relations(packages, ({ one, many }) => ({
     fields: [packages.authorId],
     references: [users.id],
   }),
-  questions: many(packageQuestions),
+  packageQuestions: many(packageQuestions),
 }));
 
 export const packageQuestionsRelations = relations(packageQuestions, ({ one }) => ({
@@ -71,11 +71,19 @@ export const insertQuestionSchema = createInsertSchema(questions);
 export const selectQuestionSchema = createSelectSchema(questions);
 export const insertPackageSchema = createInsertSchema(packages);
 export const selectPackageSchema = createSelectSchema(packages);
+export const insertPackageQuestionSchema = createInsertSchema(packageQuestions);
+export const selectPackageQuestionSchema = createSelectSchema(packageQuestions);
 
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-export type Question = typeof questions.$inferSelect;
+export type Question = typeof questions.$inferSelect & { author?: User };
 export type InsertQuestion = typeof questions.$inferInsert;
-export type Package = typeof packages.$inferSelect;
+export type Package = typeof packages.$inferSelect & {
+  packageQuestions?: (typeof packageQuestions.$inferSelect & {
+    question?: Question;
+  })[];
+};
 export type InsertPackage = typeof packages.$inferInsert;
+export type PackageQuestion = typeof packageQuestions.$inferSelect;
+export type InsertPackageQuestion = typeof packageQuestions.$inferInsert;
