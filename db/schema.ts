@@ -32,17 +32,22 @@ export const packages = pgTable("packages", {
 
 export const packageQuestions = pgTable("package_questions", {
   id: serial("id").primaryKey(),
-  packageId: integer("package_id").references(() => packages.id).notNull(),
-  questionId: integer("question_id").references(() => questions.id).notNull(),
+  packageId: integer("package_id").references(() => packages.id, { onDelete: 'cascade' }).notNull(),
+  questionId: integer("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
   orderIndex: integer("order_index").notNull(),
 });
 
-// Relations
-export const questionsRelations = relations(questions, ({ one }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
+  questions: many(questions),
+  packages: many(packages),
+}));
+
+export const questionsRelations = relations(questions, ({ one, many }) => ({
   author: one(users, {
     fields: [questions.authorId],
     references: [users.id],
   }),
+  packageQuestions: many(packageQuestions),
 }));
 
 export const packagesRelations = relations(packages, ({ one, many }) => ({
@@ -83,6 +88,7 @@ export type Package = typeof packages.$inferSelect & {
   packageQuestions?: (typeof packageQuestions.$inferSelect & {
     question?: Question;
   })[];
+  author?: User;
 };
 export type InsertPackage = typeof packages.$inferInsert;
 export type PackageQuestion = typeof packageQuestions.$inferSelect;
