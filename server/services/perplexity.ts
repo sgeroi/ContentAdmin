@@ -28,37 +28,43 @@ export async function validateQuestion(title: string, content: string, topic: st
   const messages = [
     {
       role: "system",
-      content: "You are a helpful assistant that validates quiz questions. Check for spelling, grammar, punctuation, and factual accuracy. Be precise and concise in your feedback."
+      content: "You are a helpful assistant that validates quiz questions. You must respond with a JSON object containing validation results. Never include markdown formatting in your response."
     },
     {
       role: "user",
       content: `Please validate the following quiz question:
 Title: ${title}
-Content: ${content}
+Content: ${JSON.stringify(content)}
 Topic: ${topic}
 
-Please check:
-1. Spelling and grammar
-2. Punctuation
-3. Factual accuracy
-4. Topic relevance
-
-Respond in JSON format with the following structure:
+Validate and return a JSON object with these fields:
 {
-  "isValid": boolean,
-  "spellingErrors": string[],
-  "grammarErrors": string[],
-  "punctuationErrors": string[],
-  "factualIssues": string[],
-  "suggestions": string[]
+  "isValid": boolean indicating if the question is acceptable,
+  "spellingErrors": array of spelling errors found,
+  "grammarErrors": array of grammar errors found,
+  "punctuationErrors": array of punctuation errors found,
+  "factualIssues": array of factual accuracy issues found,
+  "suggestions": array of improvement suggestions
 }`
     }
   ];
 
   try {
     const response = await validateWithPerplexity(messages);
-    const result = JSON.parse(response.choices[0].message.content);
-    return result;
+    const resultText = response.choices[0].message.content;
+
+    // Extract JSON from the response, removing any markdown formatting if present
+    const jsonStr = resultText.replace(/^```json\n|\n```$/g, '').trim();
+    const result = JSON.parse(jsonStr);
+
+    return {
+      isValid: result.isValid || false,
+      spellingErrors: result.spellingErrors || [],
+      grammarErrors: result.grammarErrors || [],
+      punctuationErrors: result.punctuationErrors || [],
+      factualIssues: result.factualIssues || [],
+      suggestions: result.suggestions || []
+    };
   } catch (error: any) {
     console.error('Error validating question:', error);
     throw new Error('Failed to validate question');
