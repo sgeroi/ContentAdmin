@@ -190,26 +190,28 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
           content: `Ты - эксперт по созданию интересных вопросов для викторины. 
           Создай ${count} уникальных вопросов на логику на русском языке.
           Вопросы должны быть разной сложности (от 1 до 5) и охватывать разные темы.
-          Верни JSON массив в формате:
-          [{
-            "title": "заголовок вопроса",
-            "content": {
-              "type": "doc",
-              "content": [
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "текст вопроса"
-                    }
-                  ]
-                }
-              ]
-            },
-            "topic": "тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)",
-            "difficulty": число от 1 до 5
-          }]`
+          Верни JSON в формате:
+          {
+            "questions": [{
+              "title": "заголовок вопроса",
+              "content": {
+                "type": "doc",
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "текст вопроса"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "topic": "тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)",
+              "difficulty": число от 1 до 5
+            }]
+          }`
         }
       ],
       response_format: { type: "json_object" }
@@ -217,7 +219,12 @@ export async function generateQuizQuestions(count: number = 10): Promise<Array<{
 
     const result = JSON.parse(response.choices[0]?.message?.content || '');
     console.log('Generated questions:', result);
-    return result;
+
+    if (!result?.questions || !Array.isArray(result.questions)) {
+      throw new Error('Некорректный формат ответа от API');
+    }
+
+    return result.questions;
   } catch (error: any) {
     console.error('Error generating quiz questions:', error);
     throw new Error('Не удалось сгенерировать вопросы: ' + error.message);
