@@ -13,13 +13,13 @@ export default function Dashboard() {
 
   const stats = [
     {
-      name: "Total Questions",
+      name: "Всего вопросов",
       value: questions.length,
       icon: HelpCircle,
       href: "/questions",
     },
     {
-      name: "Question Packages",
+      name: "Пакеты вопросов",
       value: packages.length,
       icon: Package,
       href: "/packages",
@@ -29,9 +29,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold">Welcome back, {user?.username}</h1>
+        <h1 className="text-3xl font-bold">Добро пожаловать, {user?.username}</h1>
         <p className="text-muted-foreground">
-          Manage your quiz content and packages from this dashboard
+          Управляйте содержимым викторины и пакетами вопросов через эту панель управления
         </p>
       </div>
 
@@ -56,15 +56,15 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>Быстрые действия</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Link href="/questions/new">
-              <Button className="w-full">Create New Question</Button>
+              <Button className="w-full">Создать новый вопрос</Button>
             </Link>
             <Link href="/packages">
               <Button className="w-full" variant="outline">
-                Manage Packages
+                Управление пакетами
               </Button>
             </Link>
           </CardContent>
@@ -73,15 +73,15 @@ export default function Dashboard() {
         {user?.role === "admin" && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Admin Actions</CardTitle>
+              <CardTitle>Действия администратора</CardTitle>
               <Users className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Manage users and their roles from here.
+                Управляйте пользователями и их ролями.
               </p>
               <Button variant="secondary" className="w-full">
-                Manage Users
+                Управление пользователями
               </Button>
             </CardContent>
           </Card>
