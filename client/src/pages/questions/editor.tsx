@@ -40,7 +40,7 @@ const topics = [
 ];
 
 export default function QuestionEditor({ id }: { id?: string }) {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, questions } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
@@ -68,7 +68,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
   }, [id, questions, form]);
 
   const handleCancel = () => {
-    window.history.back();
+    setLocation("/questions");
   };
 
   const handleValidateAndCorrect = async (data: FormData) => {
@@ -180,7 +180,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
           duration: 3000,
         });
       }
-      window.history.back();
+      setLocation("/questions");
     } catch (error: any) {
       toast({
         title: "Ошибка",
