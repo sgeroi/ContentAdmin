@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Loader2 } from "lucide-react";
 
 type FormData = {
   title: string;
@@ -40,14 +41,14 @@ type FormData = {
 };
 
 const topics = [
-  "History",
-  "Science",
-  "Geography",
-  "Literature",
-  "Art",
-  "Music",
-  "Sports",
-  "Technology",
+  "История",
+  "Наука",
+  "География",
+  "Литература",
+  "Искусство",
+  "Музыка",
+  "Спорт",
+  "Технологии",
 ];
 
 export default function QuestionEditor() {
@@ -56,6 +57,7 @@ export default function QuestionEditor() {
   const { toast } = useToast();
   const [validationResult, setValidationResult] = useState<any>(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -66,33 +68,36 @@ export default function QuestionEditor() {
     },
   });
 
-  const handleValidate = async (data: FormData) => {
+  const handleValidateAndCorrect = async (data: FormData) => {
+    setIsValidating(true);
     try {
       const result = await validateQuestion({
         title: data.title,
         content: data.content,
         topic: data.topic,
       });
+
       setValidationResult(result);
+
+      if (result.isValid) {
+        toast({
+          title: "Успех",
+          description: "Вопрос корректен и готов к сохранению",
+        });
+      } else {
+        // Автоматически применяем исправления
+        form.setValue("title", result.correctedTitle);
+        form.setValue("content", result.correctedContent);
+      }
       setShowValidationDialog(true);
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
-    }
-  };
-
-  const applyCorrections = () => {
-    if (validationResult) {
-      form.setValue("title", validationResult.correctedTitle);
-      form.setValue("content", validationResult.correctedContent);
-      setShowValidationDialog(false);
-      toast({
-        title: "Успех",
-        description: "Исправления применены",
-      });
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -103,13 +108,13 @@ export default function QuestionEditor() {
         difficulty: parseInt(data.difficulty),
       });
       toast({
-        title: "Success",
-        description: "Question saved successfully",
+        title: "Успех",
+        description: "Вопрос успешно сохранен",
       });
       setLocation("/questions");
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -119,9 +124,9 @@ export default function QuestionEditor() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Create Question</h1>
+        <h1 className="text-3xl font-bold">Создать вопрос</h1>
         <p className="text-muted-foreground">
-          Create a new question for your quiz
+          Создание нового вопроса для викторины
         </p>
       </div>
 
@@ -132,9 +137,9 @@ export default function QuestionEditor() {
             name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Question Title</FormLabel>
+                <FormLabel>Заголовок вопроса</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter the question title" {...field} />
+                  <Input placeholder="Введите заголовок вопроса" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -146,7 +151,7 @@ export default function QuestionEditor() {
             name="content"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Question Content</FormLabel>
+                <FormLabel>Содержание вопроса</FormLabel>
                 <FormControl>
                   <WysiwygEditor
                     content={field.value}
@@ -164,14 +169,14 @@ export default function QuestionEditor() {
               name="topic"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Topic</FormLabel>
+                  <FormLabel>Тема</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a topic" />
+                        <SelectValue placeholder="Выберите тему" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -192,20 +197,20 @@ export default function QuestionEditor() {
               name="difficulty"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Difficulty Level</FormLabel>
+                  <FormLabel>Уровень сложности</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select difficulty" />
+                        <SelectValue placeholder="Выберите сложность" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {[1, 2, 3, 4, 5].map((level) => (
                         <SelectItem key={level} value={level.toString()}>
-                          Level {level}
+                          Уровень {level}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -222,16 +227,20 @@ export default function QuestionEditor() {
               variant="outline"
               onClick={() => setLocation("/questions")}
             >
-              Cancel
+              Отмена
             </Button>
             <Button
               type="button"
               variant="secondary"
-              onClick={form.handleSubmit(handleValidate)}
+              onClick={form.handleSubmit(handleValidateAndCorrect)}
+              disabled={isValidating}
             >
-              Validate
+              {isValidating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Проверить
             </Button>
-            <Button type="submit">Save Question</Button>
+            {validationResult?.isValid && (
+              <Button type="submit">Сохранить</Button>
+            )}
           </div>
         </form>
       </Form>
@@ -240,12 +249,14 @@ export default function QuestionEditor() {
         <AlertDialogContent className="max-w-3xl">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {validationResult?.isValid ? "Валидация пройдена" : "Найдены проблемы"}
+              {validationResult?.isValid 
+                ? "Проверка пройдена успешно" 
+                : "Найдены и исправлены ошибки"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               {validationResult?.spellingErrors?.length > 0 && (
                 <div>
-                  <p className="font-semibold">Орфографические ошибки:</p>
+                  <p className="font-semibold">Исправленные орфографические ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.spellingErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -255,7 +266,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.grammarErrors?.length > 0 && (
                 <div>
-                  <p className="font-semibold">Грамматические ошибки:</p>
+                  <p className="font-semibold">Исправленные грамматические ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.grammarErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -265,7 +276,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.punctuationErrors?.length > 0 && (
                 <div>
-                  <p className="font-semibold">Пунктуационные ошибки:</p>
+                  <p className="font-semibold">Исправленные пунктуационные ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.punctuationErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -305,21 +316,10 @@ export default function QuestionEditor() {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2">
-            <AlertDialogCancel>Закрыть</AlertDialogCancel>
-            {validationResult && !validationResult.isValid && (
-              <Button
-                variant="secondary"
-                onClick={applyCorrections}
-              >
-                Исправить ошибки
-              </Button>
-            )}
-            {validationResult?.isValid && (
-              <AlertDialogAction onClick={form.handleSubmit(onSubmit)}>
-                Сохранить
-              </AlertDialogAction>
-            )}
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowValidationDialog(false)}>
+              {validationResult?.isValid ? "Продолжить" : "Понятно"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
