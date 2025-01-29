@@ -116,29 +116,11 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      // Автоматически применяем исправления
-      form.setValue("title", result.correctedTitle, { shouldValidate: true });
-      form.setValue("content", result.correctedContent, { shouldValidate: true });
-
-      if (!result.isValid) {
-        toast({
-          title: "Найдены фактические неточности",
-          description: result.factualIssues.join("\n\n"),
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Фактчекинг пройден",
-          description: "Информация в вопросе корректна.",
-        });
-      }
-
-      if (result.suggestions.length > 0) {
-        toast({
-          title: "Предложения по улучшению",
-          description: result.suggestions.join("\n\n"),
-        });
-      }
+      // Показываем текстовый ответ от ChatGPT
+      toast({
+        title: "Результат проверки",
+        description: result.suggestions[0],
+      });
     } catch (error: any) {
       toast({
         title: "Ошибка",
