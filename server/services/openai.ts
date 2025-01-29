@@ -85,69 +85,73 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   try {
     console.log('Starting fact check for:', { title, topic });
 
-    // Extract images from content
-    const images = extractImagesFromContent(content);
-    console.log('Found images:', images);
-
-    // Prepare messages array
-    const messages: any[] = [
-      {
-        role: "system",
-        content: "You are a fact-checking expert. Review the quiz question for accuracy, including any images provided. Check historical accuracy, scientific validity, and terminology. Respond in Russian."
-      }
-    ];
-
-    // Add the main content message
-    const userMessage: any = {
-      role: "user",
-      content: [
+    // First, check the text content
+    const textResponse = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
         {
-          type: "text",
-          text: `Проверь следующий вопрос для викторины:
+          role: "system",
+          content: "Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины. Проверь историческую точность, научную достоверность, актуальность информации и терминологию. Дай ответ простым текстом."
+        },
+        {
+          role: "user",
+          content: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
-      ]
-    };
+      ],
+      temperature: 0.2,
+      max_tokens: 1000
+    });
 
-    // Add images to the message if they exist
+    let resultText = textResponse.choices[0]?.message?.content || '';
+
+    // Then check images if present
+    const images = extractImagesFromContent(content);
+    console.log('Found images:', images);
+
     for (const imageUrl of images) {
       console.log('Processing image:', imageUrl);
       const base64Image = getImageBase64(imageUrl);
+
       if (base64Image) {
         console.log('Successfully encoded image to base64');
-        userMessage.content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:image/jpeg;base64,${base64Image}`
+        try {
+          const imageResponse = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Это изображение относится к следующему вопросу викторины. Проверь, соответствует ли оно контексту вопроса и нет ли в нем фактических ошибок:" },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/jpeg;base64,${base64Image}`
+                    }
+                  }
+                ]
+              }
+            ],
+            max_tokens: 500
+          });
+
+          const imageAnalysis = imageResponse.choices[0]?.message?.content;
+          if (imageAnalysis) {
+            resultText += "\n\nАнализ изображения: " + imageAnalysis;
           }
-        });
+        } catch (imageError) {
+          console.error('Error analyzing image:', imageError);
+          resultText += "\n\nНе удалось проанализировать изображение.";
+        }
       } else {
         console.log('Failed to encode image to base64');
+        resultText += "\n\nНе удалось загрузить изображение для анализа.";
       }
     }
 
-    messages.push(userMessage);
-
-    console.log('Sending request to OpenAI with messages structure:', 
-      JSON.stringify(messages.map(m => ({
-        role: m.role,
-        contentTypes: Array.isArray(m.content) 
-          ? m.content.map((c: any) => c.type)
-          : typeof m.content
-      })), null, 2)
-    );
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-1106-vision-preview",
-      messages,
-      temperature: 0.2,
-      max_tokens: 1500
-    });
-
-    const resultText = response.choices[0]?.message?.content || '';
-    console.log('Fact check response:', resultText);
+    console.log('Fact check complete response:', resultText);
 
     return {
       isValid: true,
