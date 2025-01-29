@@ -48,11 +48,13 @@ const MenuButton = ({
   isActive = false,
   disabled = false,
   children,
+  tooltip,
 }: {
   onClick: () => void;
   isActive?: boolean;
   disabled?: boolean;
   children: React.ReactNode;
+  tooltip?: string;
 }) => (
   <Button
     type="button"
@@ -61,6 +63,7 @@ const MenuButton = ({
     onClick={onClick}
     disabled={disabled}
     className="h-8 w-8 p-0"
+    title={tooltip}
   >
     {children}
   </Button>
@@ -180,53 +183,62 @@ export function WysiwygEditor({
         <MenuButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           isActive={editor.isActive("bold")}
+          tooltip="Жирный"
         >
           <Bold className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
           isActive={editor.isActive("italic")}
+          tooltip="Курсив"
         >
           <Italic className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           isActive={editor.isActive("bulletList")}
+          tooltip="Маркированный список"
         >
           <List className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           isActive={editor.isActive("orderedList")}
+          tooltip="Нумерованный список"
         >
           <ListOrdered className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           isActive={editor.isActive("blockquote")}
+          tooltip="Цитата"
         >
           <Quote className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           isActive={editor.isActive("codeBlock")}
+          tooltip="Блок кода"
         >
           <Code className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={addImage}
+          tooltip="Добавить изображение"
         >
           <ImageIcon className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
+          tooltip="Отменить"
         >
           <Undo className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
+          tooltip="Повторить"
         >
           <Redo className="h-4 w-4" />
         </MenuButton>
@@ -235,3 +247,5 @@ export function WysiwygEditor({
     </div>
   );
 }
+
+export { WysiwygEditor };
