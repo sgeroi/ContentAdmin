@@ -12,7 +12,7 @@ export async function validateQuestion(title: string, content: string, topic: st
       messages: [
         {
           role: "system",
-          content: "Ты - эксперт по русскому языку и проверке корректности текста. Твоя задача - проверить текст вопроса для викторины на наличие ошибок и предложить исправления. Анализируй орфографию, пунктуацию и грамматику."
+          content: `Ты - эксперт по русскому языку и проверке корректности текста. Твоя задача - проверить текст вопроса для викторины на наличие ошибок и предложить исправления. Анализируй орфографию, пунктуацию и грамматику. Верни ответ в формате JSON.`
         },
         {
           role: "user",
@@ -24,7 +24,6 @@ export async function validateQuestion(title: string, content: string, topic: st
       ],
       temperature: 0.3,
       max_tokens: 1000,
-      response_format: { type: "json_object" }
     });
 
     const resultText = response.choices[0]?.message?.content || '';
@@ -60,15 +59,7 @@ export async function factCheckQuestion(title: string, content: string, topic: s
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по проверке фактов. Твоя задача - проверить фактическую точность вопроса для викторины.
-Проверь следующие аспекты:
-1. Историческая точность дат, имен и событий
-2. Научная достоверность фактов и концепций
-3. Актуальность информации
-4. Отсутствие распространенных заблуждений
-5. Точность терминологии
-
-Верни результат в формате JSON с полями:
+          content: `Ты - эксперт по проверке фактов. Твоя задача - проверить фактическую точность вопроса для викторины и вернуть результат в формате JSON с полями:
 {
   "isValid": boolean,
   "factualIssues": string[],
@@ -76,7 +67,14 @@ export async function factCheckQuestion(title: string, content: string, topic: s
   "citations": string[],
   "correctedTitle": string,
   "correctedContent": object
-}`
+}
+
+Проверь следующие аспекты:
+1. Историческая точность дат, имен и событий
+2. Научная достоверность фактов и концепций
+3. Актуальность информации
+4. Отсутствие распространенных заблуждений
+5. Точность терминологии`
         },
         {
           role: "user",
@@ -89,8 +87,7 @@ export async function factCheckQuestion(title: string, content: string, topic: s
         }
       ],
       temperature: 0.2,
-      max_tokens: 1500,
-      response_format: { type: "json_object" }
+      max_tokens: 1500
     });
 
     const resultText = response.choices[0]?.message?.content || '';
