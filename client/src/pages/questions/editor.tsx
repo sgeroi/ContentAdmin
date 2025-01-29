@@ -21,16 +21,6 @@ import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
@@ -55,8 +45,6 @@ export default function QuestionEditor() {
   const [, setLocation] = useLocation();
   const { createQuestion, validateQuestion } = useQuestions();
   const { toast } = useToast();
-  const [validationResult, setValidationResult] = useState<any>(null);
-  const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
 
   const form = useForm<FormData>({
@@ -77,19 +65,28 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      setValidationResult(result);
+      // Автоматически применяем исправления
+      form.setValue("title", result.correctedTitle);
+      form.setValue("content", result.correctedContent);
 
+      // Показываем уведомление о результатах проверки
       if (result.isValid) {
         toast({
-          title: "Успех",
+          title: "Проверка пройдена",
           description: "Вопрос корректен и готов к сохранению",
         });
       } else {
-        // Автоматически применяем исправления
-        form.setValue("title", result.correctedTitle);
-        form.setValue("content", result.correctedContent);
+        const corrections = [
+          ...result.spellingErrors,
+          ...result.grammarErrors,
+          ...result.punctuationErrors,
+        ].length;
+
+        toast({
+          title: "Исправления применены",
+          description: `Исправлено ошибок: ${corrections}`,
+        });
       }
-      setShowValidationDialog(true);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -238,91 +235,10 @@ export default function QuestionEditor() {
               {isValidating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Проверить
             </Button>
-            {validationResult?.isValid && (
-              <Button type="submit">Сохранить</Button>
-            )}
+            <Button type="submit">Сохранить</Button>
           </div>
         </form>
       </Form>
-
-      <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
-        <AlertDialogContent className="max-w-3xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {validationResult?.isValid 
-                ? "Проверка пройдена успешно" 
-                : "Найдены и исправлены ошибки"}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
-              {validationResult?.spellingErrors?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Исправленные орфографические ошибки:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.spellingErrors.map((error: string, i: number) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult?.grammarErrors?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Исправленные грамматические ошибки:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.grammarErrors.map((error: string, i: number) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult?.punctuationErrors?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Исправленные пунктуационные ошибки:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.punctuationErrors.map((error: string, i: number) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult?.factualIssues?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Фактические неточности:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.factualIssues.map((issue: string, i: number) => (
-                      <li key={i}>{issue}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult?.suggestions?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Рекомендации:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.suggestions.map((suggestion: string, i: number) => (
-                      <li key={i}>{suggestion}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {validationResult?.citations?.length > 0 && (
-                <div>
-                  <p className="font-semibold">Источники:</p>
-                  <ul className="list-disc pl-4">
-                    {validationResult.citations.map((citation: string, i: number) => (
-                      <li key={i}>{citation}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowValidationDialog(false)}>
-              {validationResult?.isValid ? "Продолжить" : "Понятно"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
