@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
@@ -24,7 +23,6 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
-  title: string;
   content: any;
   topic: string;
   difficulty: string;
@@ -50,7 +48,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const form = useForm<FormData>({
     defaultValues: {
-      title: "",
       content: {},
       topic: "",
       difficulty: "1",
@@ -62,7 +59,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
       const question = questions.find(q => q.id === parseInt(id));
       if (question) {
         form.reset({
-          title: question.title,
           content: question.content,
           topic: question.topic,
           difficulty: question.difficulty.toString(),
@@ -75,6 +71,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     setIsValidating(true);
     try {
       const result = await validateQuestion({
+        title: "Временный заголовок",
         content: data.content,
         topic: data.topic,
       });
@@ -96,13 +93,13 @@ export default function QuestionEditor({ id }: { id?: string }) {
               </ul>
             </div>
           ),
-          duration: null,
+          duration: 5000,
         });
       } else {
         toast({
           title: "Проверка завершена",
           description: "Ошибок не найдено.",
-          duration: null,
+          duration: 3000,
         });
       }
     } catch (error: any) {
@@ -110,7 +107,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
-        duration: null,
+        duration: 5000,
       });
     } finally {
       setIsValidating(false);
@@ -123,7 +120,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: "Заполните содержание вопроса перед проверкой",
         variant: "destructive",
-        duration: null,
+        duration: 5000,
       });
       return;
     }
@@ -131,6 +128,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     setIsFactChecking(true);
     try {
       const result = await factCheckQuestion({
+        title: "Временный заголовок",
         content: data.content,
         topic: data.topic,
       });
@@ -138,14 +136,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
       toast({
         title: "Результаты проверки",
         description: result.suggestions[0],
-        duration: null,
+        duration: 5000,
       });
     } catch (error: any) {
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
-        duration: null,
+        duration: 5000,
       });
     } finally {
       setIsFactChecking(false);
@@ -156,6 +154,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     try {
       const questionData = {
         ...data,
+        title: "Вопрос",
         difficulty: parseInt(data.difficulty),
       };
 
@@ -167,14 +166,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
         toast({
           title: "Успех",
           description: "Вопрос успешно обновлен",
-          duration: null,
+          duration: 3000,
         });
       } else {
         await createQuestion(questionData);
         toast({
           title: "Успех",
           description: "Вопрос успешно создан",
-          duration: null,
+          duration: 3000,
         });
       }
       setLocation("/questions");
@@ -183,7 +182,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
-        duration: null,
+        duration: 5000,
       });
     }
   };
@@ -201,20 +200,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Заголовок вопроса</FormLabel>
-                <FormControl>
-                  <Input {...field} placeholder="Введите заголовок вопроса" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <FormField
             control={form.control}
             name="content"
