@@ -37,7 +37,9 @@ export async function validateQuestion(title: string, content: any, topic: strin
             const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
             messages[1].content.push({
               type: "image_url",
-              url: `https://${fullUrl}`
+              image_url: {
+                url: `https://${fullUrl}`
+              }
             });
           }
         } else if (node.type === 'text' || node.type === 'paragraph') {
@@ -106,7 +108,9 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
             const fullUrl = `${process.env.REPL_SLUG}.repl.co${imageUrl}`;
             messages[1].content.push({
               type: "image_url",
-              url: `https://${fullUrl}`
+              image_url: {
+                url: `https://${fullUrl}`
+              }
             });
           }
         } else if (node.type === 'text' || node.type === 'paragraph') {
@@ -119,7 +123,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-vision-preview",
       messages,
       temperature: 0.2,
       max_tokens: 1500
