@@ -119,7 +119,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4",
       messages,
       temperature: 0.2,
       max_tokens: 1500
