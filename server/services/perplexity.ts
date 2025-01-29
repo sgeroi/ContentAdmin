@@ -55,10 +55,27 @@ export async function validateQuestion(title: string, content: string, topic: st
     const resultText = response.choices[0].message.content;
     const citations = response.citations || [];
 
-    // Extract JSON from the response, removing any markdown formatting if present
-    const jsonStr = resultText.replace(/^```json\n|\n```$/g, '').trim();
-    const result = JSON.parse(jsonStr);
+    // Log the raw response for debugging
+    console.log('Raw response from Perplexity:', resultText);
 
+    // Extract JSON from the response, cleaning any potential formatting
+    const jsonStr = resultText
+      .replace(/^```json\s*|\s*```$/g, '') // Remove code blocks
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width spaces
+      .trim();
+
+    console.log('Cleaned JSON string:', jsonStr);
+
+    let result;
+    try {
+      result = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Attempted to parse:', jsonStr);
+      throw new Error('Ошибка при разборе ответа от API');
+    }
+
+    // Ensure all required fields are present with default values if missing
     return {
       isValid: result.isValid || false,
       spellingErrors: result.spellingErrors || [],
