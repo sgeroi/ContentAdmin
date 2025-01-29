@@ -88,7 +88,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-60 bg-sidebar p-0">
+        <SheetContent side="left" className="w-60 bg-background p-0">
           <NavContent />
         </SheetContent>
       </Sheet>
