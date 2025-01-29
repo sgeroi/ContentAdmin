@@ -7,12 +7,14 @@ const openai = new OpenAI({
 
 export async function validateQuestion(title: string, content: string, topic: string): Promise<QuestionValidationResult> {
   try {
+    console.log('Starting validation for:', { title, topic });
+
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по русскому языку и проверке корректности текста. Твоя задача - проверить текст вопроса для викторины на наличие ошибок и предложить исправления. Анализируй орфографию, пунктуацию и грамматику. Верни ответ в формате JSON.`
+          content: "Ты - эксперт по русскому языку и проверке корректности текста. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию и грамматику."
         },
         {
           role: "user",
@@ -23,10 +25,15 @@ export async function validateQuestion(title: string, content: string, topic: st
         }
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 1000
     });
 
-    const resultText = response.choices[0]?.message?.content || '';
+    const resultText = response.choices[0]?.message?.content;
+    if (!resultText) {
+      throw new Error('Пустой ответ от API');
+    }
+
+    console.log('Validation API Response:', resultText);
 
     try {
       const result = JSON.parse(resultText);
@@ -44,53 +51,59 @@ export async function validateQuestion(title: string, content: string, topic: st
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw response:', resultText);
-      throw new Error('Ошибка при разборе ответа от API');
+      throw new Error('Ошибка при разборе ответа от API: неверный формат JSON');
     }
   } catch (error: any) {
     console.error('Error validating question:', error);
-    throw new Error('Не удалось выполнить валидацию вопроса');
+    if (error.response) {
+      console.error('API error response:', error.response.data);
+    }
+    throw new Error(`Ошибка валидации: ${error.message}`);
   }
 }
 
 export async function factCheckQuestion(title: string, content: string, topic: string): Promise<QuestionValidationResult> {
   try {
+    console.log('Starting fact check for:', { title, topic });
+
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по проверке фактов. Твоя задача - проверить фактическую точность вопроса для викторины и вернуть результат в формате JSON с полями:
+          content: `Ты - эксперт по проверке фактической точности. Проанализируй вопрос для викторины и верни результат в формате JSON с такой структурой:
 {
-  "isValid": boolean,
-  "factualIssues": string[],
-  "suggestions": string[],
-  "citations": string[],
-  "correctedTitle": string,
-  "correctedContent": object
+  "isValid": true/false,
+  "factualIssues": ["список проблем"],
+  "suggestions": ["список предложений"],
+  "correctedTitle": "исправленный заголовок",
+  "correctedContent": {}
 }
 
-Проверь следующие аспекты:
-1. Историческая точность дат, имен и событий
-2. Научная достоверность фактов и концепций
+При анализе обрати внимание на:
+1. Историческую точность дат и событий
+2. Научную достоверность фактов
 3. Актуальность информации
-4. Отсутствие распространенных заблуждений
-5. Точность терминологии`
+4. Точность терминологии`
         },
         {
           role: "user",
-          content: `Проверь следующий вопрос для викторины:
+          content: `Проверь точность информации в вопросе:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
-Тема: ${topic}
-
-Пожалуйста, проверь фактическую точность и предоставь исправления, если необходимо.`
+Тема: ${topic}`
         }
       ],
       temperature: 0.2,
       max_tokens: 1500
     });
 
-    const resultText = response.choices[0]?.message?.content || '';
+    const resultText = response.choices[0]?.message?.content;
+    if (!resultText) {
+      throw new Error('Пустой ответ от API');
+    }
+
+    console.log('Fact Check API Response:', resultText);
 
     try {
       const result = JSON.parse(resultText);
@@ -101,17 +114,20 @@ export async function factCheckQuestion(title: string, content: string, topic: s
         punctuationErrors: [],
         factualIssues: result.factualIssues || [],
         suggestions: result.suggestions || [],
-        citations: result.citations || [],
+        citations: [],
         correctedTitle: result.correctedTitle || title,
         correctedContent: result.correctedContent || content
       };
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
       console.error('Raw response:', resultText);
-      throw new Error('Ошибка при разборе ответа от API');
+      throw new Error('Ошибка при разборе ответа от API: неверный формат JSON');
     }
   } catch (error: any) {
     console.error('Error fact-checking question:', error);
-    throw new Error('Не удалось выполнить проверку фактов');
+    if (error.response) {
+      console.error('API error response:', error.response.data);
+    }
+    throw new Error(`Ошибка проверки фактов: ${error.message}`);
   }
 }
