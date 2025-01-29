@@ -94,11 +94,13 @@ export default function QuestionEditor({ id }: { id?: string }) {
         toast({
           title: "Исправления применены",
           description: `Исправлено ошибок: ${corrections}. Проверьте текст и сохраните вопрос.`,
+          duration: null, // Set to null to prevent auto-dismissal
         });
       } else {
         toast({
           title: "Проверка пройдена",
           description: "Вопрос корректен и готов к сохранению.",
+          duration: null, // Set to null to prevent auto-dismissal
         });
       }
     } catch (error: any) {
@@ -106,6 +108,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
+        duration: null, // Set to null to prevent auto-dismissal
       });
     } finally {
       setIsValidating(false);
@@ -118,6 +121,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: "Заполните заголовок и содержание вопроса перед проверкой",
         variant: "destructive",
+        duration: null, // Set to null to prevent auto-dismissal
       });
       return;
     }
@@ -133,12 +137,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
       toast({
         title: "Результат проверки",
         description: result.suggestions[0],
+        duration: null, // Set to null to prevent auto-dismissal
       });
     } catch (error: any) {
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
+        duration: null, // Set to null to prevent auto-dismissal
       });
     } finally {
       setIsFactChecking(false);
@@ -160,12 +166,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
         toast({
           title: "Успех",
           description: "Вопрос успешно обновлен",
+          duration: null, // added duration:null
         });
       } else {
         await createQuestion(questionData);
         toast({
           title: "Успех",
           description: "Вопрос успешно создан",
+          duration: null, // added duration:null
         });
       }
       setLocation("/questions");
@@ -174,6 +182,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
+        duration: null, // added duration:null
       });
     }
   };
