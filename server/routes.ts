@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { validateQuestion } from './services/perplexity';
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -25,15 +26,43 @@ export function registerRoutes(app: Express): Server {
     res.json(result);
   });
 
+  app.post("/api/questions/validate", requireAuth, async (req, res) => {
+    try {
+      const { title, content, topic } = req.body;
+      const validation = await validateQuestion(title, content, topic);
+      res.json(validation);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/questions", requireAuth, async (req, res) => {
-    const [question] = await db
-      .insert(questions)
-      .values({
-        ...req.body,
-        authorId: req.user!.id,
-      })
-      .returning();
-    res.json(question);
+    try {
+      // Validate the question first
+      const validation = await validateQuestion(
+        req.body.title,
+        req.body.content,
+        req.body.topic
+      );
+
+      if (!validation.isValid) {
+        return res.status(400).json({
+          message: "Question validation failed",
+          validation
+        });
+      }
+
+      const [question] = await db
+        .insert(questions)
+        .values({
+          ...req.body,
+          authorId: req.user!.id,
+        })
+        .returning();
+      res.json(question);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.put("/api/questions/:id", requireAuth, async (req, res) => {
@@ -67,10 +96,10 @@ export function registerRoutes(app: Express): Server {
 
   // Packages API
   app.get("/api/packages", requireAuth, async (req, res) => {
-    const result = await db.query.packages.findMany({
+    const allPackages = await db.query.packages.findMany({
       with: {
         author: true,
-        questions: {
+        packageQuestions: {
           with: {
             question: true,
           },
@@ -78,7 +107,7 @@ export function registerRoutes(app: Express): Server {
       },
       orderBy: desc(packages.createdAt),
     });
-    res.json(result);
+    res.json(allPackages);
   });
 
   app.post("/api/packages", requireAuth, async (req, res) => {

@@ -20,6 +20,17 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FormData = {
   title: string;
@@ -41,8 +52,10 @@ const topics = [
 
 export default function QuestionEditor() {
   const [, setLocation] = useLocation();
-  const { createQuestion, updateQuestion } = useQuestions();
+  const { createQuestion, validateQuestion } = useQuestions();
   const { toast } = useToast();
+  const [validationResult, setValidationResult] = useState<any>(null);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -52,6 +65,24 @@ export default function QuestionEditor() {
       difficulty: "1",
     },
   });
+
+  const handleValidate = async (data: FormData) => {
+    try {
+      const result = await validateQuestion({
+        title: data.title,
+        content: data.content,
+        topic: data.topic,
+      });
+      setValidationResult(result);
+      setShowValidationDialog(true);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -181,10 +212,87 @@ export default function QuestionEditor() {
             >
               Cancel
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={form.handleSubmit(handleValidate)}
+            >
+              Validate
+            </Button>
             <Button type="submit">Save Question</Button>
           </div>
         </form>
       </Form>
+
+      <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {validationResult?.isValid ? "Validation Passed" : "Validation Issues Found"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              {validationResult?.spellingErrors.length > 0 && (
+                <div>
+                  <p className="font-semibold">Spelling Errors:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.spellingErrors.map((error: string, i: number) => (
+                      <li key={i}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {validationResult?.grammarErrors.length > 0 && (
+                <div>
+                  <p className="font-semibold">Grammar Errors:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.grammarErrors.map((error: string, i: number) => (
+                      <li key={i}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {validationResult?.punctuationErrors.length > 0 && (
+                <div>
+                  <p className="font-semibold">Punctuation Errors:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.punctuationErrors.map((error: string, i: number) => (
+                      <li key={i}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {validationResult?.factualIssues.length > 0 && (
+                <div>
+                  <p className="font-semibold">Factual Issues:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.factualIssues.map((issue: string, i: number) => (
+                      <li key={i}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {validationResult?.suggestions.length > 0 && (
+                <div>
+                  <p className="font-semibold">Suggestions:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.suggestions.map((suggestion: string, i: number) => (
+                      <li key={i}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            {validationResult?.isValid && (
+              <AlertDialogAction onClick={form.handleSubmit(onSubmit)}>
+                Save Question
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
