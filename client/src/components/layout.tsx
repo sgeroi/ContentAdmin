@@ -13,9 +13,9 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Questions", href: "/questions", icon: HelpCircle },
-  { name: "Packages", href: "/packages", icon: Package },
+  { name: "Главная", href: "/", icon: LayoutDashboard },
+  { name: "Вопросы", href: "/questions", icon: HelpCircle },
+  { name: "Пакеты", href: "/packages", icon: Package },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="space-y-4">
         <div className="px-3 py-2">
           <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-            Quiz Admin
+            Админ панель
           </h2>
           <div className="space-y-1">
             {navigation.map((item) => {
@@ -61,7 +61,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {user?.role}
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Выйти">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
@@ -71,14 +71,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
       <div className="hidden border-r bg-sidebar text-sidebar-foreground lg:flex lg:w-60 lg:flex-col">
         <div className="flex h-full flex-col">
           <NavContent />
         </div>
       </div>
 
-      {/* Mobile sidebar */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button

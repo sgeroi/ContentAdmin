@@ -59,9 +59,8 @@ export async function validateQuestion(title: string, content: any, topic: strin
       messages: [
         {
           role: "system",
-          content: `Проверь и исправь текст на наличие орфографических, пунктуационных и грамматических ошибок. Верни JSON в формате:
+          content: `Ты - эксперт по русскому языку. Исправь орфографические и пунктуационные ошибки в тексте, сохраняя оригинальное написание слов заглавными буквами (ПРИМЕР, ВАЖНО). Верни JSON в формате:
           {
-            "correctedTitle": "исправленный заголовок",
             "correctedContent": "исправленное содержание",
             "corrections": ["список всех внесенных исправлений"]
           }`
@@ -69,7 +68,6 @@ export async function validateQuestion(title: string, content: any, topic: strin
         {
           role: "user",
           content: `Исправь следующий текст:
-Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
@@ -87,7 +85,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
       factualIssues: [],
       suggestions: result.corrections || [],
       citations: [],
-      correctedTitle: result.correctedTitle || title,
+      correctedTitle: title,
       correctedContent: result.correctedContent || content
     };
   } catch (error: any) {
@@ -116,7 +114,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
         { 
           type: "text", 
           text: `Проверь следующий вопрос для викторины:
-Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }

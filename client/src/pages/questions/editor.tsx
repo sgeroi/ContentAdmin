@@ -8,7 +8,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -24,7 +23,6 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
-  title: string;
   content: any;
   topic: string;
   difficulty: string;
@@ -50,7 +48,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const form = useForm<FormData>({
     defaultValues: {
-      title: "",
       content: {},
       topic: "",
       difficulty: "1",
@@ -63,7 +60,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
       const question = questions.find(q => q.id === parseInt(id));
       if (question) {
         form.reset({
-          title: question.title,
           content: question.content,
           topic: question.topic,
           difficulty: question.difficulty.toString(),
@@ -76,13 +72,11 @@ export default function QuestionEditor({ id }: { id?: string }) {
     setIsValidating(true);
     try {
       const result = await validateQuestion({
-        title: data.title,
         content: data.content,
         topic: data.topic,
       });
 
       // Automatically apply corrections
-      form.setValue("title", result.correctedTitle, { shouldValidate: true });
       form.setValue("content", result.correctedContent, { shouldValidate: true });
 
       // Show list of corrections in notification
@@ -123,10 +117,10 @@ export default function QuestionEditor({ id }: { id?: string }) {
   };
 
   const handleFactCheck = async (data: FormData) => {
-    if (!data.title.trim() || !data.content || Object.keys(data.content).length === 0) {
+    if (!data.content || Object.keys(data.content).length === 0) {
       toast({
         title: "Ошибка",
-        description: "Заполните заголовок и содержание вопроса перед проверкой",
+        description: "Заполните содержание вопроса перед проверкой",
         variant: "destructive",
         duration: null,
       });
@@ -136,7 +130,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
     setIsFactChecking(true);
     try {
       const result = await factCheckQuestion({
-        title: data.title,
         content: data.content,
         topic: data.topic,
       });
@@ -207,20 +200,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Заголовок вопроса</FormLabel>
-                <FormControl>
-                  <Input placeholder="Введите заголовок вопроса" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <FormField
             control={form.control}
             name="content"
