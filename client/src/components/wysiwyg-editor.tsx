@@ -73,6 +73,41 @@ export function WysiwygEditor({
 }: WysiwygEditorProps) {
   const { toast } = useToast();
 
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "Ошибка",
+        description: "Размер файла не должен превышать 5MB",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки изображения');
+      }
+
+      const { url } = await response.json();
+      return url;
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, [toast]);
+
   const addImage = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -81,40 +116,32 @@ export function WysiwygEditor({
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      if (file.size > MAX_FILE_SIZE) {
-        toast({
-          title: "Ошибка",
-          description: "Размер файла не должен превышать 5MB",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      try {
-        const formData = new FormData();
-        formData.append('image', file);
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки изображения');
-        }
-
-        const { url } = await response.json();
+      const url = await handleImageUpload(file);
+      if (url) {
         editor?.chain().focus().setImage({ src: url }).run();
-      } catch (error: any) {
-        toast({
-          title: "Ошибка",
-          description: error.message,
-          variant: "destructive",
-        });
       }
     };
     input.click();
-  }, [toast]);
+  }, [handleImageUpload]);
+
+  const handlePaste = useCallback(async (event: ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.indexOf('image') === 0) {
+        event.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        const url = await handleImageUpload(file);
+        if (url) {
+          editor?.chain().focus().setImage({ src: url }).run();
+        }
+        break;
+      }
+    }
+  }, [handleImageUpload]);
 
   const editor = useEditor({
     extensions,
@@ -123,6 +150,10 @@ export function WysiwygEditor({
       attributes: {
         class:
           "prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 rounded-md border bg-background",
+      },
+      handlePaste: (view, event) => {
+        handlePaste(event);
+        return false;
       },
     },
     onUpdate: ({ editor }) => {

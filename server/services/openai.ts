@@ -58,7 +58,7 @@ export async function validateQuestion(title: string, content: string, topic: st
     console.log('Starting validation for:', { title, topic });
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -127,6 +127,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     };
 
     // Add images to message if present
+    let hasValidImages = false;
     for (const imageUrl of images) {
       console.log('Processing image:', imageUrl);
       const base64Image = getImageBase64(imageUrl);
@@ -139,6 +140,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
             url: `data:image/jpeg;base64,${base64Image}`
           }
         });
+        hasValidImages = true;
       } else {
         console.log('Failed to encode image to base64');
       }
@@ -156,8 +158,12 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       }))
     );
 
+    // Choose model based on presence of images
+    const model = hasValidImages ? "gpt-4o" : "gpt-4-vision-preview";
+    console.log(`Using model: ${model} (hasValidImages: ${hasValidImages})`);
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model,
       messages: messages,
       max_tokens: 1000,
       temperature: 0.2
