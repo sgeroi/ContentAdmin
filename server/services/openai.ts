@@ -5,58 +5,51 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function extractTextContent(content: any): string {
+  if (!content.content) return '';
+
+  return content.content.map((node: any) => {
+    if (node.type === 'text') {
+      return node.text;
+    } else if (node.type === 'paragraph' && node.content) {
+      return node.content.map((n: any) => n.text || '').join(' ');
+    }
+    return '';
+  }).join('\n').trim();
+}
+
 export async function validateQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting validation for:', { title, topic });
 
-    const messages: any[] = [
+    const textContent = extractTextContent(content);
+    console.log('Extracted text content:', textContent);
+
+    const messages = [
       {
         role: "system",
-        content: "Ты - эксперт по русскому языку. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию и грамматику. Если есть изображения, проанализируй их содержание и уместность. Дай ответ простым текстом."
+        content: "Ты - эксперт по русскому языку и проверке фактов. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию, грамматику и фактическую точность."
       },
       {
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Проверь следующий вопрос для викторины:
+        content: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
-Тема: ${topic}\n\n`
-          }
-        ]
+Содержание: ${textContent}
+Тема: ${topic}
+
+Проверь и дай оценку по следующим критериям:
+1. Орфографические ошибки
+2. Грамматические ошибки
+3. Пунктуационные ошибки
+4. Фактические неточности
+5. Предложения по улучшению`
       }
     ];
-
-    // Add images and text content from the rich text editor
-    if (content.content) {
-      for (const node of content.content) {
-        if (node.type === 'image' && node.attrs?.src) {
-          const imageUrl = node.attrs.src;
-          if (imageUrl.startsWith('/uploads/')) {
-            const baseUrl = process.env.REPL_SLUG ? 
-              `${process.env.REPL_SLUG}.replit.dev` : 
-              'localhost:5000';
-            const fullUrl = `https://${baseUrl}${imageUrl}`;
-            messages[1].content.push({
-              type: "image_url",
-              image_url: {
-                url: fullUrl
-              }
-            });
-          }
-        } else if (node.type === 'text' || node.type === 'paragraph') {
-          messages[1].content.push({
-            type: "text",
-            text: node.text || JSON.stringify(node)
-          });
-        }
-      }
-    }
 
     console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-turbo-preview",
       messages,
       temperature: 0.3,
       max_tokens: 1000
@@ -66,7 +59,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
     console.log('Validation response:', resultText);
 
     return {
-      isValid: true,
+      isValid: !resultText.includes("ошибк") && !resultText.includes("неточност"),
       spellingErrors: [],
       grammarErrors: [],
       punctuationErrors: [],
@@ -78,7 +71,10 @@ export async function validateQuestion(title: string, content: any, topic: strin
     };
   } catch (error: any) {
     console.error('Error validating question:', error);
-    throw new Error('Не удалось выполнить валидацию вопроса');
+    if (error.response) {
+      console.error('OpenAI API error response:', JSON.stringify(error.response.data, null, 2));
+    }
+    throw new Error(`Не удалось выполнить валидацию вопроса: ${error.message}`);
   }
 }
 
@@ -86,53 +82,33 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   try {
     console.log('Starting fact check for:', { title, topic });
 
-    const messages: any[] = [
+    const textContent = extractTextContent(content);
+    console.log('Extracted text content:', textContent);
+
+    const messages = [
       {
         role: "system",
-        content: "Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины. Проверь историческую точность, научную достоверность, актуальность информации и терминологию. Если есть изображения, проанализируй их содержание и уместность. Дай ответ простым текстом."
+        content: "Ты - эксперт по проверке фактов. Проанализируй информацию в вопросе викторины на предмет фактической точности. Проверь историческую достоверность, научную корректность, актуальность информации и правильность терминологии."
       },
       {
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: `Проверь следующий вопрос для викторины:
+        content: `Проверь фактическую точность следующего вопроса для викторины:
 Заголовок: ${title}
-Тема: ${topic}\n\n`
-          }
-        ]
+Содержание: ${textContent}
+Тема: ${topic}
+
+Пожалуйста, дай подробный анализ:
+1. Исторической точности
+2. Научной достоверности
+3. Актуальности информации
+4. Правильности использования терминологии`
       }
     ];
-
-    if (content.content) {
-      for (const node of content.content) {
-        if (node.type === 'image' && node.attrs?.src) {
-          const imageUrl = node.attrs.src;
-          if (imageUrl.startsWith('/uploads/')) {
-            const baseUrl = process.env.REPL_SLUG ? 
-              `${process.env.REPL_SLUG}.replit.dev` : 
-              'localhost:5000';
-            const fullUrl = `https://${baseUrl}${imageUrl}`;
-            messages[1].content.push({
-              type: "image_url",
-              image_url: {
-                url: fullUrl
-              }
-            });
-          }
-        } else if (node.type === 'text' || node.type === 'paragraph') {
-          messages[1].content.push({
-            type: "text",
-            text: node.text || JSON.stringify(node)
-          });
-        }
-      }
-    }
 
     console.log('Sending messages to OpenAI:', JSON.stringify(messages, null, 2));
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-vision-preview",
+      model: "gpt-4-turbo-preview",
       messages,
       temperature: 0.2,
       max_tokens: 1500
@@ -154,6 +130,9 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     };
   } catch (error: any) {
     console.error('Error fact-checking question:', error);
-    throw new Error('Не удалось выполнить проверку фактов');
+    if (error.response) {
+      console.error('OpenAI API error response:', JSON.stringify(error.response.data, null, 2));
+    }
+    throw new Error(`Не удалось выполнить проверку фактов: ${error.message}`);
   }
 }
