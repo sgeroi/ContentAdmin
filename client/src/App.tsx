@@ -11,6 +11,7 @@ import Questions from "@/pages/questions";
 import QuestionEditor from "@/pages/questions/editor";
 import Packages from "@/pages/packages";
 import Layout from "@/components/layout";
+import GenerateQuestions from "@/pages/questions/generate";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/questions" component={Questions} />
         <Route path="/questions/new" component={QuestionEditor} />
+        <Route path="/questions/generate" component={GenerateQuestions} />
         <Route path="/questions/:id">
           {(params) => <QuestionEditor id={params.id} />}
         </Route>

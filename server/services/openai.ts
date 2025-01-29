@@ -171,3 +171,55 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     throw new Error('Не удалось выполнить проверку фактов: ' + error.message);
   }
 }
+
+export async function generateQuizQuestions(count: number = 10): Promise<Array<{
+  title: string;
+  content: any;
+  topic: string;
+  difficulty: number;
+}>> {
+  try {
+    console.log('Starting quiz questions generation');
+
+    const response = await openai.chat.completions.create({
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Ты - эксперт по созданию интересных вопросов для викторины. 
+          Создай ${count} уникальных вопросов на логику на русском языке.
+          Вопросы должны быть разной сложности (от 1 до 5) и охватывать разные темы.
+          Верни JSON массив в формате:
+          [{
+            "title": "заголовок вопроса",
+            "content": {
+              "type": "doc",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "текст вопроса"
+                    }
+                  ]
+                }
+              ]
+            },
+            "topic": "тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)",
+            "difficulty": число от 1 до 5
+          }]`
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || '');
+    console.log('Generated questions:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Error generating quiz questions:', error);
+    throw new Error('Не удалось сгенерировать вопросы: ' + error.message);
+  }
+}

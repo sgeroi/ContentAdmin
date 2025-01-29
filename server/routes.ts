@@ -9,6 +9,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import express from 'express';
+import { generateQuizQuestions } from './services/openai';
 
 // Настройка multer для загрузки изображений
 const upload = multer({
@@ -247,6 +248,26 @@ export function registerRoutes(app: Express): Server {
         )
       );
     res.json({ success: true });
+  });
+
+  app.post("/api/questions/generate", requireAuth, async (req, res) => {
+    try {
+      const count = req.body.count || 10;
+      const questions = await generateQuizQuestions(count);
+
+      // Create all questions at once
+      const createdQuestions = await db
+        .insert(questions)
+        .values(questions.map(q => ({
+          ...q,
+          authorId: req.user!.id,
+        })))
+        .returning();
+
+      res.json(createdQuestions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   const httpServer = createServer(app);

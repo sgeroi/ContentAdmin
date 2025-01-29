@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
 import { Link, useLocation } from "wouter";
-import { Edit, Trash2, Plus, CheckCircle2 } from "lucide-react";
+import { Edit, Trash2, Plus, CheckCircle2, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -65,12 +65,20 @@ export default function Questions() {
             Управление вопросами для викторины
           </p>
         </div>
-        <Link href="/questions/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Новый вопрос
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/questions/generate">
+            <Button variant="outline">
+              <Wand2 className="mr-2 h-4 w-4" />
+              Сгенерировать вопросы
+            </Button>
+          </Link>
+          <Link href="/questions/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Новый вопрос
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-md border">
