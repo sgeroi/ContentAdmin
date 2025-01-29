@@ -19,9 +19,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Edit, Trash2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const difficultyColors: Record<number, string> = {
   1: "bg-green-500",
@@ -31,7 +32,6 @@ const difficultyColors: Record<number, string> = {
   5: "bg-red-500",
 };
 
-// Helper function to get preview text from content
 function getContentPreview(content: any): string {
   try {
     if (content?.content?.[0]?.content?.[0]?.text) {
@@ -45,9 +45,15 @@ function getContentPreview(content: any): string {
 
 export default function Questions() {
   const { questions, deleteQuestion, isLoading } = useQuestions();
+  const [, setLocation] = useLocation();
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click when deleting
     await deleteQuestion(id);
+  };
+
+  const handleRowClick = (id: number) => {
+    setLocation(`/questions/${id}`);
   };
 
   return (
@@ -80,7 +86,14 @@ export default function Questions() {
           </TableHeader>
           <TableBody>
             {questions.map((question) => (
-              <TableRow key={question.id}>
+              <TableRow 
+                key={question.id}
+                onClick={() => handleRowClick(question.id)}
+                className={cn(
+                  "cursor-pointer transition-colors hover:bg-muted/50",
+                  "focus:bg-muted/50 focus:outline-none"
+                )}
+              >
                 <TableCell>{getContentPreview(question.content)}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{question.topic}</Badge>
@@ -95,14 +108,23 @@ export default function Questions() {
                 <TableCell>{question.author?.username}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Link href={`/questions/${question.id}`}>
-                      <Button variant="ghost" size="icon">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/questions/${question.id}`);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -116,9 +138,11 @@ export default function Questions() {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Отмена</AlertDialogCancel>
+                          <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+                            Отмена
+                          </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDelete(question.id)}
+                            onClick={(e) => handleDelete(question.id, e)}
                           >
                             Удалить
                           </AlertDialogAction>

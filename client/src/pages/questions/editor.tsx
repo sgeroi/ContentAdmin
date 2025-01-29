@@ -67,6 +67,10 @@ export default function QuestionEditor({ id }: { id?: string }) {
     }
   }, [id, questions, form]);
 
+  const handleCancel = () => {
+    window.history.back();
+  };
+
   const handleValidateAndCorrect = async (data: FormData) => {
     setIsValidating(true);
     try {
@@ -176,7 +180,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
           duration: 3000,
         });
       }
-      setLocation("/questions");
+      window.history.back();
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -279,7 +283,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setLocation("/questions")}
+              onClick={handleCancel}
             >
               Отмена
             </Button>

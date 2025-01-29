@@ -20,6 +20,7 @@ export function useQuestions() {
 
   const { data: questions = [], isLoading } = useQuery<Question[]>({
     queryKey: ["/api/questions"],
+    staleTime: 1000 * 60, // Cache for 1 minute
   });
 
   const validateMutation = useMutation({
@@ -41,22 +42,6 @@ export function useQuestions() {
 
   const createMutation = useMutation({
     mutationFn: async (question: Omit<InsertQuestion, "authorId">) => {
-      // Validate first
-      const validation = await validateMutation.mutateAsync(question);
-
-      if (!validation.isValid) {
-        throw new Error(
-          "Question validation failed:\n" +
-            [
-              ...validation.spellingErrors,
-              ...validation.grammarErrors,
-              ...validation.punctuationErrors,
-              ...validation.factualIssues,
-              ...validation.suggestions,
-            ].join("\n")
-        );
-      }
-
       const response = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,14 +57,10 @@ export function useQuestions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      toast({
-        title: "Success",
-        description: "Question created successfully",
-      });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -106,14 +87,10 @@ export function useQuestions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      toast({
-        title: "Success",
-        description: "Question updated successfully",
-      });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -135,14 +112,10 @@ export function useQuestions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      toast({
-        title: "Success",
-        description: "Question deleted successfully",
-      });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
