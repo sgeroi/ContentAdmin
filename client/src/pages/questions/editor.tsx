@@ -19,7 +19,7 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
@@ -54,7 +54,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     },
   });
 
-  // Load existing question data if editing
+  // Загрузка существующего вопроса при редактировании
   useEffect(() => {
     if (id) {
       const question = questions.find(q => q.id === parseInt(id));
@@ -76,10 +76,10 @@ export default function QuestionEditor({ id }: { id?: string }) {
         topic: data.topic,
       });
 
-      // Automatically apply corrections
+      // Автоматически применяем исправления
       form.setValue("content", result.correctedContent, { shouldValidate: true });
 
-      // Show list of corrections in notification
+      // Показываем список исправлений
       if (result.suggestions.length > 0) {
         toast({
           title: "Текст исправлен",
