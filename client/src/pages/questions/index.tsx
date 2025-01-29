@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
 import { Link, useLocation } from "wouter";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, CheckCircle2 } from "lucide-react"; // Added import for CheckCircle2
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,7 @@ export default function Questions() {
   const [, setLocation] = useLocation();
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click when deleting
+    e.stopPropagation(); 
     await deleteQuestion(id);
   };
 
@@ -75,12 +75,13 @@ export default function Questions() {
 
       <div className="rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader> {/* Updated TableHeader */}
             <TableRow>
               <TableHead>Содержание</TableHead>
               <TableHead>Тема</TableHead>
               <TableHead>Сложность</TableHead>
               <TableHead>Автор</TableHead>
+              <TableHead>Статус</TableHead> {/* Added Status column */}
               <TableHead className="w-[100px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
@@ -106,6 +107,14 @@ export default function Questions() {
                   </Badge>
                 </TableCell>
                 <TableCell>{question.author?.username}</TableCell>
+                <TableCell> {/* Added fact-check status */}
+                  {question.factChecked && (
+                    <div className="flex items-center gap-1 text-green-500">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-xs">Проверен</span>
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button 
@@ -156,7 +165,7 @@ export default function Questions() {
             {questions.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6} {/* Increased colSpan to account for the new column */}
                   className="text-center text-muted-foreground h-24"
                 >
                   {isLoading ? "Загрузка..." : "Вопросы не найдены"}

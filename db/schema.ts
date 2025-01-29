@@ -17,6 +17,8 @@ export const questions = pgTable("questions", {
   topic: text("topic").notNull(),
   difficulty: integer("difficulty").notNull(), // 1-5
   authorId: integer("author_id").references(() => users.id).notNull(),
+  factChecked: boolean("fact_checked").default(false),
+  factCheckDate: timestamp("fact_check_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -135,6 +135,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         title: "Временный заголовок",
         content: data.content,
         topic: data.topic,
+        id: id ? parseInt(id) : undefined,
       });
 
       toast({

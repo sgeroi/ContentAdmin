@@ -84,6 +84,18 @@ export function registerRoutes(app: Express): Server {
     try {
       const { title, content, topic } = req.body;
       const validation = await factCheckQuestion(title, content, topic);
+
+      // Update the question's fact-check status
+      if (req.body.id) {
+        await db
+          .update(questions)
+          .set({
+            factChecked: true,
+            factCheckDate: new Date(),
+          })
+          .where(eq(questions.id, req.body.id));
+      }
+
       res.json(validation);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
