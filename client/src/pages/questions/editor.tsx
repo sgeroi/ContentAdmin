@@ -99,6 +99,15 @@ export default function QuestionEditor() {
   };
 
   const handleFactCheck = async (data: FormData) => {
+    if (!data.title.trim() || !data.content || Object.keys(data.content).length === 0) {
+      toast({
+        title: "Ошибка",
+        description: "Заполните заголовок и содержание вопроса перед проверкой",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsFactChecking(true);
     try {
       const result = await factCheckQuestion({

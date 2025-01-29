@@ -14,19 +14,27 @@ export async function validateQuestion(title: string, content: string, topic: st
       messages: [
         {
           role: "system",
-          content: "Ты - эксперт по русскому языку и проверке корректности текста. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию и грамматику."
+          content: `Ты - эксперт по проверке текста. Проверь корректность вопроса для викторины и верни ответ СТРОГО в таком формате JSON (без дополнительного текста):
+{
+  "isValid": boolean,
+  "spellingErrors": string[],
+  "grammarErrors": string[],
+  "punctuationErrors": string[],
+  "suggestions": string[],
+  "correctedTitle": string,
+  "correctedContent": object
+}`
         },
         {
           role: "user",
-          content: `Проверь следующий вопрос для викторины:
+          content: `Проверь следующий вопрос:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
       ],
       temperature: 0.3,
-      max_tokens: 1000,
-      response_format: { type: "json_object" }
+      max_tokens: 1000
     });
 
     const resultText = response.choices[0]?.message?.content;
@@ -72,11 +80,18 @@ export async function factCheckQuestion(title: string, content: string, topic: s
       messages: [
         {
           role: "system",
-          content: "Проверь фактическую точность вопроса викторины. Верни JSON с полями isValid (boolean), factualIssues (массив строк с проблемами), suggestions (массив строк с предложениями), correctedTitle (строка), correctedContent (объект)."
+          content: `Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины и верни ответ СТРОГО в таком формате JSON (без дополнительного текста):
+{
+  "isValid": boolean,
+  "factualIssues": string[],
+  "suggestions": string[],
+  "correctedTitle": string,
+  "correctedContent": object
+}`
         },
         {
           role: "user",
-          content: `Проверь точность информации:
+          content: `Проверь фактическую точность:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}
@@ -85,8 +100,7 @@ export async function factCheckQuestion(title: string, content: string, topic: s
         }
       ],
       temperature: 0.2,
-      max_tokens: 1500,
-      response_format: { type: "json_object" }
+      max_tokens: 1500
     });
 
     const resultText = response.choices[0]?.message?.content;
