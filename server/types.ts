@@ -6,4 +6,6 @@ export interface QuestionValidationResult {
   factualIssues: string[];
   suggestions: string[];
   citations: string[];
+  correctedTitle: string;
+  correctedContent: any;
 }

@@ -84,6 +84,18 @@ export default function QuestionEditor() {
     }
   };
 
+  const applyCorrections = () => {
+    if (validationResult) {
+      form.setValue("title", validationResult.correctedTitle);
+      form.setValue("content", validationResult.correctedContent);
+      setShowValidationDialog(false);
+      toast({
+        title: "Успех",
+        description: "Исправления применены",
+      });
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     try {
       await createQuestion({
@@ -228,12 +240,12 @@ export default function QuestionEditor() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {validationResult?.isValid ? "Validation Passed" : "Validation Issues Found"}
+              {validationResult?.isValid ? "Валидация пройдена" : "Найдены проблемы"}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               {validationResult?.spellingErrors.length > 0 && (
                 <div>
-                  <p className="font-semibold">Spelling Errors:</p>
+                  <p className="font-semibold">Орфографические ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.spellingErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -243,7 +255,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.grammarErrors.length > 0 && (
                 <div>
-                  <p className="font-semibold">Grammar Errors:</p>
+                  <p className="font-semibold">Грамматические ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.grammarErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -253,7 +265,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.punctuationErrors.length > 0 && (
                 <div>
-                  <p className="font-semibold">Punctuation Errors:</p>
+                  <p className="font-semibold">Пунктуационные ошибки:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.punctuationErrors.map((error: string, i: number) => (
                       <li key={i}>{error}</li>
@@ -263,7 +275,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.factualIssues.length > 0 && (
                 <div>
-                  <p className="font-semibold">Factual Issues:</p>
+                  <p className="font-semibold">Фактические неточности:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.factualIssues.map((issue: string, i: number) => (
                       <li key={i}>{issue}</li>
@@ -273,7 +285,7 @@ export default function QuestionEditor() {
               )}
               {validationResult?.suggestions.length > 0 && (
                 <div>
-                  <p className="font-semibold">Suggestions:</p>
+                  <p className="font-semibold">Рекомендации:</p>
                   <ul className="list-disc pl-4">
                     {validationResult.suggestions.map((suggestion: string, i: number) => (
                       <li key={i}>{suggestion}</li>
@@ -281,13 +293,32 @@ export default function QuestionEditor() {
                   </ul>
                 </div>
               )}
+              {validationResult?.citations.length > 0 && (
+                <div>
+                  <p className="font-semibold">Источники:</p>
+                  <ul className="list-disc pl-4">
+                    {validationResult.citations.map((citation: string, i: number) => (
+                      <li key={i}>{citation}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Close</AlertDialogCancel>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel>Закрыть</AlertDialogCancel>
+            {!validationResult?.isValid && (
+              <Button
+                variant="secondary"
+                onClick={applyCorrections}
+                className="mr-2"
+              >
+                Исправить ошибки
+              </Button>
+            )}
             {validationResult?.isValid && (
               <AlertDialogAction onClick={form.handleSubmit(onSubmit)}>
-                Save Question
+                Сохранить
               </AlertDialogAction>
             )}
           </AlertDialogFooter>

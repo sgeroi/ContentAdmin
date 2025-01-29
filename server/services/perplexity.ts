@@ -28,7 +28,7 @@ export async function validateQuestion(title: string, content: string, topic: st
   const messages = [
     {
       role: "system",
-      content: "Ты помощник для валидации вопросов для викторины. Ты должен отвечать JSON объектом, содержащим результаты проверки. Никогда не включай markdown форматирование в свой ответ. Все сообщения об ошибках и предложения должны быть на русском языке. Обязательно используй достоверные источники для проверки фактов."
+      content: "Ты помощник для валидации вопросов для викторины. Ты должен отвечать JSON объектом, содержащим результаты проверки и исправления. Никогда не включай markdown форматирование в свой ответ. Все сообщения об ошибках и предложения должны быть на русском языке. Обязательно используй достоверные источники для проверки фактов."
     },
     {
       role: "user",
@@ -45,7 +45,9 @@ export async function validateQuestion(title: string, content: string, topic: st
   "punctuationErrors": массив пунктуационных ошибок,
   "factualIssues": массив проблем с фактической точностью,
   "suggestions": массив предложений по улучшению,
-  "citations": массив ссылок на достоверные источники, подтверждающие факты
+  "citations": массив ссылок на достоверные источники,
+  "correctedTitle": исправленный заголовок с учетом всех ошибок,
+  "correctedContent": исправленное содержание с учетом всех ошибок
 }`
     }
   ];
@@ -83,7 +85,9 @@ export async function validateQuestion(title: string, content: string, topic: st
       punctuationErrors: result.punctuationErrors || [],
       factualIssues: result.factualIssues || [],
       suggestions: result.suggestions || [],
-      citations: citations
+      citations: citations,
+      correctedTitle: result.correctedTitle || title,
+      correctedContent: result.correctedContent || content
     };
   } catch (error: any) {
     console.error('Error validating question:', error);

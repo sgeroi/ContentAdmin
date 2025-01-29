@@ -10,6 +10,8 @@ interface ValidationResult {
   factualIssues: string[];
   suggestions: string[];
   citations: string[];
+  correctedTitle: string;
+  correctedContent: any;
 }
 
 export function useQuestions() {
