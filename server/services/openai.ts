@@ -14,12 +14,14 @@ function getImageBase64(url: string): string | null {
     console.log('Reading image from:', imagePath);
 
     if (!fs.existsSync(imagePath)) {
-      console.log('Image file not found');
+      console.log('Image file not found at path:', imagePath);
       return null;
     }
 
     const imageBuffer = fs.readFileSync(imagePath);
-    return imageBuffer.toString('base64');
+    const base64Image = imageBuffer.toString('base64');
+    console.log('Successfully read and encoded image');
+    return base64Image;
   } catch (error) {
     console.error('Error reading image:', error);
     return null;
@@ -28,12 +30,23 @@ function getImageBase64(url: string): string | null {
 
 function extractImagesFromContent(content: any): string[] {
   const images: string[] = [];
-  if (content.content) {
-    for (const node of content.content) {
-      if (node.type === 'image' && node.attrs?.src) {
-        images.push(node.attrs.src);
-      }
+  try {
+    if (content && typeof content === 'object' && content.content) {
+      const traverse = (nodes: any[]) => {
+        for (const node of nodes) {
+          if (node.type === 'image' && node.attrs?.src) {
+            images.push(node.attrs.src);
+          }
+          if (node.content && Array.isArray(node.content)) {
+            traverse(node.content);
+          }
+        }
+      };
+      traverse(content.content);
     }
+    console.log('Found images in content:', images);
+  } catch (error) {
+    console.error('Error extracting images from content:', error);
   }
   return images;
 }
@@ -85,72 +98,70 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   try {
     console.log('Starting fact check for:', { title, topic });
 
-    // First, check the text content
-    const textResponse = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "Ты - эксперт по проверке фактов. Проверь точность информации в вопросе викторины. Проверь историческую точность, научную достоверность, актуальность информации и терминологию. Дай ответ простым текстом."
-        },
-        {
-          role: "user",
-          content: `Проверь следующий вопрос для викторины:
+    // Get all images from content
+    const images = extractImagesFromContent(content);
+    console.log('Found images:', images);
+
+    // Create base messages array
+    const messages: any[] = [
+      {
+        role: "system",
+        content: "Ты - эксперт по проверке фактов. Проанализируй вопрос викторины и изображения к нему на предмет фактической точности. Ответь на русском языке."
+      },
+    ];
+
+    // Add main question content
+    const userMessage: any = {
+      role: "user",
+      content: [
+        { 
+          type: "text", 
+          text: `Проверь следующий вопрос для викторины:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
 Тема: ${topic}`
         }
-      ],
-      temperature: 0.2,
-      max_tokens: 1000
-    });
+      ]
+    };
 
-    let resultText = textResponse.choices[0]?.message?.content || '';
-
-    // Then check images if present
-    const images = extractImagesFromContent(content);
-    console.log('Found images:', images);
-
+    // Add images to message if present
     for (const imageUrl of images) {
       console.log('Processing image:', imageUrl);
       const base64Image = getImageBase64(imageUrl);
 
       if (base64Image) {
         console.log('Successfully encoded image to base64');
-        try {
-          const imageResponse = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: "Это изображение относится к следующему вопросу викторины. Проверь, соответствует ли оно контексту вопроса и нет ли в нем фактических ошибок:" },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:image/jpeg;base64,${base64Image}`
-                    }
-                  }
-                ]
-              }
-            ],
-            max_tokens: 500
-          });
-
-          const imageAnalysis = imageResponse.choices[0]?.message?.content;
-          if (imageAnalysis) {
-            resultText += "\n\nАнализ изображения: " + imageAnalysis;
+        userMessage.content.push({
+          type: "image_url",
+          image_url: {
+            url: `data:image/jpeg;base64,${base64Image}`
           }
-        } catch (imageError) {
-          console.error('Error analyzing image:', imageError);
-          resultText += "\n\nНе удалось проанализировать изображение.";
-        }
+        });
       } else {
         console.log('Failed to encode image to base64');
-        resultText += "\n\nНе удалось загрузить изображение для анализа.";
       }
     }
 
+    messages.push(userMessage);
+
+    // Log message structure for debugging
+    console.log('Sending request to OpenAI with message structure:', 
+      messages.map(m => ({
+        role: m.role,
+        content: Array.isArray(m.content) 
+          ? m.content.map(c => ({ type: c.type }))
+          : 'text'
+      }))
+    );
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4-vision-preview",
+      messages: messages,
+      max_tokens: 1000,
+      temperature: 0.2
+    });
+
+    const resultText = response.choices[0]?.message?.content || '';
     console.log('Fact check complete response:', resultText);
 
     return {
@@ -166,6 +177,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     };
   } catch (error: any) {
     console.error('Error fact-checking question:', error);
-    throw new Error('Не удалось выполнить проверку фактов');
+    throw new Error('Не удалось выполнить проверку фактов: ' + error.message);
   }
 }
