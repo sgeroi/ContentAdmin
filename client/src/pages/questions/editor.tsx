@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
@@ -23,6 +24,7 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 type FormData = {
+  title: string;
   content: any;
   topic: string;
   difficulty: string;
@@ -48,18 +50,19 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const form = useForm<FormData>({
     defaultValues: {
+      title: "",
       content: {},
       topic: "",
       difficulty: "1",
     },
   });
 
-  // Загрузка существующего вопроса при редактировании
   useEffect(() => {
     if (id) {
       const question = questions.find(q => q.id === parseInt(id));
       if (question) {
         form.reset({
+          title: question.title,
           content: question.content,
           topic: question.topic,
           difficulty: question.difficulty.toString(),
@@ -76,10 +79,8 @@ export default function QuestionEditor({ id }: { id?: string }) {
         topic: data.topic,
       });
 
-      // Автоматически применяем исправления
       form.setValue("content", result.correctedContent, { shouldValidate: true });
 
-      // Показываем список исправлений
       if (result.suggestions.length > 0) {
         toast({
           title: "Текст исправлен",
@@ -200,6 +201,20 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Заголовок вопроса</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Введите заголовок вопроса" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="content"
