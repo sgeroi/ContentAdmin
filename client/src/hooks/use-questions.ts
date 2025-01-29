@@ -14,31 +14,14 @@ interface ValidationResult {
   correctedContent: any;
 }
 
-export function useQuestions(id?: string) {
+export function useQuestions() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Query for all questions with longer cache time
-  const { data: questions = [], isLoading: isLoadingList } = useQuery<Question[]>({
+  const { data: questions = [], isLoading } = useQuery<Question[]>({
     queryKey: ["/api/questions"],
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60, // Cache for 1 minute
   });
-
-  // Query for individual question
-  const { data: question, isLoading: isLoadingOne } = useQuery<Question>({
-    queryKey: ["/api/questions", id],
-    enabled: !!id,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    initialData: id && questions ? questions.find(q => q.id.toString() === id) : undefined,
-  });
-
-  // Prefetch individual question
-  const prefetchQuestion = async (questionId: string) => {
-    await queryClient.prefetchQuery({
-      queryKey: ["/api/questions", questionId],
-      staleTime: 1000 * 60 * 5,
-    });
-  };
 
   const validateMutation = useMutation({
     mutationFn: async (data: { title: string; content: any; topic: string }) => {
@@ -72,12 +55,10 @@ export function useQuestions(id?: string) {
 
       return response.json();
     },
-    onSuccess: (data) => {
-      // Update both queries
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      queryClient.setQueryData(["/api/questions", data.id.toString()], data);
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -104,12 +85,10 @@ export function useQuestions(id?: string) {
 
       return response.json();
     },
-    onSuccess: (data) => {
-      // Update both queries
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      queryClient.setQueryData(["/api/questions", data.id.toString()], data);
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -131,12 +110,10 @@ export function useQuestions(id?: string) {
 
       return response.json();
     },
-    onSuccess: (_, id) => {
-      // Remove from both queries
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
-      queryClient.removeQueries({ queryKey: ["/api/questions", id.toString()] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -164,9 +141,7 @@ export function useQuestions(id?: string) {
 
   return {
     questions,
-    question,
-    isLoading: isLoadingList || isLoadingOne,
-    prefetchQuestion,
+    isLoading,
     validateQuestion: validateMutation.mutateAsync,
     factCheckQuestion: factCheckMutation.mutateAsync,
     createQuestion: createMutation.mutateAsync,

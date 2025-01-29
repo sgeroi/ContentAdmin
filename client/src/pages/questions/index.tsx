@@ -44,7 +44,7 @@ function getContentPreview(content: any): string {
 }
 
 export default function Questions() {
-  const { questions, deleteQuestion, isLoading, prefetchQuestion } = useQuestions();
+  const { questions, deleteQuestion, isLoading } = useQuestions();
   const [, setLocation] = useLocation();
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
@@ -89,7 +89,6 @@ export default function Questions() {
               <TableRow 
                 key={question.id}
                 onClick={() => handleRowClick(question.id)}
-                onMouseEnter={() => prefetchQuestion(question.id.toString())}
                 className={cn(
                   "cursor-pointer transition-colors hover:bg-muted/50",
                   "focus:bg-muted/50 focus:outline-none"
