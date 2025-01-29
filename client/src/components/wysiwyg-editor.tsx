@@ -131,7 +131,7 @@ export function WysiwygEditor({
     const items = event.clipboardData?.items;
     if (!items) return;
 
-    for (const item of items) {
+    for (const item of Array.from(items)) {
       if (item.type.indexOf('image') === 0) {
         event.preventDefault();
         const file = item.getAsFile();
@@ -247,5 +247,3 @@ export function WysiwygEditor({
     </div>
   );
 }
-
-export { WysiwygEditor };
