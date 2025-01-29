@@ -28,23 +28,23 @@ export async function validateQuestion(title: string, content: string, topic: st
   const messages = [
     {
       role: "system",
-      content: "You are a helpful assistant that validates quiz questions. You must respond with a JSON object containing validation results. Never include markdown formatting in your response."
+      content: "Ты помощник для валидации вопросов для викторины. Ты должен отвечать JSON объектом, содержащим результаты проверки. Никогда не включай markdown форматирование в свой ответ. Все сообщения об ошибках и предложения должны быть на русском языке."
     },
     {
       role: "user",
-      content: `Please validate the following quiz question:
-Title: ${title}
-Content: ${JSON.stringify(content)}
-Topic: ${topic}
+      content: `Пожалуйста, проверь следующий вопрос для викторины:
+Заголовок: ${title}
+Содержание: ${JSON.stringify(content)}
+Тема: ${topic}
 
-Validate and return a JSON object with these fields:
+Проверь и верни JSON объект со следующими полями:
 {
-  "isValid": boolean indicating if the question is acceptable,
-  "spellingErrors": array of spelling errors found,
-  "grammarErrors": array of grammar errors found,
-  "punctuationErrors": array of punctuation errors found,
-  "factualIssues": array of factual accuracy issues found,
-  "suggestions": array of improvement suggestions
+  "isValid": boolean - указывает, допустим ли вопрос,
+  "spellingErrors": массив найденных орфографических ошибок,
+  "grammarErrors": массив грамматических ошибок,
+  "punctuationErrors": массив пунктуационных ошибок,
+  "factualIssues": массив проблем с фактической точностью,
+  "suggestions": массив предложений по улучшению
 }`
     }
   ];
@@ -67,6 +67,6 @@ Validate and return a JSON object with these fields:
     };
   } catch (error: any) {
     console.error('Error validating question:', error);
-    throw new Error('Failed to validate question');
+    throw new Error('Не удалось выполнить валидацию вопроса');
   }
 }
