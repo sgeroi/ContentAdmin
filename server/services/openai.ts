@@ -59,7 +59,7 @@ export async function validateQuestion(title: string, content: string, topic: st
       messages: [
         {
           role: "system",
-          content: "Ты - эксперт по русскому языку. Проверь текст вопроса для викторины на наличие ошибок и предложи исправления. Анализируй орфографию, пунктуацию и грамматику. Дай ответ простым текстом."
+          content: "Ты - эксперт по русскому языку. Кратко проверь текст вопроса для викторины на наличие ошибок. Дай ответ в 2-3 предложения."
         },
         {
           role: "user",
@@ -103,7 +103,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
     const messages: any[] = [
       {
         role: "system",
-        content: "Ты - эксперт по проверке фактов. Проанализируй вопрос викторины и изображения к нему на предмет фактической точности. Ответь на русском языке."
+        content: "Ты - эксперт по проверке фактов. Кратко проанализируй точность информации в вопросе викторины. Дай ответ в 2-3 предложения."
       },
     ];
 
@@ -141,19 +141,11 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
 
     messages.push(userMessage);
 
-    console.log('Sending request to OpenAI with message structure:', 
-      messages.map(m => ({
-        role: m.role,
-        content: Array.isArray(m.content) 
-          ? m.content.map(c => ({ type: c.type }))
-          : 'text'
-      }))
-    );
-
-    console.log('Using model: gpt-4-turbo');
+    const model = hasValidImages ? "gpt-4o" : "gpt-4-turbo";
+    console.log(`Using model: ${model} (hasValidImages: ${hasValidImages})`);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model,
       messages: messages,
       max_tokens: 1000,
       temperature: 0.2
