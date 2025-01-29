@@ -25,7 +25,8 @@ export async function validateQuestion(title: string, content: string, topic: st
         }
       ],
       temperature: 0.3,
-      max_tokens: 1000
+      max_tokens: 1000,
+      response_format: { type: "json_object" }
     });
 
     const resultText = response.choices[0]?.message?.content;
@@ -71,31 +72,21 @@ export async function factCheckQuestion(title: string, content: string, topic: s
       messages: [
         {
           role: "system",
-          content: `Ты - эксперт по проверке фактической точности. Проанализируй вопрос для викторины и верни результат в формате JSON с такой структурой:
-{
-  "isValid": true/false,
-  "factualIssues": ["список проблем"],
-  "suggestions": ["список предложений"],
-  "correctedTitle": "исправленный заголовок",
-  "correctedContent": {}
-}
-
-При анализе обрати внимание на:
-1. Историческую точность дат и событий
-2. Научную достоверность фактов
-3. Актуальность информации
-4. Точность терминологии`
+          content: "Проверь фактическую точность вопроса викторины. Верни JSON с полями isValid (boolean), factualIssues (массив строк с проблемами), suggestions (массив строк с предложениями), correctedTitle (строка), correctedContent (объект)."
         },
         {
           role: "user",
-          content: `Проверь точность информации в вопросе:
+          content: `Проверь точность информации:
 Заголовок: ${title}
 Содержание: ${JSON.stringify(content)}
-Тема: ${topic}`
+Тема: ${topic}
+
+Проверь: историческую точность, научную достоверность, актуальность информации и терминологию.`
         }
       ],
       temperature: 0.2,
-      max_tokens: 1500
+      max_tokens: 1500,
+      response_format: { type: "json_object" }
     });
 
     const resultText = response.choices[0]?.message?.content;
