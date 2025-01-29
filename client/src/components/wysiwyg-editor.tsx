@@ -1,6 +1,5 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import { Button } from "./ui/button";
 import {
   Bold,
@@ -11,10 +10,9 @@ import {
   Undo,
   Redo,
   Code,
-  ImagePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 
 const extensions = [
   StarterKit.configure({
@@ -25,12 +23,6 @@ const extensions = [
     orderedList: {
       keepMarks: true,
       keepAttributes: false,
-    },
-  }),
-  Image.configure({
-    allowBase64: true,
-    HTMLAttributes: {
-      class: 'rounded-md max-w-full',
     },
   }),
 ];
@@ -69,29 +61,6 @@ export function WysiwygEditor({
   onChange,
   className,
 }: WysiwygEditorProps) {
-  const addImage = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append("image", file);
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const { url } = await response.json();
-      return url;
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      return null;
-    }
-  }, []);
-
   const editor = useEditor({
     extensions,
     content,
@@ -99,38 +68,6 @@ export function WysiwygEditor({
       attributes: {
         class:
           "prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 rounded-md border bg-background",
-      },
-      handleDrop: (view, event, _slice, moved) => {
-        if (moved) return false;
-
-        const hasFiles = event.dataTransfer?.files.length;
-        if (!hasFiles) return false;
-
-        event.preventDefault();
-
-        const images = Array.from(event.dataTransfer.files).filter((file) =>
-          file.type.startsWith("image/")
-        );
-
-        if (!images.length) return false;
-
-        const pos = view.posAtCoords({
-          left: event.clientX,
-          top: event.clientY,
-        })?.pos || 0;
-
-        Promise.all(
-          images.map(async (image) => {
-            const url = await addImage(image);
-            if (url) {
-              const node = view.state.schema.nodes.image.create({ src: url });
-              const transaction = view.state.tr.insert(pos, node);
-              view.dispatch(transaction);
-            }
-          })
-        );
-
-        return true;
       },
     },
     onUpdate: ({ editor }) => {
@@ -148,25 +85,6 @@ export function WysiwygEditor({
       }
     }
   }, [editor, content]);
-
-  const handleImageUpload = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = async (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const url = await addImage(file);
-        if (url && editor) {
-          editor.chain().focus().insertContent({
-            type: 'image',
-            attrs: { src: url }
-          }).run();
-        }
-      }
-    };
-    input.click();
-  };
 
   if (!editor) {
     return null;
@@ -210,9 +128,6 @@ export function WysiwygEditor({
           isActive={editor.isActive("codeBlock")}
         >
           <Code className="h-4 w-4" />
-        </MenuButton>
-        <MenuButton onClick={handleImageUpload}>
-          <ImagePlus className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}

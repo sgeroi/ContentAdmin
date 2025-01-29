@@ -20,8 +20,8 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef } from "react";
-import { Loader2, X } from "lucide-react";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 type FormData = {
   title: string;
@@ -41,15 +41,12 @@ const topics = [
   "Технологии",
 ];
 
-const TIMEOUT_MS = 30000; // 30 seconds timeout
-
 export default function QuestionEditor() {
   const [, setLocation] = useLocation();
   const { createQuestion, validateQuestion, factCheckQuestion } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -112,17 +109,6 @@ export default function QuestionEditor() {
     }
 
     setIsFactChecking(true);
-
-    // Set a timeout to cancel the operation if it takes too long
-    timeoutRef.current = setTimeout(() => {
-      setIsFactChecking(false);
-      toast({
-        title: "Ошибка",
-        description: "Превышено время ожидания проверки фактов. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    }, TIMEOUT_MS);
-
     try {
       const result = await factCheckQuestion({
         title: data.title,
@@ -130,30 +116,12 @@ export default function QuestionEditor() {
         topic: data.topic,
       });
 
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
+      // Показываем текстовый ответ от ChatGPT
       toast({
-        title: "Результат проверки фактов",
-        description: (
-          <div className="relative">
-            <div className="whitespace-pre-wrap pr-6">{result.suggestions[0]}</div>
-            <button
-              onClick={() => document.querySelector('[data-radix-toast-close]')?.click()}
-              className="absolute right-0 top-0 p-1 hover:bg-muted/50 rounded"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ),
-        duration: Infinity,
+        title: "Результат проверки",
+        description: result.suggestions[0],
       });
     } catch (error: any) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
       toast({
         title: "Ошибка",
         description: error.message,

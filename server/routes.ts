@@ -5,40 +5,6 @@ import { db } from "@db";
 import { questions, packages, packageQuestions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion } from './services/openai';
-import multer from 'multer';
-import path from 'path';
-import { mkdir } from 'fs/promises';
-import express from 'express';
-
-// Ensure uploads directory exists
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-mkdir(UPLOADS_DIR).catch(() => {});
-
-// Configure multer for image upload
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
-  },
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'));
-    }
-  }
-});
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -48,18 +14,6 @@ export function registerRoutes(app: Express): Server {
     if (req.isAuthenticated()) return next();
     res.status(401).send("Unauthorized");
   };
-
-  // Serve uploaded files
-  app.use('/uploads', express.static(UPLOADS_DIR));
-
-  // Image upload endpoint
-  app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-    const url = `/uploads/${req.file.filename}`;
-    res.json({ url });
-  });
 
   // Questions API
   app.get("/api/questions", requireAuth, async (req, res) => {
