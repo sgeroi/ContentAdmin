@@ -3,15 +3,12 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 function getImageBase64(url: string): string | null {
   try {
-    // Remove /uploads/ prefix from URL and construct full path
     const imagePath = path.join(process.cwd(), url.replace(/^\/uploads\//, 'uploads/'));
     console.log('Reading image from:', imagePath);
 
@@ -58,7 +55,7 @@ export async function validateQuestion(title: string, content: string, topic: st
     console.log('Starting validation for:', { title, topic });
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -100,11 +97,9 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   try {
     console.log('Starting fact check for:', { title, topic });
 
-    // Get all images from content
     const images = extractImagesFromContent(content);
     console.log('Found images:', images);
 
-    // Create base messages array
     const messages: any[] = [
       {
         role: "system",
@@ -112,7 +107,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       },
     ];
 
-    // Add main question content
     const userMessage: any = {
       role: "user",
       content: [
@@ -126,7 +120,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       ]
     };
 
-    // Add images to message if present
     let hasValidImages = false;
     for (const imageUrl of images) {
       console.log('Processing image:', imageUrl);
@@ -148,7 +141,6 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
 
     messages.push(userMessage);
 
-    // Log message structure for debugging
     console.log('Sending request to OpenAI with message structure:', 
       messages.map(m => ({
         role: m.role,
@@ -158,11 +150,10 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       }))
     );
 
-    // Always use gpt-4o regardless of images presence
-    console.log('Using model: gpt-4o');
+    console.log('Using model: gpt-4-turbo');
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4-turbo",
       messages: messages,
       max_tokens: 1000,
       temperature: 0.2
