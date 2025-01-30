@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2, Settings } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Save } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -131,7 +131,7 @@ function SortableRoundItem({ round, onQuestionCountChange, onRemove }: {
 }
 
 export default function Templates() {
-  const { templates, createTemplate, updateRoundSettings, addRound, removeRound, deleteTemplate, isLoading } =
+  const { templates, createTemplate, updateTemplate, updateRoundSettings, addRound, removeRound, deleteTemplate, isLoading } =
     useTemplates();
   const { rounds, createRound } = useRounds();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -146,6 +146,7 @@ export default function Templates() {
   } | null>(null);
   const { toast } = useToast();
   const [selectedRounds, setSelectedRounds] = useState<RoundSetting[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -186,10 +187,15 @@ export default function Templates() {
       console.log('Selected rounds:', selectedRounds);
 
       // First create the template
-      const template = await createTemplate({
+      const template = await (editingTemplate ? updateTemplate({
+          id: editingTemplate,
+          name: values.name,
+          description: values.description || "",
+      }) : createTemplate({
         name: values.name,
         description: values.description || "",
-      });
+      }));
+
 
       console.log('Template created:', template);
 
@@ -214,6 +220,7 @@ export default function Templates() {
       setIsCreateDialogOpen(false);
       templateForm.reset();
       setSelectedRounds([]);
+      setEditingTemplate(null);
 
       toast({
         title: "Успех",
@@ -280,6 +287,61 @@ export default function Templates() {
           ...round,
           orderIndex: index,
         }));
+      });
+    }
+  };
+
+  const handleStartEdit = (templateId: number) => {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+
+    templateForm.reset({
+      name: template.name,
+      description: template.description || "",
+    });
+    setSelectedRounds(template.roundSettings?.map(rs => ({
+      id: rs.roundId,
+      name: rs.name || rounds.find(r => r.id === rs.roundId)?.name || "",
+      description: rs.description || "",
+      questionCount: rs.questionCount || 1,
+      orderIndex: rs.orderIndex || 0,
+    })) || []);
+    setEditingTemplate(templateId);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTemplate) return;
+
+    try {
+      // Update template details
+      await updateTemplate({
+        id: editingTemplate,
+        name: templateForm.getValues("name"),
+        description: templateForm.getValues("description"),
+      });
+
+      // Update round settings
+      for (const round of selectedRounds) {
+        await updateRoundSettings({
+          templateId: editingTemplate,
+          roundId: round.id,
+          name: round.name,
+          description: round.description,
+          questionCount: round.questionCount,
+          orderIndex: round.orderIndex,
+        });
+      }
+
+      setEditingTemplate(null);
+      toast({
+        title: "Успех",
+        description: "Шаблон успешно обновлен",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
       });
     }
   };
@@ -516,111 +578,156 @@ export default function Templates() {
         {templates.map((template) => (
           <Card key={template.id}>
             <CardHeader>
-              <CardTitle>{template.name}</CardTitle>
-              {template.description && (
-                <CardDescription>{template.description}</CardDescription>
+              {editingTemplate === template.id ? (
+                <div className="space-y-2">
+                  <Input
+                    value={templateForm.watch("name")}
+                    onChange={(e) => templateForm.setValue("name", e.target.value)}
+                    placeholder="Название шаблона"
+                  />
+                  <Textarea
+                    value={templateForm.watch("description")}
+                    onChange={(e) => templateForm.setValue("description", e.target.value)}
+                    placeholder="Описание шаблона"
+                  />
+                </div>
+              ) : (
+                <>
+                  <CardTitle>{template.name}</CardTitle>
+                  {template.description && (
+                    <CardDescription>{template.description}</CardDescription>
+                  )}
+                </>
               )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Раунды</Label>
-                </div>
-                <div className="space-y-2">
-                  {template.roundSettings?.map((setting) => (
-                    <div
-                      key={setting.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                  {editingTemplate === template.id && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsNewRoundDialogOpen(true)}
                     >
-                      <div>
-                        <div className="font-medium">
-                          {setting.name || rounds.find(r => r.id === setting.roundId)?.name}
-                        </div>
-                        {setting.description && (
-                          <div className="text-sm text-muted-foreground">
-                            {setting.description}
-                          </div>
-                        )}
-                        <div className="flex gap-2 mt-1">
-                          <Badge variant="secondary">
-                            {setting.questionCount} вопросов
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedRoundSettings({
-                              templateId: template.id,
-                              roundId: setting.roundId,
-                              name: setting.name || "",
-                              description: setting.description || "",
-                              questionCount: setting.questionCount || 0,
-                              editorNotes: setting.editorNotes || "",
-                            });
+                      <Plus className="h-4 w-4 mr-2" />
+                      Добавить раунд
+                    </Button>
+                  )}
+                </div>
+                {editingTemplate === template.id ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={selectedRounds.map(r => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {selectedRounds.map((round, index) => (
+                        <SortableRoundItem
+                          key={round.id}
+                          round={round}
+                          onQuestionCountChange={(count) => {
+                            const newRounds = [...selectedRounds];
+                            newRounds[index] = {
+                              ...newRounds[index],
+                              questionCount: count,
+                            };
+                            setSelectedRounds(newRounds);
                           }}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Удалить раунд</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Вы уверены, что хотите удалить этот раунд из шаблона? Это действие нельзя отменить.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Отмена</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  removeRound({
-                                    templateId: template.id,
-                                    roundId: setting.roundId,
-                                  })
-                                }
-                              >
-                                Удалить
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          onRemove={() => {
+                            setSelectedRounds(
+                              selectedRounds.filter((_, i) => i !== index)
+                            );
+                          }}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  <div className="space-y-2">
+                    {template.roundSettings?.map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                      >
+                        <div>
+                          <div className="font-medium">
+                            {setting.name || rounds.find(r => r.id === setting.roundId)?.name}
+                          </div>
+                          {setting.description && (
+                            <div className="text-sm text-muted-foreground">
+                              {setting.description}
+                            </div>
+                          )}
+                          <div className="flex gap-2 mt-1">
+                            <Badge variant="secondary">
+                              {setting.questionCount} вопросов
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="w-full">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Удалить шаблон
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Удалить шаблон</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Вы уверены, что хотите удалить этот шаблон? Это действие нельзя отменить.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteTemplate(template.id)}
+
+              <div className="flex gap-2">
+                {editingTemplate === template.id ? (
+                  <>
+                    <Button
+                      onClick={handleSaveEdit}
+                      className="flex-1"
                     >
-                      Удалить
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <Save className="mr-2 h-4 w-4" />
+                      Сохранить
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingTemplate(null)}
+                    >
+                      Отмена
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleStartEdit(template.id)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Редактировать
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Удалить
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Удалить шаблон</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Вы уверены, что хотите удалить этот шаблон? Это действие нельзя отменить.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Отмена</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteTemplate(template.id)}
+                          >
+                            Удалить
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
         ))}
