@@ -487,6 +487,24 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Rounds API routes update
+  app.get("/api/rounds", requireAuth, async (req, res) => {
+    try {
+      console.log('Fetching rounds');
+      const result = await db.query.rounds.findMany({
+        orderBy: desc(rounds.orderIndex),
+        with: {
+          package: true,
+          template: true,
+        },
+      });
+      console.log('Rounds fetched:', result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching rounds:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/rounds", requireAuth, async (req, res) => {
     try {
       console.log('Creating round with data:', req.body);
@@ -509,36 +527,6 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error('Error creating round:', error);
       res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
-    try {
-      const [round] = await db
-        .update(rounds)
-        .set({
-          name: req.body.name,
-          description: req.body.description,
-          questionCount: req.body.questionCount,
-          orderIndex: req.body.orderIndex,
-          updatedAt: new Date(),
-        })
-        .where(eq(rounds.id, parseInt(req.params.id)))
-        .returning();
-      res.json(round);
-    } catch (error: any) {
-      res.status(500).send(error.message);
-    }
-  });
-
-  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
-    try {
-      await db
-        .delete(rounds)
-        .where(eq(rounds.id, parseInt(req.params.id)));
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).send(error.message);
     }
   });
 
@@ -621,6 +609,37 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      const [round] = await db
+        .update(rounds)
+        .set({
+          name: req.body.name,
+          description: req.body.description,
+          questionCount: req.body.questionCount,
+          orderIndex: req.body.orderIndex,
+          updatedAt: new Date(),
+        })
+        .where(eq(rounds.id, parseInt(req.params.id)))
+        .returning();
+      res.json(round);
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      await db
+        .delete(rounds)
+        .where(eq(rounds.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;
