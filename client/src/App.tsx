@@ -14,6 +14,8 @@ import Tags from "@/pages/tags";
 import Layout from "@/components/layout";
 import GenerateQuestions from "@/pages/questions/generate";
 import Users from "@/pages/users";
+import Rounds from "@/pages/rounds";
+import Templates from "@/pages/templates";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -35,13 +37,17 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/questions" component={Questions} />
-        <Route path="/questions/new" component={QuestionEditor} />
+        <Route path="/questions/new">
+          {() => <QuestionEditor />}
+        </Route>
         <Route path="/questions/generate" component={GenerateQuestions} />
         <Route path="/questions/:id">
           {(params) => <QuestionEditor id={params.id} />}
         </Route>
         <Route path="/packages" component={Packages} />
         <Route path="/tags" component={Tags} />
+        <Route path="/rounds" component={Rounds} />
+        <Route path="/templates" component={Templates} />
         {user.role === "admin" && (
           <Route path="/users" component={Users} />
         )}
