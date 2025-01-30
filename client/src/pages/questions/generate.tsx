@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +41,7 @@ export default function GenerateQuestions() {
   const [selectedTopic, setSelectedTopic] = useState<string>("");
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [prompt, setPrompt] = useState<string>("");
+  const [mode, setMode] = useState<"quick" | "advanced">("quick");
 
   const handleGenerate = async () => {
     if (!selectedTopic) {
@@ -51,7 +53,7 @@ export default function GenerateQuestions() {
       return;
     }
 
-    if (questionCount < 1 || questionCount > 20) {
+    if (mode === "advanced" && (questionCount < 1 || questionCount > 20)) {
       toast({
         title: "Некорректное количество вопросов",
         description: "Количество вопросов должно быть от 1 до 20",
@@ -67,9 +69,9 @@ export default function GenerateQuestions() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
-          count: questionCount, 
+          count: mode === "quick" ? 10 : questionCount, 
           topic: selectedTopic,
-          prompt: prompt.trim() || undefined
+          prompt: mode === "advanced" ? prompt.trim() : undefined
         }),
       });
 
@@ -107,62 +109,110 @@ export default function GenerateQuestions() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Создание нового пакета вопросов</CardTitle>
+          <CardTitle>Создание новых вопросов</CardTitle>
           <CardDescription>
-            Настройте параметры для генерации вопросов с помощью ИИ
+            Выберите режим генерации и настройте параметры
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Тема вопросов</Label>
-            <Select
-              value={selectedTopic}
-              onValueChange={setSelectedTopic}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите тему для вопросов" />
-              </SelectTrigger>
-              <SelectContent>
-                {topics.map((topic) => (
-                  <SelectItem key={topic} value={topic}>
-                    {topic}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Tabs value={mode} onValueChange={(value) => setMode(value as "quick" | "advanced")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="quick">Быстрая генерация</TabsTrigger>
+              <TabsTrigger value="advanced">Расширенная генерация</TabsTrigger>
+            </TabsList>
+            <TabsContent value="quick">
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Тема вопросов</Label>
+                  <Select
+                    value={selectedTopic}
+                    onValueChange={setSelectedTopic}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите тему для вопросов" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {topics.map((topic) => (
+                        <SelectItem key={topic} value={topic}>
+                          {topic}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="space-y-2">
-            <Label>Количество вопросов (1-20)</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={questionCount}
-              onChange={(e) => setQuestionCount(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
-              placeholder="Введите количество вопросов"
-            />
-          </div>
+                <div className="pt-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Будет сгенерировано 10 случайных вопросов разной сложности на выбранную тему.
+                  </p>
 
-          <div className="space-y-2">
-            <Label>Промпт для генерации (необязательно)</Label>
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Например: Сгенерируй сложные вопросы по истории России 20 века"
-              className="min-h-[100px]"
-            />
-          </div>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !selectedTopic}
+                    size="lg"
+                    className="w-full"
+                  >
+                    {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isGenerating ? "Генерация..." : "Сгенерировать вопросы"}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="advanced">
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Тема вопросов</Label>
+                  <Select
+                    value={selectedTopic}
+                    onValueChange={setSelectedTopic}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите тему для вопросов" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {topics.map((topic) => (
+                        <SelectItem key={topic} value={topic}>
+                          {topic}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating || !selectedTopic}
-            size="lg"
-            className="w-full"
-          >
-            {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isGenerating ? "Генерация..." : "Сгенерировать вопросы"}
-          </Button>
+                <div className="space-y-2">
+                  <Label>Количество вопросов (1-20)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={questionCount}
+                    onChange={(e) => setQuestionCount(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
+                    placeholder="Введите количество вопросов"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Промпт для генерации</Label>
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Например: Сгенерируй сложные вопросы по истории России 20 века"
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !selectedTopic}
+                  size="lg"
+                  className="w-full"
+                >
+                  {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isGenerating ? "Генерация..." : "Сгенерировать вопросы"}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
