@@ -182,6 +182,9 @@ export default function Templates() {
     }
 
     try {
+      console.log('Starting template creation with values:', values);
+      console.log('Selected rounds:', selectedRounds);
+
       // First create the template
       const template = await createTemplate({
         name: values.name,
@@ -193,14 +196,19 @@ export default function Templates() {
       // Then add rounds one by one
       for (const roundSetting of selectedRounds) {
         console.log('Adding round:', roundSetting);
-        await addRound({
-          templateId: template.id,
-          roundId: roundSetting.id,
-          name: roundSetting.name || "",
-          description: roundSetting.description || "",
-          questionCount: roundSetting.questionCount || 1,
-          orderIndex: roundSetting.orderIndex || 0,
-        });
+        try {
+          await addRound({
+            templateId: template.id,
+            roundId: roundSetting.id,
+            name: roundSetting.name || "",
+            description: roundSetting.description || "",
+            questionCount: roundSetting.questionCount || 1,
+            orderIndex: roundSetting.orderIndex || 0,
+          });
+        } catch (roundError: any) {
+          console.error('Error adding round:', roundError);
+          throw new Error(`Failed to add round: ${roundError.message}`);
+        }
       }
 
       setIsCreateDialogOpen(false);

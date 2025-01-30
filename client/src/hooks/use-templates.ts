@@ -68,19 +68,41 @@ export function useTemplates() {
   const createMutation = useMutation({
     mutationFn: async (data: CreateTemplateData) => {
       console.log('Creating template with data:', data);
-      const response = await fetch("/api/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
+      try {
+        const response = await fetch("/api/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to create template');
+        console.log('Template creation response status:', response.status);
+
+        const contentType = response.headers.get("content-type");
+        console.log('Response content type:', contentType);
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('Server error response:', text);
+          throw new Error(text || 'Failed to create template');
+        }
+
+        if (!contentType || !contentType.includes('application/json')) {
+          console.error('Invalid content type received:', contentType);
+          throw new Error('Server returned invalid content type');
+        }
+
+        const result = await response.json();
+        console.log('Template creation result:', result);
+        return result;
+      } catch (error: any) {
+        console.error('Template creation error details:', {
+          error,
+          message: error.message,
+          stack: error.stack
+        });
+        throw error;
       }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
