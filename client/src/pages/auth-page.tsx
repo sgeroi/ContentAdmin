@@ -14,10 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type FormData = {
   username: string;
   password: string;
+  rememberMe: boolean;
 };
 
 export default function AuthPage() {
@@ -29,13 +31,17 @@ export default function AuthPage() {
     defaultValues: {
       username: "",
       password: "",
+      rememberMe: false,
     },
   });
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
     try {
-      const result = await login(data);
+      const result = await login({
+        ...data,
+        rememberMe: data.rememberMe,
+      });
       if (!result.ok) {
         throw new Error(result.message);
       }
@@ -86,6 +92,23 @@ export default function AuthPage() {
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="rememberMe"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Запомнить меня</FormLabel>
+                    </div>
                   </FormItem>
                 )}
               />

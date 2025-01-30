@@ -4,9 +4,12 @@ import type { User } from "@db/schema";
 type LoginData = {
   username: string;
   password: string;
+  rememberMe?: boolean;
 };
 
-type RegisterData = LoginData & {
+type RegisterData = {
+  username: string;
+  password: string;
   role: "admin" | "editor" | "author";
 };
 
@@ -55,6 +58,10 @@ async function fetchUser(): Promise<User | null> {
   if (!response.ok) {
     if (response.status === 401) {
       return null;
+    }
+
+    if (response.status >= 500) {
+      throw new Error(`${response.status}: ${response.statusText}`);
     }
 
     throw new Error(`${response.status}: ${await response.text()}`);
