@@ -35,6 +35,16 @@ interface UpdateTemplateRoundData {
   orderIndex?: number;
 }
 
+interface AddRoundData {
+  templateId: number;
+  roundId: number;
+  name?: string;
+  description?: string;
+  questionCount?: number;
+  editorNotes?: string;
+  orderIndex?: number;
+}
+
 export function useTemplates() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -124,18 +134,18 @@ export function useTemplates() {
   });
 
   const addRoundMutation = useMutation({
-    mutationFn: async ({ templateId, roundId }: { templateId: number; roundId: number }) => {
-      const response = await fetch(`/api/templates/${templateId}/rounds`, {
+    mutationFn: async (data: AddRoundData) => {
+      const response = await fetch(`/api/templates/${data.templateId}/rounds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          roundId,
-          orderIndex: 0,
-          questionCount: 0,
-          name: "",
-          description: "",
-          editorNotes: "",
+          roundId: data.roundId,
+          orderIndex: data.orderIndex || 0,
+          questionCount: data.questionCount || 0,
+          name: data.name || "",
+          description: data.description || "",
+          editorNotes: data.editorNotes || "",
         }),
       });
 

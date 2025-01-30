@@ -32,6 +32,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { DragHandleDots2Icon } from "@radix-ui/react-icons";
 
 const roundFormSchema = z.object({
   name: z.string().min(1, "Название обязательно"),
@@ -43,6 +44,14 @@ const templateFormSchema = z.object({
   name: z.string().min(1, "Название обязательно"),
   description: z.string(),
 });
+
+interface RoundSetting {
+  id: number;
+  name: string;
+  description: string;
+  questionCount: number;
+  orderIndex: number;
+}
 
 export default function Templates() {
   const { templates, createTemplate, updateRoundSettings, addRound, removeRound, deleteTemplate, isLoading } =
@@ -59,7 +68,7 @@ export default function Templates() {
     editorNotes: string;
   } | null>(null);
   const { toast } = useToast();
-  const [selectedRounds, setSelectedRounds] = useState<number[]>([]);
+  const [selectedRounds, setSelectedRounds] = useState<RoundSetting[]>([]);
 
   const templateForm = useForm<z.infer<typeof templateFormSchema>>({
     resolver: zodResolver(templateFormSchema),
@@ -91,11 +100,15 @@ export default function Templates() {
     try {
       const template = await createTemplate(values);
 
-      // Добавляем выбранные раунды к шаблону
-      for (const roundId of selectedRounds) {
+      // Добавляем выбранные раунды к шаблону в правильном порядке
+      for (const roundSetting of selectedRounds) {
         await addRound({
           templateId: template.id,
-          roundId,
+          roundId: roundSetting.id,
+          name: roundSetting.name,
+          description: roundSetting.description,
+          questionCount: roundSetting.questionCount,
+          orderIndex: roundSetting.orderIndex,
         });
       }
 
@@ -123,9 +136,20 @@ export default function Templates() {
         orderIndex: rounds.length,
       });
 
+      // Добавляем новый раунд в список выбранных с его настройками
+      setSelectedRounds([
+        ...selectedRounds,
+        {
+          id: newRound.id,
+          name: newRound.name,
+          description: newRound.description || "",
+          questionCount: values.questionCount,
+          orderIndex: selectedRounds.length,
+        },
+      ]);
+
       setIsNewRoundDialogOpen(false);
       newRoundForm.reset();
-      setSelectedRounds([...selectedRounds, newRound.id]);
 
       toast({
         title: "Успех",
@@ -138,6 +162,20 @@ export default function Templates() {
         variant: "destructive",
       });
     }
+  };
+
+  const moveRound = (fromIndex: number, toIndex: number) => {
+    const newRounds = [...selectedRounds];
+    const [movedRound] = newRounds.splice(fromIndex, 1);
+    newRounds.splice(toIndex, 0, movedRound);
+
+    // Обновляем orderIndex для всех раундов
+    const updatedRounds = newRounds.map((round, index) => ({
+      ...round,
+      orderIndex: index,
+    }));
+
+    setSelectedRounds(updatedRounds);
   };
 
   return (
@@ -160,7 +198,7 @@ export default function Templates() {
             <DialogHeader>
               <DialogTitle>Создать новый шаблон</DialogTitle>
               <DialogDescription>
-                Создайте шаблон игры и выберите раунды
+                Создайте шаблон игры и настройте раунды
               </DialogDescription>
             </DialogHeader>
             <Form {...templateForm}>
@@ -198,42 +236,122 @@ export default function Templates() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <Label>Раунды</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsNewRoundDialogOpen(true)}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Создать новый раунд
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsNewRoundDialogOpen(true)}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Создать новый раунд
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    {rounds.map((round) => (
-                      <Button
-                        key={round.id}
-                        type="button"
-                        variant={selectedRounds.includes(round.id) ? "default" : "outline"}
-                        className="justify-start"
-                        onClick={() => {
-                          setSelectedRounds(prev =>
-                            prev.includes(round.id)
-                              ? prev.filter(id => id !== round.id)
-                              : [...prev, round.id]
-                          );
-                        }}
+                  <div className="space-y-2">
+                    {selectedRounds.map((roundSetting, index) => (
+                      <div
+                        key={roundSetting.id}
+                        className="flex items-center gap-2 p-2 border rounded-lg"
                       >
-                        <div className="flex flex-col items-start">
-                          <span>{round.name}</span>
-                          {round.description && (
-                            <span className="text-xs text-muted-foreground">
-                              {round.description}
-                            </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="cursor-move"
+                          onClick={() => {
+                            if (index > 0) {
+                              moveRound(index, index - 1);
+                            }
+                          }}
+                        >
+                          <DragHandleDots2Icon className="h-4 w-4" />
+                        </Button>
+                        <div className="flex-1">
+                          <div className="font-medium">{roundSetting.name}</div>
+                          {roundSetting.description && (
+                            <div className="text-sm text-muted-foreground">
+                              {roundSetting.description}
+                            </div>
                           )}
                         </div>
-                      </Button>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={roundSetting.questionCount}
+                          onChange={(e) => {
+                            const newRounds = [...selectedRounds];
+                            newRounds[index] = {
+                              ...newRounds[index],
+                              questionCount: parseInt(e.target.value) || 1,
+                            };
+                            setSelectedRounds(newRounds);
+                          }}
+                          className="w-24"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedRounds(
+                              selectedRounds.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ))}
                   </div>
+
+                  {rounds
+                    .filter(
+                      (round) =>
+                        !selectedRounds.some(
+                          (selected) => selected.id === round.id
+                        )
+                    )
+                    .length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {rounds
+                        .filter(
+                          (round) =>
+                            !selectedRounds.some(
+                              (selected) => selected.id === round.id
+                            )
+                        )
+                        .map((round) => (
+                          <Button
+                            key={round.id}
+                            type="button"
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => {
+                              setSelectedRounds([
+                                ...selectedRounds,
+                                {
+                                  id: round.id,
+                                  name: round.name,
+                                  description: round.description || "",
+                                  questionCount: round.questionCount || 1,
+                                  orderIndex: selectedRounds.length,
+                                },
+                              ]);
+                            }}
+                          >
+                            <div className="flex flex-col items-start">
+                              <span>{round.name}</span>
+                              {round.description && (
+                                <span className="text-xs text-muted-foreground">
+                                  {round.description}
+                                </span>
+                              )}
+                            </div>
+                          </Button>
+                        ))}
+                    </div>
+                  )}
                 </div>
 
                 <Button type="submit" className="w-full">
