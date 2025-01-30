@@ -32,7 +32,7 @@ export default function PackageEditor() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch package data
+        console.log('Fetching package data...');
         const packageResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: 'include'
         });
@@ -40,9 +40,10 @@ export default function PackageEditor() {
           throw new Error('Failed to fetch package data');
         }
         const packageResult = await packageResponse.json();
+        console.log('Package data received:', packageResult);
         setPackageData(packageResult);
 
-        // Fetch all available questions
+        console.log('Fetching questions...');
         const questionsResponse = await fetch('/api/questions', {
           credentials: 'include'
         });
@@ -50,8 +51,10 @@ export default function PackageEditor() {
           throw new Error('Failed to fetch questions');
         }
         const questionsResult = await questionsResponse.json();
+        console.log('Questions received:', questionsResult);
         setAvailableQuestions(questionsResult.questions);
       } catch (error: any) {
+        console.error('Error fetching data:', error);
         toast({
           title: "Ошибка",
           description: error.message,
@@ -67,6 +70,7 @@ export default function PackageEditor() {
 
   const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
     try {
+      console.log('Adding question:', { roundId, questionId, position });
       const response = await fetch(`/api/rounds/${roundId}/questions`, {
         method: 'POST',
         headers: {
@@ -97,6 +101,7 @@ export default function PackageEditor() {
         description: "Вопрос добавлен в раунд",
       });
     } catch (error: any) {
+      console.error('Error adding question:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -107,6 +112,7 @@ export default function PackageEditor() {
 
   const handleRemoveQuestion = async (roundId: number, questionId: number) => {
     try {
+      console.log('Removing question:', { roundId, questionId });
       const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -130,6 +136,7 @@ export default function PackageEditor() {
         description: "Вопрос удален из раунда",
       });
     } catch (error: any) {
+      console.error('Error removing question:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -146,23 +153,27 @@ export default function PackageEditor() {
     return <div>Package not found</div>;
   }
 
-  // Create array of all question slots
-  const questionSlots = packageData.rounds.flatMap((round, roundIndex) => {
-    // Ensure round has an array of questions
-    const questions = round.questions || [];
+  console.log('Rendering package data:', packageData);
+  console.log('Available rounds:', packageData.rounds);
 
-    // Create array of slots based on questionCount
+  // Create slots for questions in each round
+  const questionSlots = packageData.rounds.flatMap((round, roundIndex) => {
+    console.log(`Processing round ${roundIndex}:`, round);
     return Array.from({ length: round.questionCount }).map((_, questionIndex) => {
+      const question = round.questions?.[questionIndex];
+      console.log(`Slot ${questionIndex}:`, { roundId: round.id, question });
       return {
         roundId: round.id,
         roundName: round.name,
         roundIndex,
         questionIndex,
-        question: questions[questionIndex],
+        question,
         totalQuestions: round.questionCount
       };
     });
   });
+
+  console.log('Generated question slots:', questionSlots);
 
   return (
     <div className="container py-6 space-y-6">
@@ -182,76 +193,82 @@ export default function PackageEditor() {
       </div>
 
       <div className="grid gap-4">
-        {questionSlots.map((slot) => (
-          <div
-            key={`${slot.roundId}-${slot.questionIndex}`}
-            className="rounded-lg border p-4"
-          >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium">
-                    Раунд {slot.roundIndex + 1}: {slot.roundName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Вопрос {slot.questionIndex + 1} из {slot.totalQuestions}
-                  </p>
+        {questionSlots.length > 0 ? (
+          questionSlots.map((slot) => (
+            <div
+              key={`${slot.roundId}-${slot.questionIndex}`}
+              className="rounded-lg border p-4"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">
+                      Раунд {slot.roundIndex + 1}: {slot.roundName}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Вопрос {slot.questionIndex + 1} из {slot.totalQuestions}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {slot.question ? (
-                <div className="space-y-2">
-                  <div className="font-medium">{slot.question.title}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {slot.question.topic}
-                  </div>
-                  <div className="flex gap-2">
-                    <Link href={`/questions/${slot.question.id}`}>
-                      <Button variant="outline" size="sm">
-                        Редактировать
+                {slot.question ? (
+                  <div className="space-y-2">
+                    <div className="font-medium">{slot.question.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {slot.question.topic}
+                    </div>
+                    <div className="flex gap-2">
+                      <Link href={`/questions/${slot.question.id}`}>
+                        <Button variant="outline" size="sm">
+                          Редактировать
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveQuestion(slot.roundId, slot.question.id)}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Удалить
                       </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveQuestion(slot.roundId, slot.question.id)}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Удалить
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <select
-                      className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleAddQuestion(slot.roundId, parseInt(e.target.value), slot.questionIndex);
-                        }
-                      }}
-                      value=""
-                    >
-                      <option value="">Выберите вопрос из базы</option>
-                      {availableQuestions.map((q) => (
-                        <option key={q.id} value={q.id}>
-                          {q.title} ({q.topic})
-                        </option>
-                      ))}
-                    </select>
-                    <Link href="/questions/new">
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Создать новый
-                      </Button>
-                    </Link>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <select
+                        className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddQuestion(slot.roundId, parseInt(e.target.value), slot.questionIndex);
+                          }
+                        }}
+                        value=""
+                      >
+                        <option value="">Выберите вопрос из базы</option>
+                        {availableQuestions.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {q.title} ({q.topic})
+                          </option>
+                        ))}
+                      </select>
+                      <Link href="/questions/new">
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Создать новый
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="text-center text-muted-foreground">
+            В этом пакете нет раундов или слотов для вопросов
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
