@@ -28,11 +28,11 @@ interface CreateTemplateData {
 interface UpdateTemplateRoundData {
   templateId: number;
   roundId: number;
-  name: string;
-  description: string;
-  questionCount: number;
-  editorNotes: string;
-  orderIndex: number;
+  name?: string;
+  description?: string;
+  questionCount?: number;
+  editorNotes?: string;
+  orderIndex?: number;
 }
 
 export function useTemplates() {
@@ -41,6 +41,17 @@ export function useTemplates() {
 
   const { data: templates = [], isLoading } = useQuery<Template[]>({
     queryKey: ["/api/templates"],
+    queryFn: async () => {
+      const response = await fetch("/api/templates", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
     staleTime: 1000 * 60, // Cache for 1 minute
   });
 
@@ -61,8 +72,12 @@ export function useTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Успех",
+        description: "Шаблон успешно создан",
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -77,7 +92,13 @@ export function useTemplates() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name || "",
+          description: data.description || "",
+          questionCount: data.questionCount || 0,
+          editorNotes: data.editorNotes || "",
+          orderIndex: data.orderIndex || 0,
+        }),
       });
 
       if (!response.ok) {
@@ -88,8 +109,12 @@ export function useTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Успех",
+        description: "Настройки раунда обновлены",
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -104,7 +129,14 @@ export function useTemplates() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ roundId }),
+        body: JSON.stringify({
+          roundId,
+          orderIndex: 0,
+          questionCount: 0,
+          name: "",
+          description: "",
+          editorNotes: "",
+        }),
       });
 
       if (!response.ok) {
@@ -115,8 +147,12 @@ export function useTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Успех",
+        description: "Раунд добавлен в шаблон",
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -140,8 +176,12 @@ export function useTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Успех",
+        description: "Раунд удален из шаблона",
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -165,8 +205,12 @@ export function useTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Успех",
+        description: "Шаблон удален",
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,

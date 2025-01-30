@@ -16,7 +16,7 @@ export const questions = pgTable("questions", {
   title: text("title").notNull(),
   content: json("content").notNull(),
   answer: text("answer"),
-  topic: text("topic"), // Сделали topic необязательным
+  topic: text("topic"), 
   difficulty: integer("difficulty").notNull(),
   authorId: integer("author_id").references(() => users.id).notNull(),
   factChecked: boolean("fact_checked").default(false),
@@ -90,14 +90,13 @@ export const templateRoundSettings = pgTable("template_round_settings", {
   roundId: integer("round_id").references(() => rounds.id, { onDelete: 'cascade' }).notNull(),
   name: text("name"),
   description: text("description"),
-  questionCount: integer("question_count"),
+  questionCount: integer("question_count").default(0),
   editorNotes: text("editor_notes"),
-  orderIndex: integer("order_index").notNull(),
+  orderIndex: integer("order_index").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Relations
 export const usersRelations = relations(users, ({ many }) => ({
   questions: many(questions),
   packages: many(packages),
@@ -194,7 +193,6 @@ export const templateRoundSettingsRelations = relations(templateRoundSettings, (
 }));
 
 
-// Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertQuestionSchema = createInsertSchema(questions);
@@ -210,7 +208,6 @@ export const selectPackageSchema = createSelectSchema(packages);
 export const insertTemplateRoundSettingsSchema = createInsertSchema(templateRoundSettings);
 export const selectTemplateRoundSettingsSchema = createSelectSchema(templateRoundSettings);
 
-// Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Question = typeof questions.$inferSelect & {
