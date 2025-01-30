@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { questions, packages, packageQuestions } from "@db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { questions, packages, tags, questionTags } from "@db/schema";
+import { eq, and, desc, sql } from "drizzle-orm"; 
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
 import path from 'path';
@@ -47,6 +47,12 @@ export function registerRoutes(app: Express): Server {
     res.status(401).send("Unauthorized");
   };
 
+  // Admin middleware
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated() && req.user.role === "admin") return next();
+    res.status(403).send("Forbidden");
+  };
+
   // Static route for serving uploaded files
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
@@ -59,15 +65,88 @@ export function registerRoutes(app: Express): Server {
     res.json({ url });
   });
 
-  // Questions API
-  app.get("/api/questions", requireAuth, async (req, res) => {
-    const result = await db.query.questions.findMany({
-      with: {
-        author: true,
-      },
-      orderBy: desc(questions.createdAt),
+  // Tags API
+  app.get("/api/tags", requireAuth, async (req, res) => {
+    const result = await db.query.tags.findMany({
+      orderBy: desc(tags.name),
     });
     res.json(result);
+  });
+
+  app.post("/api/tags", requireAuth, async (req, res) => {
+    try {
+      const [tag] = await db
+        .insert(tags)
+        .values({
+          name: req.body.name,
+        })
+        .returning();
+      res.json(tag);
+    } catch (error: any) {
+      if (error.code === '23505') { // Unique violation
+        res.status(400).send("Тег с таким именем уже существует");
+      } else {
+        res.status(500).send(error.message);
+      }
+    }
+  });
+
+  app.put("/api/tags/:id", requireAuth, async (req, res) => {
+    try {
+      const [tag] = await db
+        .update(tags)
+        .set({
+          name: req.body.name,
+          updatedAt: new Date(),
+        })
+        .where(eq(tags.id, parseInt(req.params.id)))
+        .returning();
+      res.json(tag);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        res.status(400).send("Тег с таким именем уже существует");
+      } else {
+        res.status(500).send(error.message);
+      }
+    }
+  });
+
+  app.delete("/api/tags/:id", requireAuth, async (req, res) => {
+    await db
+      .delete(tags)
+      .where(eq(tags.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  });
+
+  // Questions API
+  app.get("/api/questions", requireAuth, async (req, res) => {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    const [result, total] = await Promise.all([
+      db.query.questions.findMany({
+        with: {
+          author: true,
+          questionTags: {
+            with: {
+              tag: true
+            }
+          }
+        },
+        orderBy: desc(questions.createdAt),
+        limit,
+        offset,
+      }),
+      db.select({ count: sql<number>`count(*)` }).from(questions),
+    ]);
+
+    res.json({
+      questions: result,
+      total: total[0].count,
+      page,
+      limit,
+    });
   });
 
   app.post("/api/questions/validate", requireAuth, async (req, res) => {
@@ -122,7 +201,7 @@ export function registerRoutes(app: Express): Server {
         .insert(questions)
         .values({
           ...req.body,
-          authorId: req.user!.id,
+          authorId: (req.user as any).id,
         })
         .returning();
       res.json(question);
@@ -141,7 +220,7 @@ export function registerRoutes(app: Express): Server {
       .where(
         and(
           eq(questions.id, parseInt(req.params.id)),
-          eq(questions.authorId, req.user!.id)
+          eq(questions.authorId, (req.user as any).id)
         )
       )
       .returning();
@@ -154,96 +233,7 @@ export function registerRoutes(app: Express): Server {
       .where(
         and(
           eq(questions.id, parseInt(req.params.id)),
-          eq(questions.authorId, req.user!.id)
-        )
-      );
-    res.json({ success: true });
-  });
-
-  // Packages API
-  app.get("/api/packages", requireAuth, async (req, res) => {
-    const allPackages = await db.query.packages.findMany({
-      with: {
-        author: true,
-        packageQuestions: {
-          with: {
-            question: true,
-          },
-        },
-      },
-      orderBy: desc(packages.createdAt),
-    });
-    res.json(allPackages);
-  });
-
-  app.post("/api/packages", requireAuth, async (req, res) => {
-    const { title, description, questions: packageQuestionsList } = req.body;
-
-    const [pkg] = await db
-      .insert(packages)
-      .values({
-        title,
-        description,
-        authorId: req.user!.id,
-      })
-      .returning();
-
-    if (packageQuestionsList?.length) {
-      await db.insert(packageQuestions).values(
-        packageQuestionsList.map((q: any, index: number) => ({
-          packageId: pkg.id,
-          questionId: q.id,
-          orderIndex: index,
-        }))
-      );
-    }
-
-    res.json(pkg);
-  });
-
-  app.put("/api/packages/:id", requireAuth, async (req, res) => {
-    const { title, description, questions: packageQuestionsList } = req.body;
-
-    const [pkg] = await db
-      .update(packages)
-      .set({
-        title,
-        description,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(packages.id, parseInt(req.params.id)),
-          eq(packages.authorId, req.user!.id)
-        )
-      )
-      .returning();
-
-    // Update package questions
-    await db
-      .delete(packageQuestions)
-      .where(eq(packageQuestions.packageId, pkg.id));
-
-    if (packageQuestionsList?.length) {
-      await db.insert(packageQuestions).values(
-        packageQuestionsList.map((q: any, index: number) => ({
-          packageId: pkg.id,
-          questionId: q.id,
-          orderIndex: index,
-        }))
-      );
-    }
-
-    res.json(pkg);
-  });
-
-  app.delete("/api/packages/:id", requireAuth, async (req, res) => {
-    await db
-      .delete(packages)
-      .where(
-        and(
-          eq(packages.id, parseInt(req.params.id)),
-          eq(packages.authorId, req.user!.id)
+          eq(questions.authorId, (req.user as any).id)
         )
       );
     res.json({ success: true });
@@ -262,7 +252,7 @@ export function registerRoutes(app: Express): Server {
         answer: q.answer,
         topic: q.topic,
         difficulty: q.difficulty,
-        authorId: req.user!.id,
+        authorId: (req.user as any).id,
         factChecked: false,
         isGenerated: true
       }));

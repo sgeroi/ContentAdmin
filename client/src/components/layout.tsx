@@ -1,20 +1,30 @@
 import { Link, useLocation } from "wouter";
-import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   LogOut,
   Package,
   HelpCircle,
   Menu,
+  Users,
+  Tag,
+  Layers,
+  CircuitBoard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/use-user";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+const adminNavigation = [
+  { name: "Пользователи", href: "/users", icon: Users, role: "admin" },
+];
+
 const navigation = [
   { name: "Главная", href: "/", icon: LayoutDashboard },
   { name: "Вопросы", href: "/questions", icon: HelpCircle },
+  { name: "Теги", href: "/tags", icon: Tag },
+  { name: "Раунды", href: "/rounds", icon: CircuitBoard },
+  { name: "Шаблоны", href: "/templates", icon: Layers },
   { name: "Пакеты", href: "/packages", icon: Package },
 ];
 
@@ -27,6 +37,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     await logout();
   };
 
+  const filteredNavigation = [
+    ...navigation,
+    ...(user?.role === "admin" ? adminNavigation : []),
+  ];
+
   const NavContent = () => (
     <>
       <div className="space-y-4">
@@ -35,7 +50,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             Админ панель
           </h2>
           <div className="space-y-1">
-            {navigation.map((item) => {
+            {filteredNavigation.map((item) => {
               const Icon = item.icon;
               return (
                 <Link key={item.href} href={item.href}>

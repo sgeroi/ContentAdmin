@@ -21,11 +21,16 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useTags } from "@/hooks/use-tags";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 type FormData = {
   content: any;
   topic: string;
   difficulty: string;
+  answer: string;
+  tags: string[];
 };
 
 const topics = [
@@ -45,12 +50,15 @@ export default function QuestionEditor({ id }: { id?: string }) {
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
+  const { tags } = useTags();
 
   const form = useForm<FormData>({
     defaultValues: {
       content: {},
       topic: "",
       difficulty: "1",
+      answer: "",
+      tags: [],
     },
   });
 
@@ -62,6 +70,8 @@ export default function QuestionEditor({ id }: { id?: string }) {
           content: question.content,
           topic: question.topic,
           difficulty: question.difficulty.toString(),
+          answer: question.answer || "",
+          tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
         });
       }
     }
@@ -222,6 +232,23 @@ export default function QuestionEditor({ id }: { id?: string }) {
             )}
           />
 
+          <FormField
+            control={form.control}
+            name="answer"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ответ</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Введите правильный ответ"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -279,6 +306,34 @@ export default function QuestionEditor({ id }: { id?: string }) {
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="tags"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Теги</FormLabel>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant={field.value.includes(tag.id.toString()) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const newTags = field.value.includes(tag.id.toString())
+                          ? field.value.filter((t) => t !== tag.id.toString())
+                          : [...field.value, tag.id.toString()];
+                        field.onChange(newTags);
+                      }}
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <div className="flex gap-4">
             <Button

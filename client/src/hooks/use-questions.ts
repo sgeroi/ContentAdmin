@@ -14,12 +14,28 @@ interface ValidationResult {
   correctedContent: any;
 }
 
-export function useQuestions() {
+interface QuestionsResponse {
+  questions: Question[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function useQuestions(page: number = 1) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: questions = [], isLoading } = useQuery<Question[]>({
-    queryKey: ["/api/questions"],
+  const { data, isLoading } = useQuery<QuestionsResponse>({
+    queryKey: ["/api/questions", page],
+    queryFn: async () => {
+      const response = await fetch(`/api/questions?page=${page}&limit=10`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
     staleTime: 1000 * 60, // Cache for 1 minute
   });
 
@@ -140,7 +156,10 @@ export function useQuestions() {
   });
 
   return {
-    questions,
+    questions: data?.questions ?? [],
+    total: data?.total ?? 0,
+    currentPage: data?.page ?? page,
+    limit: data?.limit ?? 10,
     isLoading,
     validateQuestion: validateMutation.mutateAsync,
     factCheckQuestion: factCheckMutation.mutateAsync,

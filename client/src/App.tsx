@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Questions from "@/pages/questions";
 import QuestionEditor from "@/pages/questions/editor";
 import Packages from "@/pages/packages";
+import Tags from "@/pages/tags";
 import Layout from "@/components/layout";
 import GenerateQuestions from "@/pages/questions/generate";
 
@@ -20,7 +21,6 @@ function Router() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-border" />
-        <span className="ml-2">Загрузка...</span>
       </div>
     );
   }
@@ -40,6 +40,7 @@ function Router() {
           {(params) => <QuestionEditor id={params.id} />}
         </Route>
         <Route path="/packages" component={Packages} />
+        <Route path="/tags" component={Tags} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
