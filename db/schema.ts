@@ -16,7 +16,7 @@ export const questions = pgTable("questions", {
   title: text("title").notNull(),
   content: json("content").notNull(),
   answer: text("answer"),
-  topic: text("topic"), 
+  topic: text("topic"),
   difficulty: integer("difficulty").notNull(),
   authorId: integer("author_id").references(() => users.id).notNull(),
   factChecked: boolean("fact_checked").default(false),
@@ -55,6 +55,7 @@ export const rounds = pgTable("rounds", {
   questionCount: integer("question_count"),
   orderIndex: integer("order_index").notNull(),
   templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }),
+  packageId: integer("package_id").references(() => packages.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -83,7 +84,6 @@ export const roundQuestions = pgTable("round_questions", {
   orderIndex: integer("order_index").notNull(),
 });
 
-// Add template round settings table
 export const templateRoundSettings = pgTable("template_round_settings", {
   id: serial("id").primaryKey(),
   templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }).notNull(),
@@ -142,6 +142,10 @@ export const roundsRelations = relations(rounds, ({ one, many }) => ({
     fields: [rounds.templateId],
     references: [templates.id],
   }),
+  package: one(packages, {
+    fields: [rounds.packageId],
+    references: [packages.id],
+  }),
   packageRounds: many(packageRounds),
   roundQuestions: many(roundQuestions),
 }));
@@ -155,6 +159,7 @@ export const packagesRelations = relations(packages, ({ one, many }) => ({
     fields: [packages.authorId],
     references: [users.id],
   }),
+  rounds: many(rounds),
   packageRounds: many(packageRounds),
 }));
 
@@ -180,7 +185,6 @@ export const roundQuestionsRelations = relations(roundQuestions, ({ one }) => ({
   }),
 }));
 
-// Add relations
 export const templateRoundSettingsRelations = relations(templateRoundSettings, ({ one }) => ({
   template: one(templates, {
     fields: [templateRoundSettings.templateId],
@@ -191,7 +195,6 @@ export const templateRoundSettingsRelations = relations(templateRoundSettings, (
     references: [rounds.id],
   }),
 }));
-
 
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);

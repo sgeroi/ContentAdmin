@@ -20,10 +20,11 @@ import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type FormData = {
   content: any;
@@ -31,6 +32,7 @@ type FormData = {
   difficulty: string;
   answer: string;
   tags: string[];
+  comment: string; // Added comment field
 };
 
 const topics = [
@@ -59,6 +61,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       difficulty: "1",
       answer: "",
       tags: [],
+      comment: "", // Added default value for comment
     },
   });
 
@@ -72,6 +75,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
           difficulty: question.difficulty.toString(),
           answer: question.answer || "",
           tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
+          comment: question.comment || "", // Added comment reset
         });
       }
     }
@@ -205,6 +209,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
   return (
     <div className="space-y-6">
       <div>
+        <Button
+          variant="ghost"
+          onClick={() => setLocation("/questions")}
+          className="mb-4"
+        >
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Назад к списку
+        </Button>
         <h1 className="text-3xl font-bold">
           {id ? "Редактировать вопрос" : "Создать вопрос"}
         </h1>
@@ -241,6 +253,23 @@ export default function QuestionEditor({ id }: { id?: string }) {
                 <FormControl>
                   <Input
                     placeholder="Введите правильный ответ"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="comment"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Комментарий</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Введите комментарий к вопросу"
                     {...field}
                   />
                 </FormControl>
