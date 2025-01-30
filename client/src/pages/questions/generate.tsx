@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const topics = [
   "История",
@@ -36,6 +38,8 @@ export default function GenerateQuestions() {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<string>("");
+  const [questionCount, setQuestionCount] = useState<number>(10);
+  const [prompt, setPrompt] = useState<string>("");
 
   const handleGenerate = async () => {
     if (!selectedTopic) {
@@ -47,13 +51,26 @@ export default function GenerateQuestions() {
       return;
     }
 
+    if (questionCount < 1 || questionCount > 20) {
+      toast({
+        title: "Некорректное количество вопросов",
+        description: "Количество вопросов должно быть от 1 до 20",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const response = await fetch("/api/questions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ count: 10, topic: selectedTopic }),
+        body: JSON.stringify({ 
+          count: questionCount, 
+          topic: selectedTopic,
+          prompt: prompt.trim() || undefined
+        }),
       });
 
       if (!response.ok) {
@@ -92,7 +109,7 @@ export default function GenerateQuestions() {
         <CardHeader>
           <CardTitle>Создание нового пакета вопросов</CardTitle>
           <CardDescription>
-            Выберите тему для генерации 10 новых вопросов разной сложности
+            Настройте параметры для генерации вопросов с помощью ИИ
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -114,6 +131,29 @@ export default function GenerateQuestions() {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-2">
+            <Label>Количество вопросов (1-20)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={questionCount}
+              onChange={(e) => setQuestionCount(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
+              placeholder="Введите количество вопросов"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Промпт для генерации (необязательно)</Label>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Например: Сгенерируй сложные вопросы по истории России 20 века"
+              className="min-h-[100px]"
+            />
+          </div>
+
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !selectedTopic}
