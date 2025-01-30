@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { questions, packages, tags, questionTags, users, rounds, templates, templateRoundSettings } from "@db/schema";
+import { questions, packages, tags, questionTags, users, rounds, templates, templateRoundSettings, roundQuestions } from "@db/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
@@ -282,12 +282,16 @@ export function registerRoutes(app: Express): Server {
           template: true,
           rounds: {
             with: {
-              questions: {
+              roundQuestions: {
                 with: {
-                  author: true,
-                  questionTags: {
+                  question: {
                     with: {
-                      tag: true
+                      author: true,
+                      questionTags: {
+                        with: {
+                          tag: true
+                        }
+                      }
                     }
                   }
                 }
@@ -303,7 +307,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Package not found' });
       }
 
-      res.json(result);
+      // Transform the data to match the expected format
+      const transformedResult = {
+        ...result,
+        rounds: result.rounds.map(round => ({
+          ...round,
+          questions: round.roundQuestions?.map(rq => rq.question) || []
+        }))
+      };
+
+      res.json(transformedResult);
     } catch (error: any) {
       console.error('Error fetching package:', error);
       res.status(500).json({ error: error.message });
