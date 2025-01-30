@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Edit, Plus, X } from "lucide-react";
+import { ChevronLeft, Plus, X } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question, Round } from "@db/schema";
@@ -27,10 +25,7 @@ export default function PackageEditor() {
   const { toast } = useToast();
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showQuestionSelector, setShowQuestionSelector] = useState(false);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
-  const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
-  const [currentPosition, setCurrentPosition] = useState<number>(0);
 
   useEffect(() => {
     const fetchPackage = async () => {
@@ -57,6 +52,7 @@ export default function PackageEditor() {
     };
 
     fetchPackage();
+    fetchAvailableQuestions();
   }, [params.id]);
 
   const fetchAvailableQuestions = async () => {
@@ -159,6 +155,14 @@ export default function PackageEditor() {
     return <div>Package not found</div>;
   }
 
+  const difficultyColors: Record<number, string> = {
+    1: "bg-green-500",
+    2: "bg-lime-500",
+    3: "bg-yellow-500",
+    4: "bg-orange-500",
+    5: "bg-red-500",
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -176,7 +180,7 @@ export default function PackageEditor() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {packageData.rounds.map((round, roundIndex) => (
           <Card key={round.id}>
             <CardHeader>
@@ -188,133 +192,90 @@ export default function PackageEditor() {
               )}
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px] rounded-md border">
-                <div className="space-y-4 p-4">
-                  {Array.from({ length: round.questionCount }).map((_, index) => {
-                    const question = round.questions[index];
-                    return (
-                      <div
-                        key={index}
-                        className="rounded-lg border p-4 space-y-2 hover:bg-accent/5"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            {question ? (
-                              <div className="space-y-1">
-                                <div className="font-medium">
-                                  {question.title}
-                                </div>
-                                <div className="flex gap-2">
-                                  <Badge variant="outline">{question.topic}</Badge>
-                                  <Badge>
-                                    Уровень {question.difficulty}
-                                  </Badge>
-                                  {question.isGenerated && (
-                                    <Badge variant="secondary">AI</Badge>
-                                  )}
-                                  {question.factChecked && (
-                                    <Badge variant="secondary">Проверено</Badge>
-                                  )}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  Автор: {question.author.username}
-                                </div>
+              <div className="space-y-4">
+                {Array.from({ length: round.questionCount }).map((_, index) => {
+                  const question = round.questions[index];
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-lg border p-4"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold mb-2">
+                            Вопрос {index + 1}
+                          </h3>
+                          {question ? (
+                            <div className="space-y-2">
+                              <div className="font-medium">
+                                {question.title}
                               </div>
-                            ) : (
-                              <div className="text-muted-foreground flex items-center gap-2">
-                                <span>Пустой слот для вопроса #{index + 1}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="hover:bg-primary/10"
-                                  onClick={() => {
-                                    setCurrentRoundId(round.id);
-                                    setCurrentPosition(index);
-                                    setShowQuestionSelector(true);
-                                    fetchAvailableQuestions();
-                                  }}
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Добавить вопрос
-                                </Button>
+                              <div className="flex gap-2">
+                                <Badge variant="outline">{question.topic}</Badge>
+                                <Badge className={difficultyColors[question.difficulty]}>
+                                  Уровень {question.difficulty}
+                                </Badge>
                               </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            {question ? (
-                              <>
+                              <div className="text-sm text-muted-foreground">
+                                Автор: {question.author.username}
+                              </div>
+                              <div className="flex gap-2 mt-4">
                                 <Link href={`/questions/${question.id}`}>
-                                  <Button variant="ghost" size="icon">
-                                    <Edit className="h-4 w-4" />
+                                  <Button variant="outline" size="sm">
+                                    Редактировать вопрос
                                   </Button>
                                 </Link>
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   onClick={() => handleRemoveQuestion(round.id, question.id)}
                                 >
-                                  <X className="h-4 w-4" />
+                                  <X className="h-4 w-4 mr-2" />
+                                  Удалить
                                 </Button>
-                              </>
-                            ) : null}
-                          </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-muted-foreground mb-4">
+                                Выберите существующий вопрос или создайте новый
+                              </div>
+                              <div className="flex gap-2">
+                                <select
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleAddQuestion(round.id, parseInt(e.target.value), index);
+                                    }
+                                  }}
+                                  value=""
+                                >
+                                  <option value="">Выберите вопрос из базы</option>
+                                  {availableQuestions.map((q) => (
+                                    <option key={q.id} value={q.id}>
+                                      {q.title} ({q.topic}, Уровень {q.difficulty})
+                                    </option>
+                                  ))}
+                                </select>
+                                <Link href="/questions/new">
+                                  <Button>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Создать новый
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      <Dialog open={showQuestionSelector} onOpenChange={setShowQuestionSelector}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Выбрать вопрос</DialogTitle>
-            <DialogDescription>
-              Выберите существующий вопрос или создайте новый
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Link href="/questions/new">
-              <Button className="w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Создать новый вопрос
-              </Button>
-            </Link>
-            <ScrollArea className="h-[400px] rounded-md border">
-              <div className="space-y-2 p-4">
-                {availableQuestions.map((q) => (
-                  <div
-                    key={q.id}
-                    className="flex items-center justify-between rounded-lg border p-2 hover:bg-accent/5"
-                  >
-                    <div>
-                      <div className="font-medium">{q.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {q.topic}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        if (currentRoundId !== null) {
-                          handleAddQuestion(currentRoundId, q.id, currentPosition);
-                          setShowQuestionSelector(false);
-                        }
-                      }}
-                    >
-                      Выбрать
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
