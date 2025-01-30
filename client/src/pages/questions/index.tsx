@@ -35,17 +35,27 @@ const difficultyColors: Record<number, string> = {
 
 function getContentPreview(content: any): string {
   try {
-    let preview = '';
     if (content?.content) {
-      content.content.forEach((node: any) => {
-        if (node.content?.[0]?.text) {
-          preview += (preview ? ' | ' : '') + node.content[0].text;
+      let preview = '';
+      // Recursively extract text from nodes
+      const extractText = (nodes: any[]): string => {
+        let text = '';
+        for (const node of nodes) {
+          if (node.text) {
+            text += node.text;
+          }
+          if (node.content) {
+            text += extractText(node.content);
+          }
         }
-      });
-      return preview.slice(0, 50) + '...';
+        return text;
+      };
+      preview = extractText(content.content);
+      return preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
     }
     return 'Нет содержания';
   } catch (error) {
+    console.error('Error parsing content:', error);
     return 'Ошибка контента';
   }
 }
