@@ -54,7 +54,7 @@ export default function AuthPage() {
     <div className="min-h-screen w-full flex items-center justify-center bg-muted/50">
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Quiz Admin Panel</CardTitle>
+          <CardTitle className="text-2xl font-bold">База знаний Квиз, плиз!</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
