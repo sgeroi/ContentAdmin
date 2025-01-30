@@ -14,8 +14,9 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { ImageCropper } from "./ui/image-cropper";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -72,8 +73,10 @@ export function WysiwygEditor({
   className,
 }: WysiwygEditorProps) {
   const { toast } = useToast();
+  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
 
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
     if (file.size > MAX_FILE_SIZE) {
       toast({
         title: "Ошибка",
@@ -108,6 +111,21 @@ export function WysiwygEditor({
     }
   }, [toast]);
 
+  const handleCroppedImage = useCallback(async (croppedImageUrl: string) => {
+    // Convert base64 to blob
+    const response = await fetch(croppedImageUrl);
+    const blob = await response.blob();
+
+    // Create a File from the blob
+    const file = new File([blob], 'cropped-image.jpg', { type: 'image/jpeg' });
+
+    const url = await handleImageUpload(file);
+    if (url) {
+      editor?.chain().focus().setImage({ src: url }).run();
+    }
+    setTempImageUrl(null);
+  }, [handleImageUpload]);
+
   const addImage = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -116,32 +134,30 @@ export function WysiwygEditor({
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const url = await handleImageUpload(file);
-      if (url) {
-        editor?.chain().focus().setImage({ src: url }).run();
-      }
+      // Create a temporary URL for the selected image
+      const tempUrl = URL.createObjectURL(file);
+      setTempImageUrl(tempUrl);
+      setIsCropperOpen(true);
     };
     input.click();
-  }, [handleImageUpload]);
+  }, []);
 
   const handlePaste = useCallback(async (event: ClipboardEvent) => {
-    const items = event.clipboardData?.items;
-    if (!items) return;
-
+    const items = Array.from(event.clipboardData?.items || []);
     for (const item of items) {
       if (item.type.indexOf('image') === 0) {
         event.preventDefault();
         const file = item.getAsFile();
         if (!file) continue;
 
-        const url = await handleImageUpload(file);
-        if (url) {
-          editor?.chain().focus().setImage({ src: url }).run();
-        }
+        // Create a temporary URL for the pasted image
+        const tempUrl = URL.createObjectURL(file);
+        setTempImageUrl(tempUrl);
+        setIsCropperOpen(true);
         break;
       }
     }
-  }, [handleImageUpload]);
+  }, []);
 
   const editor = useEditor({
     extensions,
@@ -180,67 +196,67 @@ export function WysiwygEditor({
         <MenuButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           isActive={editor.isActive("bold")}
-          title="Жирный текст"
         >
           <Bold className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
           isActive={editor.isActive("italic")}
-          title="Курсив"
         >
           <Italic className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           isActive={editor.isActive("bulletList")}
-          title="Маркированный список"
         >
           <List className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           isActive={editor.isActive("orderedList")}
-          title="Нумерованный список"
         >
           <ListOrdered className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           isActive={editor.isActive("blockquote")}
-          title="Цитата"
         >
           <Quote className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           isActive={editor.isActive("codeBlock")}
-          title="Код"
         >
           <Code className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={addImage}
-          title="Добавить изображение"
         >
           <ImageIcon className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
-          title="Отменить"
         >
           <Undo className="h-4 w-4" />
         </MenuButton>
         <MenuButton
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
-          title="Повторить"
         >
           <Redo className="h-4 w-4" />
         </MenuButton>
       </div>
       <EditorContent editor={editor} />
+
+      {tempImageUrl && (
+        <ImageCropper
+          imageUrl={tempImageUrl}
+          open={isCropperOpen}
+          onOpenChange={setIsCropperOpen}
+          onCropComplete={handleCroppedImage}
+        />
+      )}
     </div>
   );
 }
