@@ -486,33 +486,29 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Rounds API
-  app.get("/api/rounds", requireAuth, async (req, res) => {
-    try {
-      const result = await db.query.rounds.findMany({
-        orderBy: desc(rounds.orderIndex),
-      });
-      res.json(result);
-    } catch (error: any) {
-      res.status(500).send(error.message);
-    }
-  });
-
+  // Rounds API routes update
   app.post("/api/rounds", requireAuth, async (req, res) => {
     try {
+      console.log('Creating round with data:', req.body);
+      console.log('User:', req.user);
+
       const [round] = await db
         .insert(rounds)
         .values({
           name: req.body.name,
-          description: req.body.description,
+          description: req.body.description || "",
           questionCount: req.body.questionCount,
           orderIndex: req.body.orderIndex,
+          packageId: req.body.packageId || null,
           templateId: req.body.templateId || null,
         })
         .returning();
+
+      console.log('Round created:', round);
       res.json(round);
     } catch (error: any) {
-      res.status(500).send(error.message);
+      console.error('Error creating round:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
