@@ -6,6 +6,8 @@ interface Round {
   name: string;
   description: string;
   questionCount: number;
+  templateId: number;
+  orderIndex: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -14,6 +16,7 @@ interface CreateRoundData {
   name: string;
   description: string;
   questionCount: number;
+  templateId: number;
   orderIndex: number;
 }
 
@@ -47,7 +50,8 @@ export function useRounds() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        throw new Error(text || "Failed to create round");
       }
 
       return response.json();
@@ -59,7 +63,7 @@ export function useRounds() {
         description: "Раунд успешно создан",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -69,7 +73,10 @@ export function useRounds() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: CreateRoundData & { id: number }) => {
+    mutationFn: async ({
+      id,
+      ...data
+    }: CreateRoundData & { id: number }) => {
       const response = await fetch(`/api/rounds/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +85,8 @@ export function useRounds() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        throw new Error(text || "Failed to update round");
       }
 
       return response.json();
@@ -90,7 +98,7 @@ export function useRounds() {
         description: "Раунд успешно обновлен",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,
@@ -107,7 +115,8 @@ export function useRounds() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        throw new Error(text || "Failed to delete round");
       }
 
       return response.json();
@@ -119,7 +128,7 @@ export function useRounds() {
         description: "Раунд успешно удален",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Ошибка",
         description: error.message,

@@ -32,9 +32,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useRounds } from "@/hooks/use-rounds";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Rounds() {
   const { rounds, createRound, updateRound, deleteRound, isLoading } = useRounds();
+  const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<{
     id: number;
@@ -49,19 +51,36 @@ export default function Rounds() {
   });
 
   const handleSubmit = async () => {
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Название раунда обязательно",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.questionCount < 1) {
+      toast({
+        title: "Ошибка",
+        description: "Количество вопросов должно быть больше 0",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       if (editingRound) {
         await updateRound({
           id: editingRound.id,
           ...formData,
-          orderIndex: editingRound.id, // Using id as orderIndex for updates
+          orderIndex: editingRound.id,
         });
       } else {
         await createRound({
           ...formData,
-          orderIndex: rounds.length, // Using length as orderIndex for new rounds
+          templateId: 1, // Default template ID for now
+          orderIndex: rounds.length,
         });
       }
       setIsDialogOpen(false);
@@ -71,8 +90,12 @@ export default function Rounds() {
         description: "",
         questionCount: 0,
       });
-    } catch (error) {
-      // Error is handled by the mutation
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
