@@ -77,22 +77,23 @@ export function useTemplates() {
         });
 
         console.log('Template creation response status:', response.status);
-
-        const contentType = response.headers.get("content-type");
-        console.log('Response content type:', contentType);
+        console.log('Template creation response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
+          // Get response text even if it's not JSON
           const text = await response.text();
           console.error('Server error response:', text);
-          throw new Error(text || 'Failed to create template');
+          throw new Error(`Server returned error: ${text}`);
         }
 
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Invalid content type received:', contentType);
-          throw new Error('Server returned invalid content type');
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError);
+          throw new Error('Server returned invalid JSON response');
         }
 
-        const result = await response.json();
         console.log('Template creation result:', result);
         return result;
       } catch (error: any) {
@@ -123,6 +124,7 @@ export function useTemplates() {
 
   const updateRoundSettingsMutation = useMutation({
     mutationFn: async (data: UpdateTemplateRoundData) => {
+      console.log('Updating round settings:', data);
       const response = await fetch(`/api/templates/${data.templateId}/rounds/${data.roundId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -137,7 +139,9 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        console.error('Update round settings error:', text);
+        throw new Error(text);
       }
 
       return response.json();
@@ -176,11 +180,20 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to add round');
+        const text = await response.text();
+        console.error('Add round error:', text);
+        throw new Error(text);
       }
 
-      return response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        throw new Error('Server returned invalid JSON response');
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
@@ -207,7 +220,9 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        console.error('Remove round error:', text);
+        throw new Error(text);
       }
 
       return response.json();
@@ -236,7 +251,9 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const text = await response.text();
+        console.error('Delete template error:', text);
+        throw new Error(text);
       }
 
       return response.json();
