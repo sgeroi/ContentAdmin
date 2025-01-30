@@ -16,6 +16,7 @@ export const questions = pgTable("questions", {
   title: text("title").notNull(),
   content: json("content").notNull(),
   answer: text("answer"),
+  topic: text("topic"), // Сделали topic необязательным
   difficulty: integer("difficulty").notNull(),
   authorId: integer("author_id").references(() => users.id).notNull(),
   factChecked: boolean("fact_checked").default(false),
