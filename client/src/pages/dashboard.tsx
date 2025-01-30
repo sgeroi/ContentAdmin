@@ -7,14 +7,14 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
-  const { questions } = useQuestions();
+  const { total: questionCount } = useQuestions();
   const { packages } = usePackages();
   const { user } = useUser();
 
   const stats = [
     {
       name: "Всего вопросов",
-      value: questions.length,
+      value: questionCount,
       icon: HelpCircle,
       href: "/questions",
     },
@@ -80,9 +80,11 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground mb-4">
                 Управляйте пользователями и их ролями.
               </p>
-              <Button variant="secondary" className="w-full">
-                Управление пользователями
-              </Button>
+              <Link href="/users">
+                <Button variant="secondary" className="w-full">
+                  Управление пользователями
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         )}
