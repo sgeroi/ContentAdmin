@@ -122,6 +122,12 @@ export default function PackageView() {
           )}
         </div>
         <div className="flex gap-2">
+          <Link href={`/packages/${params.id}/edit`}>
+            <Button variant="default">
+              <Edit className="mr-2 h-4 w-4" />
+              Редактировать контент
+            </Button>
+          </Link>
           <Button
             variant="outline"
             onClick={() => {
@@ -167,6 +173,15 @@ export default function PackageView() {
                               <Badge className={difficultyColors[question.difficulty]}>
                                 Уровень {question.difficulty}
                               </Badge>
+                              {question.isGenerated && (
+                                <Badge variant="secondary">AI</Badge>
+                              )}
+                              {question.factChecked && (
+                                <Badge variant="secondary">Проверено</Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Автор: {question.author.username}
                             </div>
                           </div>
                         </div>

@@ -646,6 +646,49 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+  // Round questions management
+  app.post("/api/rounds/:roundId/questions", requireAuth, async (req, res) => {
+    try {
+      const roundId = parseInt(req.params.roundId);
+      const { questionId, orderIndex } = req.body;
+
+      const [result] = await db
+        .insert(roundQuestions)
+        .values({
+          roundId,
+          questionId,
+          orderIndex,
+        })
+        .returning();
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error adding question to round:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/rounds/:roundId/questions/:questionId", requireAuth, async (req, res) => {
+    try {
+      const roundId = parseInt(req.params.roundId);
+      const questionId = parseInt(req.params.questionId);
+
+      await db
+        .delete(roundQuestions)
+        .where(
+          and(
+            eq(roundQuestions.roundId, roundId),
+            eq(roundQuestions.questionId, questionId)
+          )
+        );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error removing question from round:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
     try {
