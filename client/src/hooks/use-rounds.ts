@@ -5,7 +5,7 @@ interface Round {
   id: number;
   name: string;
   description: string;
-  questionCount: string;
+  questionCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -13,7 +13,8 @@ interface Round {
 interface CreateRoundData {
   name: string;
   description: string;
-  questionCount: string;
+  questionCount: number;
+  orderIndex: number;
 }
 
 export function useRounds() {
@@ -22,6 +23,17 @@ export function useRounds() {
 
   const { data: rounds = [], isLoading } = useQuery<Round[]>({
     queryKey: ["/api/rounds"],
+    queryFn: async () => {
+      const response = await fetch("/api/rounds", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
     staleTime: 1000 * 60, // Cache for 1 minute
   });
 
@@ -42,6 +54,10 @@ export function useRounds() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rounds"] });
+      toast({
+        title: "Успех",
+        description: "Раунд успешно создан",
+      });
     },
     onError: (error) => {
       toast({
@@ -69,6 +85,10 @@ export function useRounds() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rounds"] });
+      toast({
+        title: "Успех",
+        description: "Раунд успешно обновлен",
+      });
     },
     onError: (error) => {
       toast({
@@ -94,6 +114,10 @@ export function useRounds() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rounds"] });
+      toast({
+        title: "Успех",
+        description: "Раунд успешно удален",
+      });
     },
     onError: (error) => {
       toast({

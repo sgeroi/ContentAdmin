@@ -40,12 +40,12 @@ export default function Rounds() {
     id: number;
     name: string;
     description: string;
-    questionCount: string;
+    questionCount: number;
   } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    questionCount: "",
+    questionCount: 0,
   });
 
   const handleSubmit = async () => {
@@ -56,16 +56,20 @@ export default function Rounds() {
         await updateRound({
           id: editingRound.id,
           ...formData,
+          orderIndex: editingRound.id, // Using id as orderIndex for updates
         });
       } else {
-        await createRound(formData);
+        await createRound({
+          ...formData,
+          orderIndex: rounds.length, // Using length as orderIndex for new rounds
+        });
       }
       setIsDialogOpen(false);
       setEditingRound(null);
       setFormData({
         name: "",
         description: "",
-        questionCount: "",
+        questionCount: 0,
       });
     } catch (error) {
       // Error is handled by the mutation
@@ -144,14 +148,15 @@ export default function Rounds() {
               <div className="space-y-2">
                 <Label>Количество вопросов</Label>
                 <Input
-                  value={formData.questionCount}
+                  type="number"
+                  min={1}
+                  value={formData.questionCount || ""}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      questionCount: e.target.value,
+                      questionCount: parseInt(e.target.value) || 0,
                     }))
                   }
-                  placeholder="Например: 5-7 вопросов"
                 />
               </div>
               <Button onClick={handleSubmit} className="w-full">
@@ -197,8 +202,8 @@ export default function Rounds() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Удалить раунд</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Вы уверены, что хотите удалить этот раунд? Это действие
-                            нельзя отменить.
+                            Вы уверены, что хотите удалить этот раунд? Это
+                            действие нельзя отменить.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
