@@ -400,88 +400,73 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/questions", requireAuth, async (req, res) => {
     try {
-      // Validate the question first
-      const validation = await validateQuestion(
-        req.body.title,
-        req.body.content,
-        req.body.topic
-      );
-
-      if (!validation.isValid) {
-        return res.status(400).json({
-          message: "Question validation failed",
-          validation
-        });
-      }
-
+      console.log('Creating question:', req.body);
       const [question] = await db
         .insert(questions)
         .values({
           ...req.body,
           authorId: (req.user as any).id,
+          isValidated: false, // Mark as not validated initially
         })
         .returning();
+
+      // Start validation in the background if requested
+      if (req.body.validate) {
+        validateQuestion(
+          question.title,
+          question.content,
+          question.topic
+        ).then(async (validation) => {
+          if (validation.isValid) {
+            await db
+              .update(questions)
+              .set({
+                isValidated: true,
+                validatedAt: new Date(),
+              })
+              .where(eq(questions.id, question.id));
+          }
+        }).catch(console.error);
+      }
+
       res.json(question);
     } catch (error: any) {
+      console.error('Error creating question:', error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.put("/api/questions/:id", requireAuth, async (req, res) => {
-    const [question] = await db
-      .update(questions)
-      .set({
-        ...req.body,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(questions.id, parseInt(req.params.id)),
-          eq(questions.authorId, (req.user as any).id)
-        )
-      )
-      .returning();
-    res.json(question);
-  });
-
-  app.delete("/api/questions/:id", requireAuth, async (req, res) => {
-    await db
-      .delete(questions)
-      .where(
-        and(
-          eq(questions.id, parseInt(req.params.id)),
-          eq(questions.authorId, (req.user as any).id)
-        )
-      );
-    res.json({ success: true });
-  });
-
-  app.post("/api/questions/generate", requireAuth, async (req, res) => {
+  // Separate validation endpoint
+  app.post("/api/questions/:id/validate", requireAuth, async (req, res) => {
     try {
-      const count = req.body.count || 10;
-      const topic = req.body.topic;
-      const generatedQuestions = await generateQuizQuestions(count, topic);
+      const [question] = await db
+        .select()
+        .from(questions)
+        .where(eq(questions.id, parseInt(req.params.id)))
+        .limit(1);
 
-      // Create all questions at once with proper type casting
-      const questionsToInsert = generatedQuestions.map(q => ({
-        title: q.title,
-        content: q.content,
-        answer: q.answer,
-        topic: q.topic,
-        difficulty: q.difficulty,
-        authorId: (req.user as any).id,
-        factChecked: false,
-        isGenerated: true
-      }));
+      if (!question) {
+        return res.status(404).json({ error: "Question not found" });
+      }
 
-      const createdQuestions = await db
-        .insert(questions)
-        .values(questionsToInsert)
-        .returning();
+      const validation = await validateQuestion(
+        question.title,
+        question.content,
+        question.topic
+      );
 
-      res.json(createdQuestions);
+      if (validation.isValid) {
+        await db
+          .update(questions)
+          .set({
+            isValidated: true,
+            validatedAt: new Date(),
+          })
+          .where(eq(questions.id, question.id));
+      }
+
+      res.json(validation);
     } catch (error: any) {
-      console.error('Error generating questions:', error);
       res.status(500).json({ error: error.message });
     }
   });
