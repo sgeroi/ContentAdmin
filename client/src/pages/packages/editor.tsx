@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, Plus, X } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
@@ -104,6 +104,39 @@ export default function PackageEditor() {
     }
   };
 
+  const handleRemoveQuestion = async (roundId: number, questionId: number) => {
+    try {
+      const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove question from round');
+      }
+
+      // Refresh package data
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: 'include'
+      });
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setPackageData(updatedData);
+      }
+
+      toast({
+        title: "Успех",
+        description: "Вопрос удален из раунда",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -113,19 +146,19 @@ export default function PackageEditor() {
   }
 
   // Вычисляем общее количество вопросов во всех раундах
-  const totalQuestions = packageData.rounds.reduce((total, round) => total + round.questionCount, 0);
+  const totalQuestions = packageData.rounds.reduce((total, round) => total + (round.questionCount ?? 0), 0);
 
   // Создаем массив всех слотов для вопросов
   const questionSlots = packageData.rounds.flatMap((round, roundIndex) => 
-    Array.from({ length: round.questionCount }).map((_, questionIndex) => {
-      const question = round.questions[questionIndex];
+    Array.from({ length: round.questionCount ?? 0 }).map((_, questionIndex) => {
+      const question = round.questions?.[questionIndex];
       return {
         roundId: round.id,
         roundName: round.name,
         roundIndex,
         questionIndex,
         question,
-        globalIndex: packageData.rounds.slice(0, roundIndex).reduce((sum, r) => sum + r.questionCount, 0) + questionIndex
+        globalIndex: packageData.rounds.slice(0, roundIndex).reduce((sum, r) => sum + (r.questionCount ?? 0), 0) + questionIndex
       };
     })
   );
@@ -178,6 +211,14 @@ export default function PackageEditor() {
                           Редактировать
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveQuestion(slot.roundId, slot.question.id)}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Удалить
+                      </Button>
                     </div>
                   </div>
                 ) : (

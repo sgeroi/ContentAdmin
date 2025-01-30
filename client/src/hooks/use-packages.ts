@@ -2,9 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Package, InsertPackage, Question } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
-type CreatePackageData = Omit<InsertPackage, "authorId"> & {
-  questions: Question[];
-};
+type CreatePackageData = Omit<InsertPackage, "authorId">;
 
 export function usePackages() {
   const queryClient = useQueryClient();
