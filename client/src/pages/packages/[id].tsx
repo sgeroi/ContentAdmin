@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePackages } from "@/hooks/use-packages";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, FileText } from "lucide-react";
 import { Link } from "wouter";
@@ -125,7 +124,7 @@ export default function PackageView() {
           <Link href={`/packages/${params.id}/edit`}>
             <Button variant="default">
               <Edit className="mr-2 h-4 w-4" />
-              Редактировать контент
+              Редактировать вопросы
             </Button>
           </Link>
           <Button

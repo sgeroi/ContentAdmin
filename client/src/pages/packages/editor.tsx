@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, Plus, X } from "lucide-react";
@@ -27,9 +27,10 @@ export default function PackageEditor() {
   const { toast } = useToast();
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
   const [showQuestionSelector, setShowQuestionSelector] = useState(false);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+  const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<number>(0);
 
   useEffect(() => {
     const fetchPackage = async () => {
@@ -194,7 +195,7 @@ export default function PackageEditor() {
                     return (
                       <div
                         key={index}
-                        className="rounded-lg border p-4 space-y-2"
+                        className="rounded-lg border p-4 space-y-2 hover:bg-accent/5"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -220,8 +221,22 @@ export default function PackageEditor() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="text-muted-foreground">
-                                Пустой слот для вопроса
+                              <div className="text-muted-foreground flex items-center gap-2">
+                                <span>Пустой слот для вопроса #{index + 1}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-primary/10"
+                                  onClick={() => {
+                                    setCurrentRoundId(round.id);
+                                    setCurrentPosition(index);
+                                    setShowQuestionSelector(true);
+                                    fetchAvailableQuestions();
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Добавить вопрос
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -241,65 +256,7 @@ export default function PackageEditor() {
                                   <X className="h-4 w-4" />
                                 </Button>
                               </>
-                            ) : (
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      setSelectedQuestionId(null);
-                                      setShowQuestionSelector(true);
-                                      fetchAvailableQuestions();
-                                    }}
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Выбрать вопрос</DialogTitle>
-                                    <DialogDescription>
-                                      Выберите существующий вопрос или создайте новый
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="space-y-4">
-                                    <Link href="/questions/new">
-                                      <Button className="w-full">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Создать новый вопрос
-                                      </Button>
-                                    </Link>
-                                    <ScrollArea className="h-[400px] rounded-md border">
-                                      <div className="space-y-2 p-4">
-                                        {availableQuestions.map((q) => (
-                                          <div
-                                            key={q.id}
-                                            className="flex items-center justify-between rounded-lg border p-2"
-                                          >
-                                            <div>
-                                              <div className="font-medium">{q.title}</div>
-                                              <div className="text-sm text-muted-foreground">
-                                                {q.topic}
-                                              </div>
-                                            </div>
-                                            <Button
-                                              variant="ghost"
-                                              onClick={() => {
-                                                handleAddQuestion(round.id, q.id, index);
-                                                setShowQuestionSelector(false);
-                                              }}
-                                            >
-                                              Выбрать
-                                            </Button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </ScrollArea>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -311,6 +268,53 @@ export default function PackageEditor() {
           </Card>
         ))}
       </div>
+
+      <Dialog open={showQuestionSelector} onOpenChange={setShowQuestionSelector}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Выбрать вопрос</DialogTitle>
+            <DialogDescription>
+              Выберите существующий вопрос или создайте новый
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Link href="/questions/new">
+              <Button className="w-full">
+                <Plus className="mr-2 h-4 w-4" />
+                Создать новый вопрос
+              </Button>
+            </Link>
+            <ScrollArea className="h-[400px] rounded-md border">
+              <div className="space-y-2 p-4">
+                {availableQuestions.map((q) => (
+                  <div
+                    key={q.id}
+                    className="flex items-center justify-between rounded-lg border p-2 hover:bg-accent/5"
+                  >
+                    <div>
+                      <div className="font-medium">{q.title}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {q.topic}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        if (currentRoundId !== null) {
+                          handleAddQuestion(currentRoundId, q.id, currentPosition);
+                          setShowQuestionSelector(false);
+                        }
+                      }}
+                    >
+                      Выбрать
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
