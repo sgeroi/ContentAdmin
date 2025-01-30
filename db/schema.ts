@@ -81,6 +81,20 @@ export const roundQuestions = pgTable("round_questions", {
   orderIndex: integer("order_index").notNull(),
 });
 
+// Add template round settings table
+export const templateRoundSettings = pgTable("template_round_settings", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }).notNull(),
+  roundId: integer("round_id").references(() => rounds.id, { onDelete: 'cascade' }).notNull(),
+  name: text("name"),
+  description: text("description"),
+  questionCount: integer("question_count"),
+  editorNotes: text("editor_notes"),
+  orderIndex: integer("order_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   questions: many(questions),
@@ -119,6 +133,7 @@ export const templatesRelations = relations(templates, ({ one, many }) => ({
   }),
   rounds: many(rounds),
   packages: many(packages),
+  roundSettings: many(templateRoundSettings),
 }));
 
 export const roundsRelations = relations(rounds, ({ one, many }) => ({
@@ -164,6 +179,19 @@ export const roundQuestionsRelations = relations(roundQuestions, ({ one }) => ({
   }),
 }));
 
+// Add relations
+export const templateRoundSettingsRelations = relations(templateRoundSettings, ({ one }) => ({
+  template: one(templates, {
+    fields: [templateRoundSettings.templateId],
+    references: [templates.id],
+  }),
+  round: one(rounds, {
+    fields: [templateRoundSettings.roundId],
+    references: [rounds.id],
+  }),
+}));
+
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -177,11 +205,13 @@ export const insertRoundSchema = createInsertSchema(rounds);
 export const selectRoundSchema = createSelectSchema(rounds);
 export const insertPackageSchema = createInsertSchema(packages);
 export const selectPackageSchema = createSelectSchema(packages);
+export const insertTemplateRoundSettingsSchema = createInsertSchema(templateRoundSettings);
+export const selectTemplateRoundSettingsSchema = createSelectSchema(templateRoundSettings);
 
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-export type Question = typeof questions.$inferSelect & { 
+export type Question = typeof questions.$inferSelect & {
   author?: User;
   tags?: Tag[];
 };
@@ -191,6 +221,7 @@ export type InsertTag = typeof tags.$inferInsert;
 export type Template = typeof templates.$inferSelect & {
   author?: User;
   rounds?: Round[];
+  roundSettings?: TemplateRoundSettings[];
 };
 export type InsertTemplate = typeof templates.$inferInsert;
 export type Round = typeof rounds.$inferSelect & {
@@ -203,3 +234,5 @@ export type Package = typeof packages.$inferSelect & {
   rounds?: (Round & { questions?: Question[] })[];
 };
 export type InsertPackage = typeof packages.$inferInsert;
+export type TemplateRoundSettings = typeof templateRoundSettings.$inferSelect;
+export type InsertTemplateRoundSettings = typeof templateRoundSettings.$inferInsert;
