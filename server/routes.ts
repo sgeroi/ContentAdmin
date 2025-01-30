@@ -263,6 +263,85 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.put("/api/packages/:id", requireAuth, async (req, res) => {
+    try {
+      console.log('Updating package:', req.params.id, 'with data:', req.body);
+
+      // Update the package
+      const [pkg] = await db
+        .update(packages)
+        .set({
+          title: req.body.title,
+          description: req.body.description || "",
+          templateId: req.body.templateId || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(packages.id, parseInt(req.params.id)))
+        .returning();
+
+      // If manual rounds were provided, update them
+      if (req.body.rounds && Array.isArray(req.body.rounds)) {
+        // First, delete existing rounds
+        await db
+          .delete(rounds)
+          .where(eq(rounds.packageId, pkg.id));
+
+        // Then create new rounds
+        for (const round of req.body.rounds) {
+          await db.insert(rounds).values({
+            name: round.name,
+            description: round.description || "",
+            questionCount: round.questionCount,
+            orderIndex: round.orderIndex,
+            packageId: pkg.id,
+          });
+        }
+      }
+
+      // Fetch the complete updated package with related data
+      const [result] = await db.query.packages.findMany({
+        where: eq(packages.id, pkg.id),
+        with: {
+          template: true,
+          rounds: {
+            with: {
+              roundQuestions: {
+                with: {
+                  question: {
+                    with: {
+                      author: true,
+                      questionTags: {
+                        with: {
+                          tag: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: asc(rounds.orderIndex),
+          },
+        },
+        limit: 1,
+      });
+
+      // Transform the result to match the expected format
+      const transformedResult = {
+        ...result,
+        rounds: result.rounds.map(round => ({
+          ...round,
+          questions: round.roundQuestions?.map(rq => rq.question) || []
+        }))
+      };
+
+      res.json(transformedResult);
+    } catch (error: any) {
+      console.error('Error updating package:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/packages/:id", requireAuth, async (req, res) => {
     try {
       await db.delete(packages).where(eq(packages.id, parseInt(req.params.id)));

@@ -32,13 +32,13 @@ export function usePackages() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       toast({
-        title: "Success",
-        description: "Package created successfully",
+        title: "Успех",
+        description: "Пакет создан успешно",
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -66,13 +66,13 @@ export function usePackages() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       toast({
-        title: "Success",
-        description: "Package updated successfully",
+        title: "Успех",
+        description: "Пакет обновлен успешно",
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -95,13 +95,13 @@ export function usePackages() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       toast({
-        title: "Success",
-        description: "Package deleted successfully",
+        title: "Успех",
+        description: "Пакет удален успешно",
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });

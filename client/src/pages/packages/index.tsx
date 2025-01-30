@@ -29,11 +29,12 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, Eye, FileText } from "lucide-react";
+import { Plus, Trash2, Eye, FileText, Edit } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
+import type { Package } from "@db/schema";
 
 type Round = {
   id?: number;
@@ -51,17 +52,45 @@ type CreatePackageData = {
 };
 
 export default function Packages() {
-  const { packages, createPackage, deletePackage } = usePackages();
+  const { packages, createPackage, updatePackage, deletePackage } = usePackages();
   const { templates } = useTemplates();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [manualRounds, setManualRounds] = useState<Round[]>([]);
   const [createMode, setCreateMode] = useState<"template" | "manual">("template");
 
-  const handleCreate = async () => {
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setSelectedTemplateId("");
+    setManualRounds([]);
+    setCreateMode("template");
+    setEditingPackage(null);
+  };
+
+  const handleEdit = (pkg: Package) => {
+    setEditingPackage(pkg);
+    setTitle(pkg.title);
+    setDescription(pkg.description || "");
+    setSelectedTemplateId(pkg.templateId?.toString() || "");
+    setManualRounds(
+      pkg.rounds?.map((round) => ({
+        id: round.id,
+        name: round.name,
+        description: round.description || "",
+        questionCount: round.questionCount,
+        orderIndex: round.orderIndex,
+      })) || []
+    );
+    setCreateMode(pkg.templateId ? "template" : "manual");
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
     if (!title) {
       toast({
         title: "Ошибка",
@@ -82,7 +111,12 @@ export default function Packages() {
         packageData.templateId = parseInt(selectedTemplateId);
       }
 
-      await createPackage(packageData);
+      if (editingPackage) {
+        await updatePackage({ ...packageData, id: editingPackage.id });
+      } else {
+        await createPackage(packageData);
+      }
+
       setIsDialogOpen(false);
       resetForm();
     } catch (error: any) {
@@ -92,14 +126,6 @@ export default function Packages() {
         variant: "destructive",
       });
     }
-  };
-
-  const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setSelectedTemplateId("");
-    setManualRounds([]);
-    setCreateMode("template");
   };
 
   const addRound = () => {
@@ -148,9 +174,11 @@ export default function Packages() {
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Создать новый пакет</DialogTitle>
+              <DialogTitle>{editingPackage ? 'Редактировать пакет' : 'Создать новый пакет'}</DialogTitle>
               <DialogDescription>
-                Создайте новый пакет, выбрав шаблон или создав раунды вручную
+                {editingPackage 
+                  ? 'Отредактируйте информацию о пакете и его раундах'
+                  : 'Создайте новый пакет, выбрав шаблон или создав раунды вручную'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
@@ -285,8 +313,8 @@ export default function Packages() {
                 </TabsContent>
               </Tabs>
 
-              <Button onClick={handleCreate} className="w-full">
-                Создать пакет
+              <Button onClick={handleSave} className="w-full">
+                {editingPackage ? 'Сохранить изменения' : 'Создать пакет'}
               </Button>
             </div>
           </DialogContent>
@@ -323,6 +351,14 @@ export default function Packages() {
                         Просмотр
                       </Button>
                     </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(pkg)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Изменить
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
