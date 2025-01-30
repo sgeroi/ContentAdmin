@@ -29,10 +29,11 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, FileDown, Trash2, Plus as PlusIcon } from "lucide-react";
+import { Plus, FileDown, Trash2, Eye, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from "wouter";
 
 type Round = {
   id?: number;
@@ -304,7 +305,7 @@ export default function Packages() {
               <TableHead>Description</TableHead>
               <TableHead>Template</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="w-[280px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -316,18 +317,28 @@ export default function Packages() {
                 <TableCell>{formatDate(pkg.createdAt)}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
+                    <Link href={`/packages/${pkg.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="whitespace-nowrap"
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Просмотр
+                      </Button>
+                    </Link>
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
                       onClick={() => {
                         toast({
-                          title: "Coming Soon",
-                          description: "Export functionality will be available soon",
+                          title: "Скоро",
+                          description: "Функция скачивания PDF будет доступна в ближайшее время",
                         });
                       }}
                     >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Export
+                      <FileText className="mr-2 h-4 w-4" />
+                      PDF
                     </Button>
                     <Button
                       variant="ghost"
@@ -335,7 +346,7 @@ export default function Packages() {
                       onClick={() => deletePackage(pkg.id)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
+                      Удалить
                     </Button>
                   </div>
                 </TableCell>

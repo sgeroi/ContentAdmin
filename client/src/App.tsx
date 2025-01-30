@@ -16,6 +16,7 @@ import GenerateQuestions from "@/pages/questions/generate";
 import Users from "@/pages/users";
 import Rounds from "@/pages/rounds";
 import Templates from "@/pages/templates";
+import PackageView from "@/pages/packages/[id]";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -45,6 +46,7 @@ function Router() {
           {(params) => <QuestionEditor id={params.id} />}
         </Route>
         <Route path="/packages" component={Packages} />
+        <Route path="/packages/:id" component={PackageView} />
         <Route path="/tags" component={Tags} />
         <Route path="/rounds" component={Rounds} />
         <Route path="/templates" component={Templates} />
