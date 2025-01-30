@@ -182,17 +182,24 @@ export default function Templates() {
     }
 
     try {
-      const template = await createTemplate(values);
+      // First create the template
+      const template = await createTemplate({
+        name: values.name,
+        description: values.description || "",
+      });
 
-      // Добавляем выбранные раунды к шаблону в правильном порядке
+      console.log('Template created:', template);
+
+      // Then add rounds one by one
       for (const roundSetting of selectedRounds) {
+        console.log('Adding round:', roundSetting);
         await addRound({
           templateId: template.id,
           roundId: roundSetting.id,
-          name: roundSetting.name,
-          description: roundSetting.description,
-          questionCount: roundSetting.questionCount,
-          orderIndex: roundSetting.orderIndex,
+          name: roundSetting.name || "",
+          description: roundSetting.description || "",
+          questionCount: roundSetting.questionCount || 1,
+          orderIndex: roundSetting.orderIndex || 0,
         });
       }
 
@@ -205,9 +212,13 @@ export default function Templates() {
         description: "Шаблон успешно создан",
       });
     } catch (error: any) {
+      console.error('Template creation error:', error);
+      const errorMessage = error.message || "Не удалось создать шаблон";
+      console.log('Error message:', errorMessage);
+
       toast({
-        title: "Ошибка",
-        description: error.message,
+        title: "Ошибка при создании шаблона",
+        description: errorMessage,
         variant: "destructive",
       });
     }

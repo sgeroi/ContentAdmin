@@ -67,6 +67,7 @@ export function useTemplates() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateTemplateData) => {
+      console.log('Creating template with data:', data);
       const response = await fetch("/api/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,6 +138,7 @@ export function useTemplates() {
 
   const addRoundMutation = useMutation({
     mutationFn: async (data: AddRoundData) => {
+      console.log('Adding round with data:', data);
       const response = await fetch(`/api/templates/${data.templateId}/rounds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
