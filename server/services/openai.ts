@@ -50,9 +50,48 @@ function extractImagesFromContent(content: any): string[] {
   return images;
 }
 
+// Extract text content from the JSON structure
+function extractTextFromContent(content: any): string {
+  try {
+    if (!content?.content) return '';
+
+    let text = '';
+    const traverse = (nodes: any[]) => {
+      for (const node of nodes) {
+        if (node.type === 'text') {
+          text += node.text;
+        }
+        if (node.content) {
+          traverse(node.content);
+        }
+      }
+    };
+    traverse(content.content);
+    return text;
+  } catch (error) {
+    console.error('Error extracting text from content:', error);
+    return '';
+  }
+}
+
+// Create content structure from text
+function createContentFromText(text: string): any {
+  return {
+    type: "doc",
+    content: [{
+      type: "paragraph",
+      content: [{
+        type: "text",
+        text: text
+      }]
+    }]
+  };
+}
+
 export async function validateQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting validation for:', { title, topic });
+    const textContent = extractTextFromContent(content);
 
     const response = await openai.chat.completions.create({
       // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -64,15 +103,13 @@ export async function validateQuestion(title: string, content: any, topic: strin
           ВАЖНО: сохраняй без изменений весь текст, написанный ЗАГЛАВНЫМИ буквами (например: ПРИМЕР, ВАЖНО, ЛИТЕРАТУРА).
           Верни JSON в формате:
           {
-            "correctedContent": "исправленное содержание",
+            "correctedText": "исправленный текст",
             "corrections": ["список всех внесенных исправлений"]
           }`
         },
         {
           role: "user",
-          content: `Исправь следующий текст:
-Содержание: ${JSON.stringify(content)}
-Тема: ${topic}`
+          content: `Исправь следующий текст: "${textContent}"`
         }
       ],
       response_format: { type: "json_object" }
@@ -89,7 +126,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
       suggestions: result.corrections || [],
       citations: [],
       correctedTitle: title,
-      correctedContent: result.correctedContent || content
+      correctedContent: createContentFromText(result.correctedText)
     };
   } catch (error: any) {
     console.error('Error validating question:', error);
@@ -100,7 +137,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
 export async function factCheckQuestion(title: string, content: any, topic: string): Promise<QuestionValidationResult> {
   try {
     console.log('Starting fact check for:', { title, topic });
-
+    const textContent = extractTextFromContent(content);
     const images = extractImagesFromContent(content);
     console.log('Found images:', images);
 
@@ -118,9 +155,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
       content: [
         { 
           type: "text", 
-          text: `Проверь следующий вопрос для викторины:
-Содержание: ${JSON.stringify(content)}
-Тема: ${topic}`
+          text: `Проверь следующий текст: "${textContent}"` 
         }
       ]
     };
