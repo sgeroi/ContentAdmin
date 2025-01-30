@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { questions, packages, tags, questionTags, users, rounds } from "@db/schema";
+import { questions, packages, tags, questionTags, users, rounds, templates, templateRoundSettings } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
@@ -469,6 +469,77 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).send(error.message);
+    }
+  });
+
+
+  // Template management routes
+  app.get("/api/templates", requireAuth, async (req, res) => {
+    try {
+      console.log('Fetching templates');
+      const result = await db.query.templates.findMany({
+        with: {
+          roundSettings: {
+            with: {
+              round: true
+            }
+          }
+        },
+        orderBy: desc(templates.createdAt),
+      });
+      console.log('Templates fetched:', result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching templates:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/templates", requireAuth, async (req, res) => {
+    try {
+      console.log('Creating template with data:', req.body);
+      const [template] = await db
+        .insert(templates)
+        .values({
+          name: req.body.name,
+          description: req.body.description || "",
+          authorId: (req.user as any).id,
+        })
+        .returning();
+
+      console.log('Template created:', template);
+      res.json(template);
+    } catch (error: any) {
+      console.error('Error creating template:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/templates/:templateId/rounds", requireAuth, async (req, res) => {
+    try {
+      console.log('Adding round to template:', {
+        templateId: req.params.templateId,
+        roundData: req.body
+      });
+
+      const [setting] = await db
+        .insert(templateRoundSettings)
+        .values({
+          templateId: parseInt(req.params.templateId),
+          roundId: req.body.roundId,
+          name: req.body.name || "",
+          description: req.body.description || "",
+          questionCount: req.body.questionCount || 0,
+          editorNotes: req.body.editorNotes || "",
+          orderIndex: req.body.orderIndex || 0,
+        })
+        .returning();
+
+      console.log('Round setting created:', setting);
+      res.json(setting);
+    } catch (error: any) {
+      console.error('Error adding round to template:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
