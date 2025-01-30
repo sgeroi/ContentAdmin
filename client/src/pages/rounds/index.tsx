@@ -40,12 +40,12 @@ export default function Rounds() {
     id: number;
     name: string;
     description: string;
-    questionCount: number;
+    questionCount: string;
   } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    questionCount: 10,
+    questionCount: "",
   });
 
   const handleSubmit = async () => {
@@ -65,7 +65,7 @@ export default function Rounds() {
       setFormData({
         name: "",
         description: "",
-        questionCount: 10,
+        questionCount: "",
       });
     } catch (error) {
       // Error is handled by the mutation
@@ -144,15 +144,14 @@ export default function Rounds() {
               <div className="space-y-2">
                 <Label>Количество вопросов</Label>
                 <Input
-                  type="number"
-                  min={1}
                   value={formData.questionCount}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      questionCount: parseInt(e.target.value) || 10,
+                      questionCount: e.target.value,
                     }))
                   }
+                  placeholder="Например: 5-7 вопросов"
                 />
               </div>
               <Button onClick={handleSubmit} className="w-full">

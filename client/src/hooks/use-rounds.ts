@@ -5,7 +5,7 @@ interface Round {
   id: number;
   name: string;
   description: string;
-  questionCount: number;
+  questionCount: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -13,7 +13,7 @@ interface Round {
 interface CreateRoundData {
   name: string;
   description: string;
-  questionCount: number;
+  questionCount: string;
 }
 
 export function useRounds() {
