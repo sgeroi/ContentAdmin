@@ -12,6 +12,7 @@ import {
   Redo,
   Code,
   ImageIcon,
+  Crop,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useCallback, useState } from "react";
@@ -75,6 +76,7 @@ export function WysiwygEditor({
   const { toast } = useToast();
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [selectedImageNode, setSelectedImageNode] = useState<{ src: string, pos: number } | null>(null);
 
   const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
     if (file.size > MAX_FILE_SIZE) {
@@ -112,21 +114,24 @@ export function WysiwygEditor({
   }, [toast]);
 
   const handleCroppedImage = useCallback(async (croppedImageUrl: string) => {
-    // Convert base64 to blob
     const response = await fetch(croppedImageUrl);
     const blob = await response.blob();
-
-    // Create a File from the blob
     const file = new File([blob], 'cropped-image.jpg', { type: 'image/jpeg' });
 
     const url = await handleImageUpload(file);
-    if (url) {
-      editor?.chain().focus().setImage({ src: url }).run();
+    if (url && selectedImageNode) {
+      // Replace the image at the stored position
+      editor?.chain().focus().setNodeSelection(selectedImageNode.pos).deleteSelection().insertContent({
+        type: 'image',
+        attrs: { src: url }
+      }).run();
     }
+    setIsCropperOpen(false);
     setTempImageUrl(null);
-  }, [handleImageUpload]);
+    setSelectedImageNode(null);
+  }, [handleImageUpload, selectedImageNode]);
 
-  const addImage = useCallback(() => {
+  const addImage = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -134,13 +139,13 @@ export function WysiwygEditor({
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      // Create a temporary URL for the selected image
-      const tempUrl = URL.createObjectURL(file);
-      setTempImageUrl(tempUrl);
-      setIsCropperOpen(true);
+      const url = await handleImageUpload(file);
+      if (url) {
+        editor?.chain().focus().setImage({ src: url }).run();
+      }
     };
     input.click();
-  }, []);
+  }, [handleImageUpload]);
 
   const handlePaste = useCallback(async (event: ClipboardEvent) => {
     const items = Array.from(event.clipboardData?.items || []);
@@ -150,14 +155,14 @@ export function WysiwygEditor({
         const file = item.getAsFile();
         if (!file) continue;
 
-        // Create a temporary URL for the pasted image
-        const tempUrl = URL.createObjectURL(file);
-        setTempImageUrl(tempUrl);
-        setIsCropperOpen(true);
+        const url = await handleImageUpload(file);
+        if (url) {
+          editor?.chain().focus().setImage({ src: url }).run();
+        }
         break;
       }
     }
-  }, []);
+  }, [handleImageUpload]);
 
   const editor = useEditor({
     extensions,
@@ -169,6 +174,15 @@ export function WysiwygEditor({
       },
       handlePaste: (view, event) => {
         handlePaste(event);
+        return false;
+      },
+      handleClick: (view, pos) => {
+        const node = view.state.doc.nodeAt(pos);
+        if (node?.type.name === 'image') {
+          setSelectedImageNode({ src: node.attrs.src, pos });
+          return true;
+        }
+        setSelectedImageNode(null);
         return false;
       },
     },
@@ -185,6 +199,13 @@ export function WysiwygEditor({
       }
     }
   }, [editor, content]);
+
+  const handleCropClick = useCallback(() => {
+    if (selectedImageNode) {
+      setTempImageUrl(selectedImageNode.src);
+      setIsCropperOpen(true);
+    }
+  }, [selectedImageNode]);
 
   if (!editor) {
     return null;
@@ -234,6 +255,13 @@ export function WysiwygEditor({
         >
           <ImageIcon className="h-4 w-4" />
         </MenuButton>
+        {selectedImageNode && (
+          <MenuButton
+            onClick={handleCropClick}
+          >
+            <Crop className="h-4 w-4" />
+          </MenuButton>
+        )}
         <MenuButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
