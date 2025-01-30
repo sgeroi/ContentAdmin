@@ -6,8 +6,9 @@ interface Round {
   name: string;
   description: string;
   questionCount: number;
-  templateId?: number;
   orderIndex: number;
+  templateId?: number;
+  packageId?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,8 +17,9 @@ interface CreateRoundData {
   name: string;
   description: string;
   questionCount: number;
-  templateId?: number;
   orderIndex: number;
+  templateId?: number;
+  packageId?: number;
 }
 
 export function useRounds() {
@@ -35,7 +37,19 @@ export function useRounds() {
         throw new Error(await response.text());
       }
 
-      return response.json();
+      const data = await response.json();
+      // Convert snake_case to camelCase
+      return data.map((round: any) => ({
+        id: round.id,
+        name: round.name,
+        description: round.description,
+        questionCount: round.question_count,
+        orderIndex: round.order_index,
+        templateId: round.template_id,
+        packageId: round.package_id,
+        createdAt: round.created_at,
+        updatedAt: round.updated_at,
+      }));
     },
     staleTime: 1000 * 60, // Cache for 1 minute
   });
@@ -46,7 +60,14 @@ export function useRounds() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          questionCount: data.questionCount,
+          orderIndex: data.orderIndex,
+          templateId: data.templateId,
+          packageId: data.packageId,
+        }),
       });
 
       if (!response.ok) {
@@ -54,7 +75,18 @@ export function useRounds() {
         throw new Error(text || "Failed to create round");
       }
 
-      return response.json();
+      const roundData = await response.json();
+      return {
+        id: roundData.id,
+        name: roundData.name,
+        description: roundData.description,
+        questionCount: roundData.question_count,
+        orderIndex: roundData.order_index,
+        templateId: roundData.template_id,
+        packageId: roundData.package_id,
+        createdAt: roundData.created_at,
+        updatedAt: roundData.updated_at,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rounds"] });
@@ -89,7 +121,18 @@ export function useRounds() {
         throw new Error(text || "Failed to update round");
       }
 
-      return response.json();
+      const roundData = await response.json();
+      return {
+        id: roundData.id,
+        name: roundData.name,
+        description: roundData.description,
+        questionCount: roundData.question_count,
+        orderIndex: roundData.order_index,
+        templateId: roundData.template_id,
+        packageId: roundData.package_id,
+        createdAt: roundData.created_at,
+        updatedAt: roundData.updated_at,
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rounds"] });
