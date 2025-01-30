@@ -13,6 +13,7 @@ import Packages from "@/pages/packages";
 import Tags from "@/pages/tags";
 import Layout from "@/components/layout";
 import GenerateQuestions from "@/pages/questions/generate";
+import Users from "@/pages/users";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -41,6 +42,9 @@ function Router() {
         </Route>
         <Route path="/packages" component={Packages} />
         <Route path="/tags" component={Tags} />
+        {user.role === "admin" && (
+          <Route path="/users" component={Users} />
+        )}
         <Route component={NotFound} />
       </Switch>
     </Layout>

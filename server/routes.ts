@@ -2,13 +2,34 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { questions, packages, tags, questionTags } from "@db/schema";
-import { eq, and, desc, sql } from "drizzle-orm"; 
+import { questions, packages, tags, questionTags, users } from "@db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import express from 'express';
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+const crypto = {
+  hash: async (password: string) => {
+    const salt = randomBytes(16).toString("hex");
+    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${buf.toString("hex")}.${salt}`;
+  },
+  compare: async (suppliedPassword: string, storedPassword: string) => {
+    const [hashedPassword, salt] = storedPassword.split(".");
+    const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
+    const suppliedPasswordBuf = (await scryptAsync(
+      suppliedPassword,
+      salt,
+      64
+    )) as Buffer;
+    return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
+  },
+};
 
 // Настройка multer для загрузки изображений
 const upload = multer({
@@ -55,6 +76,128 @@ export function registerRoutes(app: Express): Server {
 
   // Static route for serving uploaded files
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // User management routes (admin only)
+  app.get("/api/users", requireAdmin, async (req, res) => {
+    const result = await db.query.users.findMany({
+      orderBy: desc(users.createdAt),
+    });
+    res.json(result);
+  });
+
+  app.post("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const { username, password, role } = req.body;
+
+      // Check if user already exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username))
+        .limit(1);
+
+      if (existingUser) {
+        return res.status(400).send("Пользователь с таким именем уже существует");
+      }
+
+      // Hash the password
+      const hashedPassword = await crypto.hash(password);
+
+      // Create the new user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          username,
+          password: hashedPassword,
+          role,
+        })
+        .returning();
+
+      res.json({ id: newUser.id, username: newUser.username, role: newUser.role });
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.put("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { username, password, role } = req.body;
+      const userId = parseInt(req.params.id);
+
+      // Check if username is taken by another user
+      if (username) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(and(
+            eq(users.username, username),
+            sql`${users.id} != ${userId}`
+          ))
+          .limit(1);
+
+        if (existingUser) {
+          return res.status(400).send("Пользователь с таким именем уже существует");
+        }
+      }
+
+      const updateData: any = {
+        ...(username && { username }),
+        ...(role && { role }),
+        updatedAt: new Date(),
+      };
+
+      // Only update password if it's provided
+      if (password) {
+        updateData.password = await crypto.hash(password);
+      }
+
+      const [updatedUser] = await db
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, userId))
+        .returning();
+
+      res.json({
+        id: updatedUser.id,
+        username: updatedUser.username,
+        role: updatedUser.role,
+      });
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+
+      // Prevent deleting the last admin
+      const [adminCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(eq(users.role, "admin"));
+
+      if (adminCount.count === 1) {
+        const [userToDelete] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (userToDelete?.role === "admin") {
+          return res.status(400).send("Невозможно удалить последнего администратора");
+        }
+      }
+
+      await db
+        .delete(users)
+        .where(eq(users.id, userId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
 
   // Upload image endpoint
   app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
