@@ -6,7 +6,7 @@ interface Round {
   name: string;
   description: string;
   questionCount: number;
-  templateId: number;
+  templateId?: number;
   orderIndex: number;
   createdAt: string;
   updatedAt: string;
@@ -16,7 +16,7 @@ interface CreateRoundData {
   name: string;
   description: string;
   questionCount: number;
-  templateId: number;
+  templateId?: number;
   orderIndex: number;
 }
 

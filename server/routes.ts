@@ -433,7 +433,7 @@ export function registerRoutes(app: Express): Server {
           description: req.body.description,
           questionCount: req.body.questionCount,
           orderIndex: req.body.orderIndex,
-          templateId: req.body.templateId,
+          templateId: req.body.templateId || null,
         })
         .returning();
       res.json(round);

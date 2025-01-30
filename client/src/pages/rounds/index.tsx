@@ -79,7 +79,6 @@ export default function Rounds() {
       } else {
         await createRound({
           ...formData,
-          templateId: 1, // Default template ID for now
           orderIndex: rounds.length,
         });
       }
