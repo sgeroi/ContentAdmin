@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Plus, X } from "lucide-react";
-import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 
@@ -11,22 +10,24 @@ type PackageQuestion = Question & {
   author: { username: string };
 };
 
-type PackageWithQuestions = Package & {
-  rounds: Array<{
-    id: number;
-    name: string;
-    description: string;
-    questionCount: number;
-    questions: PackageQuestion[];
-  }>;
+type Round = {
+  id: number;
+  name: string;
+  description: string;
+  questionCount: number;
+  questions: PackageQuestion[];
+};
+
+type PackageWithRounds = Package & {
+  rounds: Round[];
 };
 
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
-  const [packageData, setPackageData] = useState<PackageWithQuestions | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,7 +42,7 @@ export default function PackageEditor() {
         const packageResult = await packageResponse.json();
         setPackageData(packageResult);
 
-        // Fetch available questions
+        // Fetch all available questions
         const questionsResponse = await fetch('/api/questions', {
           credentials: 'include'
         });
@@ -145,29 +146,29 @@ export default function PackageEditor() {
     return <div>Package not found</div>;
   }
 
-  // Вычисляем общее количество вопросов во всех раундах
-  const totalQuestions = packageData.rounds.reduce((total, round) => total + (round.questionCount ?? 0), 0);
+  // Create array of all question slots
+  const questionSlots = packageData.rounds.flatMap((round, roundIndex) => {
+    // Ensure round has an array of questions
+    const questions = round.questions || [];
 
-  // Создаем массив всех слотов для вопросов
-  const questionSlots = packageData.rounds.flatMap((round, roundIndex) => 
-    Array.from({ length: round.questionCount ?? 0 }).map((_, questionIndex) => {
-      const question = round.questions?.[questionIndex];
+    // Create array of slots based on questionCount
+    return Array.from({ length: round.questionCount }).map((_, questionIndex) => {
       return {
         roundId: round.id,
         roundName: round.name,
         roundIndex,
         questionIndex,
-        question,
-        globalIndex: packageData.rounds.slice(0, roundIndex).reduce((sum, r) => sum + (r.questionCount ?? 0), 0) + questionIndex
+        question: questions[questionIndex],
+        totalQuestions: round.questionCount
       };
-    })
-  );
+    });
+  });
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-6">
+    <div className="container py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <Link href="/packages" className="inline-block">
+          <Link href="/packages">
             <Button variant="ghost" className="pl-0">
               <ChevronLeft className="mr-2 h-4 w-4" />
               Назад к пакетам
@@ -184,72 +185,70 @@ export default function PackageEditor() {
         {questionSlots.map((slot) => (
           <div
             key={`${slot.roundId}-${slot.questionIndex}`}
-            className="rounded-lg border p-4 bg-card"
+            className="rounded-lg border p-4"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
                   <h3 className="font-medium">
                     Раунд {slot.roundIndex + 1}: {slot.roundName}
                   </h3>
-                  <span className="text-muted-foreground">
-                    Вопрос {slot.questionIndex + 1} из {packageData.rounds[slot.roundIndex].questionCount}
-                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    Вопрос {slot.questionIndex + 1} из {slot.totalQuestions}
+                  </p>
                 </div>
-
-                {slot.question ? (
-                  <div className="space-y-2">
-                    <div>
-                      <div className="font-medium">{slot.question.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {slot.question.topic}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <Link href={`/questions/${slot.question.id}`}>
-                        <Button variant="outline" size="sm">
-                          Редактировать
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveQuestion(slot.roundId, slot.question.id)}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Удалить
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <select
-                        className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddQuestion(slot.roundId, parseInt(e.target.value), slot.questionIndex);
-                          }
-                        }}
-                        value=""
-                      >
-                        <option value="">Выберите вопрос из базы</option>
-                        {availableQuestions.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {q.title} ({q.topic})
-                          </option>
-                        ))}
-                      </select>
-                      <Link href="/questions/new">
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Создать новый
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {slot.question ? (
+                <div className="space-y-2">
+                  <div className="font-medium">{slot.question.title}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {slot.question.topic}
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/questions/${slot.question.id}`}>
+                      <Button variant="outline" size="sm">
+                        Редактировать
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveQuestion(slot.roundId, slot.question.id)}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Удалить
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <select
+                      className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddQuestion(slot.roundId, parseInt(e.target.value), slot.questionIndex);
+                        }
+                      }}
+                      value=""
+                    >
+                      <option value="">Выберите вопрос из базы</option>
+                      {availableQuestions.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.title} ({q.topic})
+                        </option>
+                      ))}
+                    </select>
+                    <Link href="/questions/new">
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Создать новый
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}
