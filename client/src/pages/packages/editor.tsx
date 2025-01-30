@@ -2,9 +2,27 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, X } from "lucide-react";
+import { ChevronLeft, X, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 type PackageQuestion = Question & {
   author: { username: string };
@@ -22,12 +40,30 @@ type PackageWithRounds = Package & {
   rounds: Round[];
 };
 
+type QuestionFormData = {
+  title: string;
+  content: string;
+  answer: string;
+  topic: string;
+  difficulty: number;
+};
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const form = useForm<QuestionFormData>({
+    defaultValues: {
+      title: "",
+      content: "",
+      answer: "",
+      topic: "",
+      difficulty: 1,
+    },
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -145,6 +181,43 @@ export default function PackageEditor() {
     }
   };
 
+  const handleSubmitQuestion = async (roundId: number, position: number, data: QuestionFormData) => {
+    try {
+      // First create the question
+      const createQuestionResponse = await fetch('/api/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      if (!createQuestionResponse.ok) {
+        throw new Error('Failed to create question');
+      }
+
+      const newQuestion = await createQuestionResponse.json();
+
+      // Then add it to the round
+      await handleAddQuestion(roundId, newQuestion.id, position);
+
+      // Reset form
+      form.reset();
+
+      toast({
+        title: "Успех",
+        description: "Новый вопрос создан и добавлен в раунд",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -235,30 +308,130 @@ export default function PackageEditor() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <select
-                        className="flex-1 h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddQuestion(slot.roundId, parseInt(e.target.value), slot.questionIndex);
-                          }
-                        }}
-                        value=""
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit((data) =>
+                          handleSubmitQuestion(slot.roundId, slot.questionIndex, data)
+                        )}
+                        className="space-y-4"
                       >
-                        <option value="">Выберите вопрос из базы</option>
-                        {availableQuestions.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {q.title} ({q.topic})
-                          </option>
-                        ))}
-                      </select>
-                      <Link href="/questions/new">
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Создать новый
-                        </Button>
-                      </Link>
-                    </div>
+                        <FormField
+                          control={form.control}
+                          name="title"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Заголовок вопроса</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Введите заголовок" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="content"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Текст вопроса</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Введите текст вопроса"
+                                  className="min-h-[100px]"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="answer"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Ответ</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Введите ответ"
+                                  className="min-h-[100px]"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex gap-4">
+                          <FormField
+                            control={form.control}
+                            name="topic"
+                            render={({ field }) => (
+                              <FormItem className="flex-1">
+                                <FormLabel>Тема</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Введите тему" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="difficulty"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Сложность</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                    className="w-20"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <Button type="submit">Создать вопрос</Button>
+                          <Sheet>
+                            <SheetTrigger asChild>
+                              <Button variant="outline">
+                                <Database className="h-4 w-4 mr-2" />
+                                Выбрать из базы
+                              </Button>
+                            </SheetTrigger>
+                            <SheetContent>
+                              <SheetHeader>
+                                <SheetTitle>Выбрать существующий вопрос</SheetTitle>
+                              </SheetHeader>
+                              <div className="py-4">
+                                <div className="space-y-4">
+                                  {availableQuestions.map((q) => (
+                                    <div
+                                      key={q.id}
+                                      className="p-4 border rounded-lg cursor-pointer hover:bg-accent"
+                                      onClick={() => {
+                                        handleAddQuestion(slot.roundId, q.id, slot.questionIndex);
+                                      }}
+                                    >
+                                      <div className="font-medium">{q.title}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {q.topic}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </SheetContent>
+                          </Sheet>
+                        </div>
+                      </form>
+                    </Form>
                   </div>
                 )}
               </div>
