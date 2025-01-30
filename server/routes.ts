@@ -240,7 +240,7 @@ export function registerRoutes(app: Express): Server {
             name: round.name,
             description: round.description || "",
             questionCount: round.questionCount,
-            order_index: round.orderIndex,
+            orderIndex: round.orderIndex,
             packageId: pkg.id,
           });
         }
@@ -491,7 +491,7 @@ export function registerRoutes(app: Express): Server {
     try {
       console.log('Fetching rounds');
       const result = await db.query.rounds.findMany({
-        orderBy: desc(rounds.order_index),
+        orderBy: desc(rounds.orderIndex),
         with: {
           package: true,
           template: true,
@@ -515,10 +515,10 @@ export function registerRoutes(app: Express): Server {
         .values({
           name: req.body.name,
           description: req.body.description || "",
-          question_count: req.body.questionCount,
-          order_index: req.body.orderIndex,
-          package_id: req.body.packageId || null,
-          template_id: req.body.templateId || null,
+          questionCount: req.body.questionCount,
+          orderIndex: req.body.orderIndex,
+          packageId: req.body.packageId || null,
+          templateId: req.body.templateId || null,
         })
         .returning();
 
@@ -526,36 +526,6 @@ export function registerRoutes(app: Express): Server {
       res.json(round);
     } catch (error: any) {
       console.error('Error creating round:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
-    try {
-      const [round] = await db
-        .update(rounds)
-        .set({
-          name: req.body.name,
-          description: req.body.description,
-          question_count: req.body.questionCount,
-          order_index: req.body.orderIndex,
-          updated_at: new Date(),
-        })
-        .where(eq(rounds.id, parseInt(req.params.id)))
-        .returning();
-      res.json(round);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
-    try {
-      await db
-        .delete(rounds)
-        .where(eq(rounds.id, parseInt(req.params.id)));
-      res.json({ success: true });
-    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
@@ -640,6 +610,24 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      const [round] = await db
+        .update(rounds)
+        .set({
+          name: req.body.name,
+          description: req.body.description,
+          questionCount: req.body.questionCount,
+          orderIndex: req.body.orderIndex,
+          updatedAt: new Date(),
+        })
+        .where(eq(rounds.id, parseInt(req.params.id)))
+        .returning();
+      res.json(round);
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
 
   app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
