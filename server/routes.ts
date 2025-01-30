@@ -625,59 +625,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/questions/generate-batch", requireAuth, async (req, res) => {
-    try {
-      const count = req.body.count || 10000;
-      const batchSize = 100;
-      const batches = Math.ceil(count / batchSize);
-      let totalGenerated = 0;
-
-      console.log(`Starting generation of ${count} questions in ${batches} batches`);
-
-      for (let i = 0; i < batches; i++) {
-        const batchCount = Math.min(batchSize, count - (i * batchSize));
-        console.log(`Generating batch ${i + 1}/${batches} (${batchCount} questions)`);
-
-        try {
-          const generatedQuestions = await generateQuizQuestions(batchCount);
-
-          // Create all questions at once with proper type casting
-          const questionsToInsert = generatedQuestions.map(q => ({
-            title: q.title,
-            content: q.content,
-            answer: q.answer,
-            topic: q.topic,
-            difficulty: q.difficulty,
-            authorId: (req.user as any).id,
-            factChecked: false,
-            isGenerated: true,
-            isValidated: true, // Mark as validated since they're AI-generated
-            validatedAt: new Date()
-          }));
-
-          const createdQuestions = await db
-            .insert(questions)
-            .values(questionsToInsert)
-            .returning();
-
-          totalGenerated += createdQuestions.length;
-          console.log(`Successfully inserted batch ${i + 1}, total: ${totalGenerated}`);
-        } catch (batchError: any) {
-          console.error(`Error in batch ${i + 1}:`, batchError);
-          // Continue with next batch even if this one failed
-        }
-      }
-
-      res.json({ 
-        success: true, 
-        message: `Generated ${totalGenerated} questions`,
-        totalGenerated 
-      });
-    } catch (error: any) {
-      console.error('Error in batch generation:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;
