@@ -40,18 +40,16 @@ export function setupAuth(app: Express) {
     secret: process.env.REPL_ID || "quiz-admin-secret",
     resave: false,
     saveUninitialized: false,
-    cookie: {},
     store: new MemoryStore({
-      checkPeriod: 86400000,
+      checkPeriod: 86400000, // 24 hours
     }),
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      secure: app.get("env") === "production",
+      httpOnly: true,
+      sameSite: "lax"
+    }
   };
-
-  if (app.get("env") === "production") {
-    app.set("trust proxy", 1);
-    sessionSettings.cookie = {
-      secure: true,
-    };
-  }
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
