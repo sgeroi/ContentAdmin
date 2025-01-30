@@ -6,8 +6,6 @@ interface Round {
   name: string;
   description: string;
   questionCount: number;
-  difficulty: number;
-  timeLimit: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,8 +13,7 @@ interface Round {
 interface CreateRoundData {
   name: string;
   description: string;
-  difficulty: number;
-  timeLimit: number;
+  questionCount: number;
 }
 
 export function useRounds() {

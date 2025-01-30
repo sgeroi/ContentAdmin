@@ -51,6 +51,7 @@ export const rounds = pgTable("rounds", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  questionCount: integer("question_count").default(0),
   orderIndex: integer("order_index").notNull(),
   templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

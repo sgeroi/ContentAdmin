@@ -30,13 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useRounds } from "@/hooks/use-rounds";
 
 export default function Rounds() {
@@ -46,14 +40,12 @@ export default function Rounds() {
     id: number;
     name: string;
     description: string;
-    difficulty: number;
-    timeLimit: number;
+    questionCount: number;
   } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    difficulty: "1",
-    timeLimit: "60",
+    questionCount: 10,
   });
 
   const handleSubmit = async () => {
@@ -63,26 +55,17 @@ export default function Rounds() {
       if (editingRound) {
         await updateRound({
           id: editingRound.id,
-          name: formData.name,
-          description: formData.description,
-          difficulty: parseInt(formData.difficulty),
-          timeLimit: parseInt(formData.timeLimit),
+          ...formData,
         });
       } else {
-        await createRound({
-          name: formData.name,
-          description: formData.description,
-          difficulty: parseInt(formData.difficulty),
-          timeLimit: parseInt(formData.timeLimit),
-        });
+        await createRound(formData);
       }
       setIsDialogOpen(false);
       setEditingRound(null);
       setFormData({
         name: "",
         description: "",
-        difficulty: "1",
-        timeLimit: "60",
+        questionCount: 10,
       });
     } catch (error) {
       // Error is handled by the mutation
@@ -95,8 +78,7 @@ export default function Rounds() {
     setFormData({
       name: round.name,
       description: round.description,
-      difficulty: round.difficulty.toString(),
-      timeLimit: round.timeLimit.toString(),
+      questionCount: round.questionCount,
     });
     setIsDialogOpen(true);
   };
@@ -134,9 +116,8 @@ export default function Rounds() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Название</Label>
+                <Label>Название</Label>
                 <Input
-                  id="name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -148,9 +129,8 @@ export default function Rounds() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Описание</Label>
-                <Input
-                  id="description"
+                <Label>Описание</Label>
+                <Textarea
                   value={formData.description}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -161,43 +141,19 @@ export default function Rounds() {
                   placeholder="Введите описание раунда"
                 />
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="difficulty">Сложность</Label>
-                  <Select
-                    value={formData.difficulty}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, difficulty: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите сложность" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <SelectItem key={level} value={level.toString()}>
-                          Уровень {level}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timeLimit">Время (секунд)</Label>
-                  <Input
-                    id="timeLimit"
-                    type="number"
-                    min="30"
-                    max="300"
-                    value={formData.timeLimit}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        timeLimit: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Количество вопросов</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={formData.questionCount}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      questionCount: parseInt(e.target.value) || 10,
+                    }))
+                  }
+                />
               </div>
               <Button onClick={handleSubmit} className="w-full">
                 {editingRound ? "Сохранить изменения" : "Создать раунд"}
@@ -213,8 +169,7 @@ export default function Rounds() {
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Описание</TableHead>
-              <TableHead>Сложность</TableHead>
-              <TableHead>Время</TableHead>
+              <TableHead>Количество вопросов</TableHead>
               <TableHead className="w-[100px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
@@ -223,8 +178,7 @@ export default function Rounds() {
               <TableRow key={round.id}>
                 <TableCell>{round.name}</TableCell>
                 <TableCell>{round.description}</TableCell>
-                <TableCell>Уровень {round.difficulty}</TableCell>
-                <TableCell>{round.timeLimit} сек</TableCell>
+                <TableCell>{round.questionCount}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button
@@ -265,7 +219,7 @@ export default function Rounds() {
             {rounds.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={4}
                   className="text-center text-muted-foreground h-24"
                 >
                   {isLoading ? "Загрузка..." : "Раунды не найдены"}
