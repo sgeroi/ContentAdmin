@@ -26,23 +26,11 @@ export const questions = pgTable("questions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const tags = pgTable("tags", {
+export const packages = pgTable("packages", {
   id: serial("id").primaryKey(),
-  name: text("name").unique().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const questionTags = pgTable("question_tags", {
-  id: serial("id").primaryKey(),
-  questionId: integer("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
-  tagId: integer("tag_id").references(() => tags.id, { onDelete: 'cascade' }).notNull(),
-});
-
-export const templates = pgTable("templates", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  title: text("title").notNull(),
   description: text("description"),
+  templateId: integer("template_id").references(() => templates.id),
   authorId: integer("author_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -52,7 +40,7 @@ export const rounds = pgTable("rounds", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  questionCount: integer("question_count"),
+  questionCount: integer("question_count").default(0),
   orderIndex: integer("order_index").notNull(),
   templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }),
   packageId: integer("package_id").references(() => packages.id, { onDelete: 'cascade' }),
@@ -60,21 +48,13 @@ export const rounds = pgTable("rounds", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const packages = pgTable("packages", {
+export const templates = pgTable("templates", {
   id: serial("id").primaryKey(),
-  title: text("title").notNull(),
+  name: text("name").notNull(),
   description: text("description"),
-  templateId: integer("template_id").references(() => templates.id).notNull(),
   authorId: integer("author_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const packageRounds = pgTable("package_rounds", {
-  id: serial("id").primaryKey(),
-  packageId: integer("package_id").references(() => packages.id, { onDelete: 'cascade' }).notNull(),
-  roundId: integer("round_id").references(() => rounds.id, { onDelete: 'cascade' }).notNull(),
-  orderIndex: integer("order_index").notNull(),
 });
 
 export const roundQuestions = pgTable("round_questions", {
@@ -97,6 +77,20 @@ export const templateRoundSettings = pgTable("template_round_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const tags = pgTable("tags", {
+  id: serial("id").primaryKey(),
+  name: text("name").unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const questionTags = pgTable("question_tags", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
+  tagId: integer("tag_id").references(() => tags.id, { onDelete: 'cascade' }).notNull(),
+});
+
+// Relations
 export const usersRelations = relations(users, ({ many }) => ({
   questions: many(questions),
   packages: many(packages),
@@ -112,29 +106,16 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   roundQuestions: many(roundQuestions),
 }));
 
-export const tagsRelations = relations(tags, ({ many }) => ({
-  questionTags: many(questionTags),
-}));
-
-export const questionTagsRelations = relations(questionTags, ({ one }) => ({
-  question: one(questions, {
-    fields: [questionTags.questionId],
-    references: [questions.id],
+export const packagesRelations = relations(packages, ({ one, many }) => ({
+  template: one(templates, {
+    fields: [packages.templateId],
+    references: [templates.id],
   }),
-  tag: one(tags, {
-    fields: [questionTags.tagId],
-    references: [tags.id],
-  }),
-}));
-
-export const templatesRelations = relations(templates, ({ one, many }) => ({
   author: one(users, {
-    fields: [templates.authorId],
+    fields: [packages.authorId],
     references: [users.id],
   }),
   rounds: many(rounds),
-  packages: many(packages),
-  roundSettings: many(templateRoundSettings),
 }));
 
 export const roundsRelations = relations(rounds, ({ one, many }) => ({
@@ -146,32 +127,17 @@ export const roundsRelations = relations(rounds, ({ one, many }) => ({
     fields: [rounds.packageId],
     references: [packages.id],
   }),
-  packageRounds: many(packageRounds),
   roundQuestions: many(roundQuestions),
 }));
 
-export const packagesRelations = relations(packages, ({ one, many }) => ({
-  template: one(templates, {
-    fields: [packages.templateId],
-    references: [templates.id],
-  }),
+export const templatesRelations = relations(templates, ({ one, many }) => ({
   author: one(users, {
-    fields: [packages.authorId],
+    fields: [templates.authorId],
     references: [users.id],
   }),
   rounds: many(rounds),
-  packageRounds: many(packageRounds),
-}));
-
-export const packageRoundsRelations = relations(packageRounds, ({ one }) => ({
-  package: one(packages, {
-    fields: [packageRounds.packageId],
-    references: [packages.id],
-  }),
-  round: one(rounds, {
-    fields: [packageRounds.roundId],
-    references: [rounds.id],
-  }),
+  packages: many(packages),
+  roundSettings: many(templateRoundSettings),
 }));
 
 export const roundQuestionsRelations = relations(roundQuestions, ({ one }) => ({
@@ -196,6 +162,22 @@ export const templateRoundSettingsRelations = relations(templateRoundSettings, (
   }),
 }));
 
+export const tagsRelations = relations(tags, ({ many }) => ({
+  questionTags: many(questionTags),
+}));
+
+export const questionTagsRelations = relations(questionTags, ({ one }) => ({
+  question: one(questions, {
+    fields: [questionTags.questionId],
+    references: [questions.id],
+  }),
+  tag: one(tags, {
+    fields: [questionTags.tagId],
+    references: [tags.id],
+  }),
+}));
+
+// Schema types
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertQuestionSchema = createInsertSchema(questions);
@@ -211,6 +193,7 @@ export const selectPackageSchema = createSelectSchema(packages);
 export const insertTemplateRoundSettingsSchema = createInsertSchema(templateRoundSettings);
 export const selectTemplateRoundSettingsSchema = createSelectSchema(templateRoundSettings);
 
+// Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Question = typeof questions.$inferSelect & {
@@ -233,7 +216,7 @@ export type InsertRound = typeof rounds.$inferInsert;
 export type Package = typeof packages.$inferSelect & {
   template?: Template;
   author?: User;
-  rounds?: (Round & { questions?: Question[] })[];
+  rounds?: Round[];
 };
 export type InsertPackage = typeof packages.$inferInsert;
 export type TemplateRoundSettings = typeof templateRoundSettings.$inferSelect;
