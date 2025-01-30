@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, FileDown, Trash2, Eye, FileText } from "lucide-react";
+import { Plus, Trash2, Eye, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -64,8 +64,8 @@ export default function Packages() {
   const handleCreate = async () => {
     if (!title) {
       toast({
-        title: "Error",
-        description: "Title is required",
+        title: "Ошибка",
+        description: "Необходимо указать название",
         variant: "destructive",
       });
       return;
@@ -87,7 +87,7 @@ export default function Packages() {
       resetForm();
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -127,17 +127,13 @@ export default function Packages() {
     setManualRounds(manualRounds.filter((_, i) => i !== index));
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString();
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Question Packages</h1>
+          <h1 className="text-3xl font-bold">Пакеты вопросов</h1>
           <p className="text-muted-foreground">
-            Create and manage packages of questions
+            Создание и управление пакетами вопросов
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -147,52 +143,52 @@ export default function Packages() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              New Package
+              Новый пакет
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Create New Package</DialogTitle>
+              <DialogTitle>Создать новый пакет</DialogTitle>
               <DialogDescription>
-                Create a new package by selecting a template or creating rounds manually
+                Создайте новый пакет, выбрав шаблон или создав раунды вручную
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">Название</Label>
                   <Input
                     id="title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Enter package title"
+                    placeholder="Введите название пакета"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Описание</Label>
                   <Textarea
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter package description"
+                    placeholder="Введите описание пакета"
                   />
                 </div>
               </div>
 
               <Tabs value={createMode} onValueChange={(value) => setCreateMode(value as "template" | "manual")}>
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="template">Use Template</TabsTrigger>
-                  <TabsTrigger value="manual">Create Manually</TabsTrigger>
+                  <TabsTrigger value="template">Использовать шаблон</TabsTrigger>
+                  <TabsTrigger value="manual">Создать вручную</TabsTrigger>
                 </TabsList>
                 <TabsContent value="template" className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Select Template</Label>
+                    <Label>Выберите шаблон</Label>
                     <Select
                       value={selectedTemplateId}
                       onValueChange={setSelectedTemplateId}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a template" />
+                        <SelectValue placeholder="Выберите шаблон" />
                       </SelectTrigger>
                       <SelectContent>
                         {templates.map((template) => (
@@ -204,7 +200,7 @@ export default function Packages() {
                     </Select>
                     {selectedTemplateId && (
                       <div className="pt-4">
-                        <Label>Template Rounds</Label>
+                        <Label>Раунды шаблона</Label>
                         {templates
                           .find((t) => t.id.toString() === selectedTemplateId)
                           ?.roundSettings?.map((round) => (
@@ -214,7 +210,7 @@ export default function Packages() {
                                 {round.description}
                               </div>
                               <Badge variant="secondary">
-                                {round.questionCount} questions
+                                {round.questionCount} вопросов
                               </Badge>
                             </div>
                           ))}
@@ -225,15 +221,15 @@ export default function Packages() {
                 <TabsContent value="manual" className="space-y-4">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <Label>Rounds</Label>
+                      <Label>Раунды</Label>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={addRound}
                         size="sm"
                       >
-                        <PlusIcon className="h-4 w-4 mr-2" />
-                        Add Round
+                        <Plus className="h-4 w-4 mr-2" />
+                        Добавить раунд
                       </Button>
                     </div>
                     <ScrollArea className="h-[300px] rounded-md border p-4">
@@ -241,7 +237,7 @@ export default function Packages() {
                         {manualRounds.map((round, index) => (
                           <div key={index} className="space-y-2 p-4 border rounded-lg">
                             <div className="flex justify-between">
-                              <Label>Round {index + 1}</Label>
+                              <Label>Раунд {index + 1}</Label>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -252,21 +248,21 @@ export default function Packages() {
                               </Button>
                             </div>
                             <Input
-                              placeholder="Round name"
+                              placeholder="Название раунда"
                               value={round.name}
                               onChange={(e) =>
                                 updateRound(index, "name", e.target.value)
                               }
                             />
                             <Textarea
-                              placeholder="Round description"
+                              placeholder="Описание раунда"
                               value={round.description}
                               onChange={(e) =>
                                 updateRound(index, "description", e.target.value)
                               }
                             />
                             <div className="flex items-center gap-2">
-                              <Label>Questions</Label>
+                              <Label>Количество вопросов</Label>
                               <Input
                                 type="number"
                                 min={1}
@@ -290,7 +286,7 @@ export default function Packages() {
               </Tabs>
 
               <Button onClick={handleCreate} className="w-full">
-                Create Package
+                Создать пакет
               </Button>
             </div>
           </DialogContent>
@@ -301,11 +297,11 @@ export default function Packages() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Template</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[280px]">Actions</TableHead>
+              <TableHead>Название</TableHead>
+              <TableHead>Описание</TableHead>
+              <TableHead>Шаблон</TableHead>
+              <TableHead>Создан</TableHead>
+              <TableHead className="w-[280px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -313,8 +309,8 @@ export default function Packages() {
               <TableRow key={pkg.id}>
                 <TableCell className="font-medium">{pkg.title}</TableCell>
                 <TableCell>{pkg.description}</TableCell>
-                <TableCell>{pkg.template?.name || "Custom Package"}</TableCell>
-                <TableCell>{formatDate(pkg.createdAt)}</TableCell>
+                <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
+                <TableCell>{new Date(pkg.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Link href={`/packages/${pkg.id}`}>
