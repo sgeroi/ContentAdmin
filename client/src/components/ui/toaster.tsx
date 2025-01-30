@@ -6,6 +6,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
+  ToastCopy,
 } from "@/components/ui/toast"
 
 export function Toaster() {
@@ -15,7 +16,7 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <Toast key={id} {...props}>
+          <Toast key={id} {...props} aria-label={`toast-${id}`}>
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
@@ -23,6 +24,7 @@ export function Toaster() {
               )}
             </div>
             {action}
+            <ToastCopy aria-label={`toast-${id}`} />
             <ToastClose />
           </Toast>
         )
