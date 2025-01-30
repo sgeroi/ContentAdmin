@@ -211,7 +211,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
   }
 }
 
-export async function generateQuizQuestions(count: number = 10, topic?: string): Promise<Array<{
+export async function generateQuizQuestions(count: number = 10, topic?: string, prompt?: string): Promise<Array<{
   title: string;
   content: any;
   answer: string;
@@ -221,9 +221,14 @@ export async function generateQuizQuestions(count: number = 10, topic?: string):
   try {
     console.log('Starting quiz questions generation');
 
-    const topicPrompt = topic ? 
-      `Создай ${count} уникальных вопросов на тему "${topic}" на русском языке.` :
-      `Создай ${count} уникальных вопросов на логику на русском языке.`;
+    let promptText;
+    if (prompt) {
+      promptText = prompt;
+    } else {
+      promptText = topic ? 
+        `Создай ${count} уникальных вопросов на тему "${topic}" на русском языке.` :
+        `Создай ${count} уникальных вопросов на логику на русском языке.`;
+    }
 
     const response = await openai.chat.completions.create({
       // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -232,8 +237,8 @@ export async function generateQuizQuestions(count: number = 10, topic?: string):
         {
           role: "system",
           content: `Ты - эксперт по созданию интересных вопросов для викторины. 
-          ${topicPrompt}
-          Вопросы должны быть разной сложности (от 1 до 5) и ${topic ? 'охватывать разные аспекты выбранной темы' : 'охватывать разные темы'}.
+          ${promptText}
+          Вопросы должны быть разной сложности (от 1 до 5).
           Для каждого вопроса обязательно укажи правильный ответ.
           Верни JSON в формате:
           {

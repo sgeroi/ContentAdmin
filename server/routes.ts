@@ -625,6 +625,46 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/questions/generate", requireAuth, async (req, res) => {
+    try {
+      console.log('Starting question generation with params:', req.body);
+      const count = req.body.count || 10;
+      const topic = req.body.topic;
+      const prompt = req.body.prompt;
+
+      const generatedQuestions = await generateQuizQuestions(count, topic, prompt);
+      console.log('Questions generated successfully:', generatedQuestions);
+
+      // Create all questions at once with proper type casting
+      const questionsToInsert = generatedQuestions.map(q => ({
+        title: q.title,
+        content: q.content,
+        answer: q.answer,
+        topic: q.topic,
+        difficulty: q.difficulty,
+        authorId: (req.user as any).id,
+        factChecked: false,
+        isGenerated: true,
+        isValidated: false,
+      }));
+
+      console.log('Inserting generated questions into database');
+      const createdQuestions = await db
+        .insert(questions)
+        .values(questionsToInsert)
+        .returning();
+
+      console.log('Questions saved successfully');
+      res.json(createdQuestions);
+    } catch (error: any) {
+      console.error('Error generating questions:', error);
+      // Ensure we always return JSON, even for errors
+      res.status(500).json({
+        error: error.message,
+        details: error.toString()
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
