@@ -30,12 +30,21 @@ const crypto = {
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User {
+      id: number;
+      username: string;
+      role: string;
+      password: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }
   }
 }
 
 export function setupAuth(app: Express) {
   const MemoryStore = createMemoryStore(session);
+
+  // Session configuration
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "quiz-admin-secret",
     resave: false,
@@ -51,6 +60,10 @@ export function setupAuth(app: Express) {
     }
   };
 
+  if (app.get("env") === "production") {
+    app.set("trust proxy", 1);
+  }
+
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
@@ -65,11 +78,11 @@ export function setupAuth(app: Express) {
           .limit(1);
 
         if (!user) {
-          return done(null, false, { message: "Incorrect username." });
+          return done(null, false, { message: "Неверное имя пользователя" });
         }
         const isMatch = await crypto.compare(password, user.password);
         if (!isMatch) {
-          return done(null, false, { message: "Incorrect password." });
+          return done(null, false, { message: "Неверный пароль" });
         }
         return done(null, user);
       } catch (err) {
@@ -118,13 +131,14 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Auth routes
   app.post("/api/register", async (req, res, next) => {
     try {
       const { username, password } = req.body;
 
       // Check if user is authenticated and has admin role
       if (!req.isAuthenticated() || req.user.role !== "admin") {
-        return res.status(403).send("Only admins can create new users");
+        return res.status(403).send("Только администраторы могут создавать новых пользователей");
       }
 
       const [existingUser] = await db
@@ -134,7 +148,7 @@ export function setupAuth(app: Express) {
         .limit(1);
 
       if (existingUser) {
-        return res.status(400).send("Username already exists");
+        return res.status(400).send("Пользователь с таким именем уже существует");
       }
 
       const hashedPassword = await crypto.hash(password);
@@ -148,7 +162,7 @@ export function setupAuth(app: Express) {
         .returning();
 
       res.json({
-        message: "User created successfully",
+        message: "Пользователь успешно создан",
         user: { id: newUser.id, username: newUser.username, role: newUser.role },
       });
     } catch (error) {
@@ -163,7 +177,7 @@ export function setupAuth(app: Express) {
       }
 
       if (!user) {
-        return res.status(400).send(info.message ?? "Login failed");
+        return res.status(400).send(info.message ?? "Ошибка входа");
       }
 
       req.logIn(user, (err) => {
@@ -172,7 +186,7 @@ export function setupAuth(app: Express) {
         }
 
         return res.json({
-          message: "Login successful",
+          message: "Вход выполнен успешно",
           user: {
             id: user.id,
             username: user.username,
@@ -186,9 +200,9 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res) => {
     req.logout((err) => {
       if (err) {
-        return res.status(500).send("Logout failed");
+        return res.status(500).send("Ошибка выхода");
       }
-      res.json({ message: "Logout successful" });
+      res.json({ message: "Выход выполнен успешно" });
     });
   });
 
@@ -196,6 +210,6 @@ export function setupAuth(app: Express) {
     if (req.isAuthenticated()) {
       return res.json(req.user);
     }
-    res.status(401).send("Not logged in");
+    res.status(401).send("Не авторизован");
   });
 }
