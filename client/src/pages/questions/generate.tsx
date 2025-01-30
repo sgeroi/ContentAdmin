@@ -44,10 +44,19 @@ export default function GenerateQuestions() {
   const [mode, setMode] = useState<"quick" | "advanced">("quick");
 
   const handleGenerate = async () => {
-    if (!selectedTopic) {
+    if (mode === "quick" && !selectedTopic) {
       toast({
         title: "Выберите тему",
         description: "Для генерации вопросов необходимо выбрать тему",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (mode === "advanced" && !prompt.trim()) {
+      toast({
+        title: "Введите промпт",
+        description: "Для генерации вопросов необходимо ввести промпт",
         variant: "destructive",
       });
       return;
@@ -70,7 +79,7 @@ export default function GenerateQuestions() {
         credentials: "include",
         body: JSON.stringify({ 
           count: mode === "quick" ? 10 : questionCount, 
-          topic: selectedTopic,
+          topic: mode === "quick" ? selectedTopic : undefined,
           prompt: mode === "advanced" ? prompt.trim() : undefined
         }),
       });
@@ -82,7 +91,7 @@ export default function GenerateQuestions() {
       const questions = await response.json();
       toast({
         title: "Успех",
-        description: `Сгенерировано ${questions.length} новых вопросов по теме "${selectedTopic}"`,
+        description: `Сгенерировано ${questions.length} новых вопросов${mode === "quick" ? ` по теме "${selectedTopic}"` : ""}`,
       });
       setLocation("/questions");
     } catch (error: any) {
@@ -161,25 +170,6 @@ export default function GenerateQuestions() {
             <TabsContent value="advanced">
               <div className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Тема вопросов</Label>
-                  <Select
-                    value={selectedTopic}
-                    onValueChange={setSelectedTopic}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите тему для вопросов" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic} value={topic}>
-                          {topic}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
                   <Label>Количество вопросов (1-20)</Label>
                   <Input
                     type="number"
@@ -203,7 +193,7 @@ export default function GenerateQuestions() {
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !selectedTopic}
+                  disabled={isGenerating || !prompt.trim()}
                   size="lg"
                   className="w-full"
                 >
