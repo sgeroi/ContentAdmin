@@ -75,7 +75,8 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create template');
       }
 
       return response.json();
@@ -88,6 +89,7 @@ export function useTemplates() {
       });
     },
     onError: (error: Error) => {
+      console.error('Template creation error:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -150,7 +152,8 @@ export function useTemplates() {
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to add round');
       }
 
       return response.json();
@@ -163,6 +166,7 @@ export function useTemplates() {
       });
     },
     onError: (error: Error) => {
+      console.error('Add round error:', error);
       toast({
         title: "Ошибка",
         description: error.message,
