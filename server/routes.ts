@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { questions, packages, tags, questionTags, users, rounds, templates, templateRoundSettings } from "@db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
 import path from 'path';
@@ -272,6 +272,44 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.get("/api/packages/:id", requireAuth, async (req, res) => {
+    try {
+      console.log('Fetching package:', req.params.id);
+      const [result] = await db.query.packages.findMany({
+        where: eq(packages.id, parseInt(req.params.id)),
+        with: {
+          template: true,
+          rounds: {
+            with: {
+              questions: {
+                with: {
+                  author: true,
+                  questionTags: {
+                    with: {
+                      tag: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: asc(rounds.orderIndex),
+          },
+        },
+        limit: 1,
+      });
+
+      if (!result) {
+        return res.status(404).json({ error: 'Package not found' });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching package:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 
   // Upload image endpoint
   app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
