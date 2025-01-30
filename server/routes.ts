@@ -65,7 +65,7 @@ export function registerRoutes(app: Express): Server {
   // Middleware to check if user is authenticated
   const requireAuth = (req: any, res: any, next: any) => {
     if (req.isAuthenticated()) return next();
-    res.status(401).send("Unauthorized");
+    res.status(401).json({ error: "Unauthorized" });
   };
 
   // Admin middleware
@@ -196,6 +196,80 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).send(error.message);
+    }
+  });
+
+  // Package management routes
+  app.get("/api/packages", requireAuth, async (req, res) => {
+    try {
+      const result = await db.query.packages.findMany({
+        with: {
+          template: true,
+          rounds: true,
+        },
+        orderBy: desc(packages.createdAt),
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching packages:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/packages", requireAuth, async (req, res) => {
+    try {
+      console.log('Creating package with data:', req.body);
+
+      // First create the package
+      const [pkg] = await db
+        .insert(packages)
+        .values({
+          title: req.body.title,
+          description: req.body.description || "",
+          templateId: req.body.templateId || null,
+          authorId: (req.user as any).id,
+        })
+        .returning();
+
+      console.log('Package created:', pkg);
+
+      // If manual rounds were provided, add them
+      if (req.body.rounds && Array.isArray(req.body.rounds)) {
+        for (const round of req.body.rounds) {
+          await db.insert(rounds).values({
+            name: round.name,
+            description: round.description || "",
+            questionCount: round.questionCount,
+            orderIndex: round.orderIndex,
+            packageId: pkg.id,
+          });
+        }
+      }
+
+      // Fetch the complete package with related data
+      const [result] = await db.query.packages.findMany({
+        where: eq(packages.id, pkg.id),
+        with: {
+          template: true,
+          rounds: true,
+        },
+        limit: 1,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error creating package:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/packages/:id", requireAuth, async (req, res) => {
+    try {
+      await db.delete(packages).where(eq(packages.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error deleting package:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -498,6 +572,11 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/templates", requireAuth, async (req, res) => {
     try {
       console.log('Creating template with data:', req.body);
+
+      if (!req.body.name) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+
       const [template] = await db
         .insert(templates)
         .values({
@@ -521,6 +600,10 @@ export function registerRoutes(app: Express): Server {
         templateId: req.params.templateId,
         roundData: req.body
       });
+
+      if (!req.body.roundId) {
+        return res.status(400).json({ error: "Round ID is required" });
+      }
 
       const [setting] = await db
         .insert(templateRoundSettings)
