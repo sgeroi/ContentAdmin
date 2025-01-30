@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { questions, packages, tags, questionTags, users } from "@db/schema";
+import { questions, packages, tags, questionTags, users, rounds } from "@db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { validateQuestion, factCheckQuestion, generateQuizQuestions } from './services/openai';
 import multer from 'multer';
@@ -409,6 +409,66 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error('Error generating questions:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Rounds API
+  app.get("/api/rounds", requireAuth, async (req, res) => {
+    try {
+      const result = await db.query.rounds.findMany({
+        orderBy: desc(rounds.orderIndex),
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.post("/api/rounds", requireAuth, async (req, res) => {
+    try {
+      const [round] = await db
+        .insert(rounds)
+        .values({
+          name: req.body.name,
+          description: req.body.description,
+          questionCount: req.body.questionCount,
+          orderIndex: req.body.orderIndex,
+          templateId: req.body.templateId,
+        })
+        .returning();
+      res.json(round);
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      const [round] = await db
+        .update(rounds)
+        .set({
+          name: req.body.name,
+          description: req.body.description,
+          questionCount: req.body.questionCount,
+          orderIndex: req.body.orderIndex,
+          updatedAt: new Date(),
+        })
+        .where(eq(rounds.id, parseInt(req.params.id)))
+        .returning();
+      res.json(round);
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
+  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      await db
+        .delete(rounds)
+        .where(eq(rounds.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).send(error.message);
     }
   });
 
