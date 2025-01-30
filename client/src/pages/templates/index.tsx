@@ -33,6 +33,22 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { DragHandleDots2Icon } from "@radix-ui/react-icons";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const roundFormSchema = z.object({
   name: z.string().min(1, "Название обязательно"),
@@ -53,6 +69,67 @@ interface RoundSetting {
   orderIndex: number;
 }
 
+function SortableRoundItem({ round, onQuestionCountChange, onRemove }: {
+  round: RoundSetting;
+  onQuestionCountChange: (count: number) => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: round.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 p-2 border rounded-lg"
+      {...attributes}
+      {...listeners}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="cursor-move"
+      >
+        <DragHandleDots2Icon className="h-4 w-4" />
+      </Button>
+      <div className="flex-1">
+        <div className="font-medium">{round.name}</div>
+        {round.description && (
+          <div className="text-sm text-muted-foreground">
+            {round.description}
+          </div>
+        )}
+      </div>
+      <Input
+        type="number"
+        min={1}
+        value={round.questionCount}
+        onChange={(e) => onQuestionCountChange(parseInt(e.target.value) || 1)}
+        className="w-24"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onRemove}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 export default function Templates() {
   const { templates, createTemplate, updateRoundSettings, addRound, removeRound, deleteTemplate, isLoading } =
     useTemplates();
@@ -69,6 +146,13 @@ export default function Templates() {
   } | null>(null);
   const { toast } = useToast();
   const [selectedRounds, setSelectedRounds] = useState<RoundSetting[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const templateForm = useForm<z.infer<typeof templateFormSchema>>({
     resolver: zodResolver(templateFormSchema),
@@ -164,18 +248,21 @@ export default function Templates() {
     }
   };
 
-  const moveRound = (fromIndex: number, toIndex: number) => {
-    const newRounds = [...selectedRounds];
-    const [movedRound] = newRounds.splice(fromIndex, 1);
-    newRounds.splice(toIndex, 0, movedRound);
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
 
-    // Обновляем orderIndex для всех раундов
-    const updatedRounds = newRounds.map((round, index) => ({
-      ...round,
-      orderIndex: index,
-    }));
+    if (active.id !== over.id) {
+      setSelectedRounds((rounds) => {
+        const oldIndex = rounds.findIndex((r) => r.id === active.id);
+        const newIndex = rounds.findIndex((r) => r.id === over.id);
 
-    setSelectedRounds(updatedRounds);
+        const newRounds = arrayMove(rounds, oldIndex, newIndex);
+        return newRounds.map((round, index) => ({
+          ...round,
+          orderIndex: index,
+        }));
+      });
+    }
   };
 
   return (
@@ -249,60 +336,36 @@ export default function Templates() {
                   </div>
 
                   <div className="space-y-2">
-                    {selectedRounds.map((roundSetting, index) => (
-                      <div
-                        key={roundSetting.id}
-                        className="flex items-center gap-2 p-2 border rounded-lg"
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={selectedRounds.map(r => r.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="cursor-move"
-                          onClick={() => {
-                            if (index > 0) {
-                              moveRound(index, index - 1);
-                            }
-                          }}
-                        >
-                          <DragHandleDots2Icon className="h-4 w-4" />
-                        </Button>
-                        <div className="flex-1">
-                          <div className="font-medium">{roundSetting.name}</div>
-                          {roundSetting.description && (
-                            <div className="text-sm text-muted-foreground">
-                              {roundSetting.description}
-                            </div>
-                          )}
-                        </div>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={roundSetting.questionCount}
-                          onChange={(e) => {
-                            const newRounds = [...selectedRounds];
-                            newRounds[index] = {
-                              ...newRounds[index],
-                              questionCount: parseInt(e.target.value) || 1,
-                            };
-                            setSelectedRounds(newRounds);
-                          }}
-                          className="w-24"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedRounds(
-                              selectedRounds.filter((_, i) => i !== index)
-                            );
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                        {selectedRounds.map((roundSetting, index) => (
+                          <SortableRoundItem
+                            key={roundSetting.id}
+                            round={roundSetting}
+                            onQuestionCountChange={(count) => {
+                              const newRounds = [...selectedRounds];
+                              newRounds[index] = {
+                                ...newRounds[index],
+                                questionCount: count,
+                              };
+                              setSelectedRounds(newRounds);
+                            }}
+                            onRemove={() => {
+                              setSelectedRounds(
+                                selectedRounds.filter((_, i) => i !== index)
+                              );
+                            }}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   </div>
 
                   {rounds
