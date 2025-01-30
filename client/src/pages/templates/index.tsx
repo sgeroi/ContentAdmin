@@ -26,26 +26,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { useTemplates } from "@/hooks/use-templates";
 import { useRounds } from "@/hooks/use-rounds";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+
+const roundFormSchema = z.object({
+  name: z.string().min(1, "Название обязательно"),
+  description: z.string(),
+  questionCount: z.number().min(1, "Количество вопросов должно быть больше 0"),
+});
+
+const templateFormSchema = z.object({
+  name: z.string().min(1, "Название обязательно"),
+  description: z.string(),
+});
 
 export default function Templates() {
   const { templates, createTemplate, updateRoundSettings, addRound, removeRound, deleteTemplate, isLoading } =
     useTemplates();
-  const { rounds } = useRounds();
+  const { rounds, createRound } = useRounds();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isRoundDialogOpen, setIsRoundDialogOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<{
-    id: number;
-    name: string;
-    description: string;
-  } | null>(null);
-  const [selectedRound, setSelectedRound] = useState<{
+  const [isNewRoundDialogOpen, setIsNewRoundDialogOpen] = useState(false);
+  const [selectedRoundSettings, setSelectedRoundSettings] = useState<{
     templateId: number;
     roundId: number;
     name: string;
@@ -53,49 +58,85 @@ export default function Templates() {
     questionCount: number;
     editorNotes: string;
   } | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-  });
-  const [roundFormData, setRoundFormData] = useState({
-    name: "",
-    description: "",
-    questionCount: 0,
-    editorNotes: "",
+  const { toast } = useToast();
+  const [selectedRounds, setSelectedRounds] = useState<number[]>([]);
+
+  const templateForm = useForm<z.infer<typeof templateFormSchema>>({
+    resolver: zodResolver(templateFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
   });
 
-  const handleCreate = async () => {
-    if (!formData.name.trim()) return;
+  const newRoundForm = useForm<z.infer<typeof roundFormSchema>>({
+    resolver: zodResolver(roundFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      questionCount: 1,
+    },
+  });
+
+  const handleCreate = async (values: z.infer<typeof templateFormSchema>) => {
+    if (selectedRounds.length === 0) {
+      toast({
+        title: "Ошибка",
+        description: "Выберите хотя бы один раунд",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      await createTemplate(formData);
+      const template = await createTemplate(values);
+
+      // Добавляем выбранные раунды к шаблону
+      for (const roundId of selectedRounds) {
+        await addRound({
+          templateId: template.id,
+          roundId,
+        });
+      }
+
       setIsCreateDialogOpen(false);
-      setFormData({ name: "", description: "" });
-    } catch (error) {
-      // Error is handled by the mutation
+      templateForm.reset();
+      setSelectedRounds([]);
+
+      toast({
+        title: "Успех",
+        description: "Шаблон успешно создан",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
-  const handleRoundSettingsUpdate = async () => {
-    if (!selectedRound) return;
-
+  const onCreateNewRound = async (values: z.infer<typeof roundFormSchema>) => {
     try {
-      await updateRoundSettings({
-        templateId: selectedRound.templateId,
-        roundId: selectedRound.roundId,
-        ...roundFormData,
-        orderIndex: 0, // TODO: Implement proper ordering
+      const newRound = await createRound({
+        ...values,
+        orderIndex: rounds.length,
       });
-      setIsRoundDialogOpen(false);
-      setSelectedRound(null);
-      setRoundFormData({
-        name: "",
-        description: "",
-        questionCount: 0,
-        editorNotes: "",
+
+      setIsNewRoundDialogOpen(false);
+      newRoundForm.reset();
+      setSelectedRounds([...selectedRounds, newRound.id]);
+
+      toast({
+        title: "Успех",
+        description: "Раунд успешно создан",
       });
-    } catch (error) {
-      // Error is handled by the mutation
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -115,50 +156,162 @@ export default function Templates() {
               Новый шаблон
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Создать новый шаблон</DialogTitle>
               <DialogDescription>
-                Создайте базовый шаблон игры. После создания вы сможете добавить раунды.
+                Создайте шаблон игры и выберите раунды
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Название</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      name: e.target.value,
-                    }))
-                  }
-                  placeholder="Введите название шаблона"
+            <Form {...templateForm}>
+              <form onSubmit={templateForm.handleSubmit(handleCreate)} className="space-y-6">
+                <FormField
+                  control={templateForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Название</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Введите название шаблона" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Описание</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Введите описание шаблона"
+                <FormField
+                  control={templateForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Описание</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Введите описание шаблона"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <Button onClick={handleCreate} className="w-full">
-                Создать шаблон
-              </Button>
-            </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Раунды</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsNewRoundDialogOpen(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Создать новый раунд
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {rounds.map((round) => (
+                      <Button
+                        key={round.id}
+                        type="button"
+                        variant={selectedRounds.includes(round.id) ? "default" : "outline"}
+                        className="justify-start"
+                        onClick={() => {
+                          setSelectedRounds(prev =>
+                            prev.includes(round.id)
+                              ? prev.filter(id => id !== round.id)
+                              : [...prev, round.id]
+                          );
+                        }}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span>{round.name}</span>
+                          {round.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {round.description}
+                            </span>
+                          )}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full">
+                  Создать шаблон
+                </Button>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Диалог создания нового раунда */}
+      <Dialog open={isNewRoundDialogOpen} onOpenChange={setIsNewRoundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Создать новый раунд</DialogTitle>
+            <DialogDescription>
+              Создайте новый раунд для добавления в шаблон
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...newRoundForm}>
+            <form onSubmit={newRoundForm.handleSubmit(onCreateNewRound)} className="space-y-4">
+              <FormField
+                control={newRoundForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Введите название раунда" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={newRoundForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Введите описание раунда"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={newRoundForm.control}
+                name="questionCount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Количество вопросов</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        {...field}
+                        onChange={e => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full">
+                Создать раунд
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Список существующих шаблонов */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {templates.map((template) => (
           <Card key={template.id}>
@@ -172,17 +325,6 @@ export default function Templates() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Раунды</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedTemplate(template);
-                      setIsRoundDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Добавить раунд
-                  </Button>
                 </div>
                 <div className="space-y-2">
                   {template.roundSettings?.map((setting) => (
@@ -210,7 +352,7 @@ export default function Templates() {
                           variant="ghost"
                           size="icon"
                           onClick={() => {
-                            setSelectedRound({
+                            setSelectedRoundSettings({
                               templateId: template.id,
                               roundId: setting.roundId,
                               name: setting.name || "",
@@ -218,13 +360,6 @@ export default function Templates() {
                               questionCount: setting.questionCount || 0,
                               editorNotes: setting.editorNotes || "",
                             });
-                            setRoundFormData({
-                              name: setting.name || "",
-                              description: setting.description || "",
-                              questionCount: setting.questionCount || 0,
-                              editorNotes: setting.editorNotes || "",
-                            });
-                            setIsRoundDialogOpen(true);
                           }}
                         >
                           <Settings className="h-4 w-4" />
@@ -302,111 +437,6 @@ export default function Templates() {
           </Card>
         )}
       </div>
-
-      <Dialog open={isRoundDialogOpen} onOpenChange={setIsRoundDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedRound ? "Настройки раунда" : "Добавить раунд"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedRound
-                ? "Измените настройки раунда для этого шаблона"
-                : "Выберите раунд и настройте его параметры"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {!selectedRound && (
-              <div className="space-y-2">
-                <Label>Выберите раунд</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {rounds.map((round) => (
-                    <Button
-                      key={round.id}
-                      variant="outline"
-                      className="justify-start"
-                      onClick={() => {
-                        if (!selectedTemplate) return;
-                        addRound({
-                          templateId: selectedTemplate.id,
-                          roundId: round.id,
-                        });
-                        setIsRoundDialogOpen(false);
-                      }}
-                    >
-                      {round.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedRound && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="roundName">Название (опционально)</Label>
-                  <Input
-                    id="roundName"
-                    value={roundFormData.name}
-                    onChange={(e) =>
-                      setRoundFormData((prev) => ({
-                        ...prev,
-                        name: e.target.value,
-                      }))
-                    }
-                    placeholder="Оставьте пустым, чтобы использовать название раунда"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="roundDescription">Описание (опционально)</Label>
-                  <Textarea
-                    id="roundDescription"
-                    value={roundFormData.description}
-                    onChange={(e) =>
-                      setRoundFormData((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    placeholder="Оставьте пустым, чтобы использовать описание раунда"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="questionCount">Количество вопросов</Label>
-                  <Input
-                    id="questionCount"
-                    type="number"
-                    min={1}
-                    value={roundFormData.questionCount}
-                    onChange={(e) =>
-                      setRoundFormData((prev) => ({
-                        ...prev,
-                        questionCount: parseInt(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editorNotes">Пометки для редактора</Label>
-                  <Textarea
-                    id="editorNotes"
-                    value={roundFormData.editorNotes}
-                    onChange={(e) =>
-                      setRoundFormData((prev) => ({
-                        ...prev,
-                        editorNotes: e.target.value,
-                      }))
-                    }
-                    placeholder="Например: подобрать вопросы про искусство XX века"
-                  />
-                </div>
-                <Button onClick={handleRoundSettingsUpdate} className="w-full">
-                  Сохранить настройки
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
