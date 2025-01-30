@@ -56,7 +56,6 @@ export default function Packages() {
   const { templates } = useTemplates();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -69,25 +68,6 @@ export default function Packages() {
     setSelectedTemplateId("");
     setManualRounds([]);
     setCreateMode("template");
-    setEditingPackage(null);
-  };
-
-  const handleEdit = (pkg: Package) => {
-    setEditingPackage(pkg);
-    setTitle(pkg.title);
-    setDescription(pkg.description || "");
-    setSelectedTemplateId(pkg.templateId?.toString() || "");
-    setManualRounds(
-      pkg.rounds?.map((round) => ({
-        id: round.id,
-        name: round.name,
-        description: round.description || "",
-        questionCount: round.questionCount,
-        orderIndex: round.orderIndex,
-      })) || []
-    );
-    setCreateMode(pkg.templateId ? "template" : "manual");
-    setIsDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -111,12 +91,7 @@ export default function Packages() {
         packageData.templateId = parseInt(selectedTemplateId);
       }
 
-      if (editingPackage) {
-        await updatePackage({ ...packageData, id: editingPackage.id });
-      } else {
-        await createPackage(packageData);
-      }
-
+      await createPackage(packageData);
       setIsDialogOpen(false);
       resetForm();
     } catch (error: any) {
@@ -174,11 +149,9 @@ export default function Packages() {
           </DialogTrigger>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{editingPackage ? 'Редактировать пакет' : 'Создать новый пакет'}</DialogTitle>
+              <DialogTitle>Создать новый пакет</DialogTitle>
               <DialogDescription>
-                {editingPackage 
-                  ? 'Отредактируйте информацию о пакете и его раундах'
-                  : 'Создайте новый пакет, выбрав шаблон или создав раунды вручную'}
+                Создайте новый пакет, выбрав шаблон или создав раунды вручную
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
@@ -314,7 +287,7 @@ export default function Packages() {
               </Tabs>
 
               <Button onClick={handleSave} className="w-full">
-                {editingPackage ? 'Сохранить изменения' : 'Создать пакет'}
+                Создать пакет
               </Button>
             </div>
           </DialogContent>
@@ -351,14 +324,15 @@ export default function Packages() {
                         Просмотр
                       </Button>
                     </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(pkg)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Изменить
-                    </Button>
+                    <Link href={`/packages/${pkg.id}/edit`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Изменить
+                      </Button>
+                    </Link>
                     <Button
                       variant="outline"
                       size="sm"
