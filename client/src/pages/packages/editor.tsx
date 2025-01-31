@@ -34,6 +34,16 @@ import {
 import { cn } from "@/lib/utils";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
+// Custom hook for DnD sensors
+function useDndSensors() {
+  return useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+}
+
 function getContentPreview(content: any): string {
   try {
     if (content?.content) {
@@ -58,16 +68,6 @@ function getContentPreview(content: any): string {
     console.error('Error parsing content:', error);
     return 'Ошибка контента';
   }
-}
-
-// Custom hook for DnD sensors
-function useDndSensors() {
-  return useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 }
 
 type PackageQuestion = Question & {
@@ -107,7 +107,8 @@ interface TreeItemProps {
   onToggle?: () => void;
   onClick?: () => void;
   isActive?: boolean;
-}
+  isDraggable?: boolean;
+};
 
 function TreeItem({
   id,
@@ -120,6 +121,7 @@ function TreeItem({
   onToggle,
   onClick,
   isActive,
+  isDraggable = true,
 }: TreeItemProps) {
   const {
     attributes,
@@ -128,7 +130,10 @@ function TreeItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({
+    id,
+    disabled: !isDraggable
+  });
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -151,8 +156,7 @@ function TreeItem({
         !isActive && "hover:bg-accent/50",
       )}
       onClick={onClick}
-      {...attributes}
-      {...listeners}
+      {...(isDraggable ? { ...attributes, ...listeners } : {})}
     >
       <div style={{ paddingLeft: `${depth * 12}px` }} className="flex items-center gap-2 w-full">
         {isFolder ? (
@@ -169,13 +173,13 @@ function TreeItem({
                 <ChevronRight className="h-4 w-4" />
               )}
             </Button>
-            <span className="text-sm font-medium" onClick={handleToggleClick}>{label}</span>
+            <span className="text-sm font-medium">{label}</span>
           </>
         ) : (
           <>
             <GripVertical className="h-4 w-4 text-muted-foreground" />
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-sm shrink-0" onClick={onClick}>{label}.</span>
+              <span className="text-sm shrink-0">{label}.</span>
               {questionPreview && (
                 <span className="text-sm text-muted-foreground truncate">{questionPreview}</span>
               )}
@@ -360,6 +364,16 @@ export default function PackageEditor() {
       }
       return newExpanded;
     });
+  }, []);
+
+  const scrollToRound = useCallback((roundId: number) => {
+    const element = document.getElementById(`round-${roundId}-description`);
+    if (element && rightPanelRef.current) {
+      rightPanelRef.current.scrollTo({
+        top: element.offsetTop - 20,
+        behavior: 'smooth'
+      });
+    }
   }, []);
 
   const scrollToQuestion = useCallback((roundId: number, index: number) => {
@@ -580,6 +594,47 @@ export default function PackageEditor() {
 
     if (!over || active.id === over.id) return;
 
+    // Check if we're dragging a round
+    if (typeof active.id === 'number' && typeof over.id === 'number') {
+      const oldIndex = packageData!.rounds.findIndex(r => r.id === active.id);
+      const newIndex = packageData!.rounds.findIndex(r => r.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        try {
+          const response = await fetch(`/api/packages/${params.id}/rounds/reorder`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              roundIds: arrayMove(packageData!.rounds.map(r => r.id), oldIndex, newIndex),
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to reorder rounds');
+          }
+
+          const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+            credentials: 'include'
+          });
+          if (updatedResponse.ok) {
+            const updatedData = await updatedResponse.json();
+            setPackageData(updatedData);
+          }
+        } catch (error: any) {
+          toast({
+            title: "Ошибка",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+    }
+
+    // Handle question dragging
     const [activeRoundId, activeIndex] = active.id.toString().split('-');
     const [overRoundId, overIndex] = over.id.toString().split('-');
 
@@ -617,11 +672,6 @@ export default function PackageEditor() {
           const updatedData = await updatedResponse.json();
           setPackageData(updatedData);
         }
-
-        toast({
-          title: "Успех",
-          description: "Порядок вопросов обновлен",
-        });
       } catch (error: any) {
         toast({
           title: "Ошибка",
@@ -786,80 +836,79 @@ export default function PackageEditor() {
         <ResizablePanel defaultSize={25} minSize={15}>
           <ScrollArea className="h-full">
             <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">Содержание</div>
-                <Button variant="outline" size="sm" onClick={() => setIsCreateRoundDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Добавить раунд
-                </Button>
-              </div>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={(packageData?.rounds ?? []).flatMap(round =>
-                    (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
-                  )}
+                  items={[
+                    ...packageData.rounds.map(r => r.id),
+                    ...packageData.rounds.flatMap(round =>
+                      (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
+                    )
+                  ]}
                   strategy={verticalListSortingStrategy}
                 >
                   {packageData.rounds.map((round) => (
                     <div key={round.id} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <TreeItem
-                          id={`round-${round.id}`}
-                          depth={0}
-                          isFolder
-                          isExpanded={expandedRounds.has(round.id)}
-                          label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
-                          onToggle={() => toggleRound(round.id)}
-                        />
-                        <div className="flex gap-1">
+                      <TreeItem
+                        id={round.id.toString()}
+                        depth={0}
+                        isFolder
+                        isExpanded={expandedRounds.has(round.id)}
+                        label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
+                        onToggle={() => toggleRound(round.id)}
+                        onClick={() => scrollToRound(round.id)}
+                      />
+                      {expandedRounds.has(round.id) && (
+                        <>
+                          {[...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
+                            const question = round.questions?.[index];
+                            const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
+                            const questionPreview = question ? getContentPreview(question.content) : undefined;
+                            return (
+                              <TreeItem
+                                key={`${round.id}-${index}`}
+                                id={`${round.id}-${index}`}
+                                depth={1}
+                                label={String(index + 1)}
+                                questionPreview={questionPreview}
+                                badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
+                                isActive={isActive}
+                                onClick={() => {
+                                  setActiveQuestion({ roundId: round.id, index });
+                                  scrollToQuestion(round.id, index);
+                                }}
+                              />
+                            );
+                          })}
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEditRound(round)}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
+                            size="sm"
+                            className="w-full justify-start pl-8 text-muted-foreground"
                             onClick={() => {
                               const nextIndex = round.questions?.length || 0;
                               setActiveQuestion({ roundId: round.id, index: nextIndex });
                               scrollToQuestion(round.id, nextIndex);
                             }}
                           >
-                            <Plus className="h-4 w-4" />
+                            <Plus className="h-4 w-4 mr-2" />
+                            Добавить вопрос
                           </Button>
-                        </div>
-                      </div>
-                      {expandedRounds.has(round.id) && [...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
-                        const question = round.questions?.[index];
-                        const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
-                        const questionPreview = question ? getContentPreview(question.content) : undefined;
-                        return (
-                          <TreeItem
-                            key={`${round.id}-${index}`}
-                            id={`${round.id}-${index}`}
-                            depth={1}
-                            label={String(index + 1)}
-                            questionPreview={questionPreview}
-                            badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
-                            isActive={isActive}
-                            onClick={() => {
-                              setActiveQuestion({ roundId: round.id, index });
-                              scrollToQuestion(round.id, index);
-                            }}
-                          />
-                        );
-                      })}
+                        </>
+                      )}
                     </div>
                   ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-muted-foreground mt-4"
+                    onClick={() => setIsCreateRoundDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Добавить раунд
+                  </Button>
                 </SortableContext>
               </DndContext>
             </div>
@@ -871,10 +920,19 @@ export default function PackageEditor() {
             <div className="p-6 space-y-8">
               {packageData?.rounds.map((round) => (
                 <div key={round.id} className="space-y-6">
-                  <div className="sticky top-0 bg-background z-10 py-2">
-                    <h2 className="text-2xl font-bold">
-                      Раунд {round.orderIndex + 1}: {round.name}
-                    </h2>
+                  <div id={`round-${round.id}-description`} className="sticky top-0 bg-background z-10 py-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold">
+                        Раунд {round.orderIndex + 1}: {round.name}
+                      </h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditRound(round)}
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
                     {round.description && (
                       <p className="text-muted-foreground">{round.description}</p>
                     )}
@@ -953,7 +1011,7 @@ export default function PackageEditor() {
                                                 <Input
                                                   placeholder="Поиск по тексту..."
                                                   {...field}
-                                                />
+                 />
                                               </FormControl>
                                             </FormItem>
                                           )}
@@ -972,15 +1030,15 @@ export default function PackageEditor() {
                                           key={q.id}
                                           className="p-3 border rounded-lg cursor-pointer hover:bg-accent"
                                           onClick={() => {
-                                            handleAddQuestion(activeQuestion!.roundId, q.id, activeQuestion!.index);
+                                            handleAddQuestion(round.id, q.id, index);
                                             setIsSearchDialogOpen(false);
                                           }}
                                         >
                                           <div className="text-sm">
-                                            {q.content && typeof q.content === 'object' && 'content' in q.content && Array.isArray(q.content.content) && q.content.content[0]?.content?.[0]?.text || "Нет текста"}
+                                            {getContentPreview(q.content)}
                                           </div>
                                           <div className="text-sm text-muted-foreground mt-2">
-                                            Автор: {(q.author as any)?.username} •
+                                            Автор: {q.author?.username || "Неизвестен"} •
                                             Создан: {new Date(q.createdAt).toLocaleDateString()}
                                           </div>
                                         </div>
