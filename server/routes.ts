@@ -781,9 +781,13 @@ export function registerRoutes(app: Express): Server {
         })
         .where(eq(rounds.id, parseInt(req.params.id)))
         .returning();
+
       res.json(round);
     } catch (error: any) {
-      res.status(500).send(error.message);
+      res.status(500).json({ 
+        error: error.message,
+        details: error.toString()
+      });
     }
   });
 

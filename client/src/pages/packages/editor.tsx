@@ -329,7 +329,7 @@ export default function PackageEditor() {
       console.log('Updating round:', id, data);
 
       const response = await fetch(`/api/rounds/${id}`, {
-        method: "PATCH",
+        method: "PUT",  // Изменяем на PUT для соответствия серверному роуту
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -341,17 +341,21 @@ export default function PackageEditor() {
         }),
       });
 
+      console.log('Update response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
       let responseData;
       try {
-        responseData = await response.json();
-        console.log('Update round response:', responseData);
+        responseData = JSON.parse(responseText);
+        console.log('Parsed response data:', responseData);
       } catch (e) {
         console.error('Failed to parse response:', e);
-        throw new Error('Invalid server response');
+        throw new Error(`Invalid server response: ${responseText}`);
       }
 
       if (!response.ok) {
-        throw new Error(responseData?.message || `Failed to update round: ${response.statusText}`);
+        throw new Error(responseData?.error || `Failed to update round: ${response.statusText}`);
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
@@ -365,13 +369,16 @@ export default function PackageEditor() {
         throw new Error("Failed to fetch updated package data");
       }
 
+      const updatedText = await updatedResponse.text();
+      console.log('Raw updated package response:', updatedText);
+
       let updatedData;
       try {
-        updatedData = await updatedResponse.json();
-        console.log('Updated package data:', updatedData);
+        updatedData = JSON.parse(updatedText);
+        console.log('Parsed package data:', updatedData);
       } catch (e) {
         console.error('Failed to parse updated package data:', e);
-        throw new Error('Invalid server response for package data');
+        throw new Error(`Invalid package response: ${updatedText}`);
       }
 
       setPackageData(updatedData);
