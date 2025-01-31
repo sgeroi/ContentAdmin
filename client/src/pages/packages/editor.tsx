@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, PlusCircle, Search, MoveVertical, GripVertical, ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronLeft, X, Database, Search, MoveVertical, GripVertical, ChevronRight, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -10,12 +10,26 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import debounce from "lodash/debounce";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  UniqueIdentifier,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { cn } from "@/lib/utils";
 
 type PackageQuestion = Question & {
@@ -76,10 +90,10 @@ function TreeItem({
     isDragging,
   } = useSortable({ id });
 
-  const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    transition,
-  };
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    transition
+  } : undefined;
 
   return (
     <div
@@ -125,7 +139,7 @@ function TreeItem({
   );
 }
 
-interface QuestionItemProps {
+interface QuestionEditorProps {
   question: PackageQuestion;
   index: number;
   roundId: number;
@@ -134,7 +148,6 @@ interface QuestionItemProps {
   handleRemoveQuestion: (roundId: number, questionId: number) => void;
   handleMoveQuestion: (fromRoundId: number, toRoundId: number, questionId: number) => void;
   form: any;
-  id: string;
   packageData: PackageWithRounds;
 }
 
@@ -148,7 +161,7 @@ function QuestionEditor({
   handleMoveQuestion,
   form,
   packageData,
-}: QuestionItemProps) {
+}: QuestionEditorProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -478,7 +491,7 @@ export default function PackageEditor() {
 
     if (activeRoundId === overRoundId) {
       const round = packageData?.rounds.find(r => r.id === parseInt(activeRoundId));
-      if (!round || !round.questions) return;
+      if (!round?.questions) return;
 
       const oldIndex = parseInt(activeIndex);
       const newIndex = parseInt(overIndex);
@@ -584,8 +597,8 @@ export default function PackageEditor() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={packageData.rounds.flatMap(round => 
-                    round.questions.map((_, index) => `${round.id}-${index}`)
+                  items={(packageData?.rounds ?? []).flatMap(round => 
+                    (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
                   )}
                   strategy={verticalListSortingStrategy}
                 >
@@ -635,7 +648,6 @@ export default function PackageEditor() {
                   handleRemoveQuestion={handleRemoveQuestion}
                   handleMoveQuestion={handleMoveQuestion}
                   form={form}
-                  id={`${activeRound.id}-${activeQuestion!.index}`}
                   packageData={packageData}
                 />
               ) : activeQuestion ? (
