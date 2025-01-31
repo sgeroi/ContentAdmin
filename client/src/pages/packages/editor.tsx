@@ -434,106 +434,198 @@ export default function PackageEditor() {
 
                           {question ? (
                             <div className="space-y-4">
-                              <FormField
-                                control={form.control}
-                                name="title"
-                                render={({ field }) => (
+                              <Form {...form}>
+                                <form className="space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="title"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Заголовок вопроса</FormLabel>
+                                        <FormControl>
+                                          <Input 
+                                            defaultValue={question.title}
+                                            onChange={(e) => {
+                                              field.onChange(e);
+                                              handleAutoSave(question.id, { title: e.target.value });
+                                            }}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
                                   <FormItem>
-                                    <FormLabel>Заголовок вопроса</FormLabel>
-                                    <FormControl>
-                                      <Input 
-                                        defaultValue={question.title}
-                                        onChange={(e) => {
-                                          field.onChange(e);
-                                          handleAutoSave(question.id, { title: e.target.value });
-                                        }}
-                                      />
-                                    </FormControl>
+                                    <FormLabel>Содержание вопроса</FormLabel>
+                                    <WysiwygEditor
+                                      content={question.content}
+                                      onChange={(content) => handleAutoSave(question.id, { content })}
+                                      className="min-h-[200px]"
+                                    />
+                                    <FormMessage />
                                   </FormItem>
-                                )}
-                              />
-                              <FormItem>
-                                <FormLabel>Содержание вопроса</FormLabel>
-                                <WysiwygEditor
-                                  content={question.content}
-                                  onChange={(content) => handleAutoSave(question.id, { content })}
-                                />
-                              </FormItem>
-                              <FormField
-                                control={form.control}
-                                name="answer"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Ответ</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        defaultValue={question.answer || ""}
-                                        onChange={(e) => {
-                                          field.onChange(e);
-                                          handleAutoSave(question.id, { answer: e.target.value });
-                                        }}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <div className="flex gap-4">
-                                <FormField
-                                  control={form.control}
-                                  name="topic"
-                                  render={({ field }) => (
-                                    <FormItem className="flex-1">
-                                      <FormLabel>Тема</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          defaultValue={question.topic}
-                                          onChange={(e) => {
-                                            field.onChange(e);
-                                            handleAutoSave(question.id, { topic: e.target.value });
-                                          }}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={form.control}
-                                  name="difficulty"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Сложность</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          type="number"
-                                          min={1}
-                                          max={5}
-                                          className="w-20"
-                                          defaultValue={question.difficulty}
-                                          onChange={(e) => {
-                                            field.onChange(e);
-                                            handleAutoSave(question.id, { 
-                                              difficulty: parseInt(e.target.value) 
-                                            });
-                                          }}
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
+                                  <FormField
+                                    control={form.control}
+                                    name="answer"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Ответ</FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            defaultValue={question.answer || ""}
+                                            onChange={(e) => {
+                                              field.onChange(e);
+                                              handleAutoSave(question.id, { answer: e.target.value });
+                                            }}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <div className="flex gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name="topic"
+                                      render={({ field }) => (
+                                        <FormItem className="flex-1">
+                                          <FormLabel>Тема</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              defaultValue={question.topic}
+                                              onChange={(e) => {
+                                                field.onChange(e);
+                                                handleAutoSave(question.id, { topic: e.target.value });
+                                              }}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={form.control}
+                                      name="difficulty"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Сложность</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              min={1}
+                                              max={5}
+                                              className="w-20"
+                                              defaultValue={question.difficulty}
+                                              onChange={(e) => {
+                                                field.onChange(e);
+                                                handleAutoSave(question.id, { 
+                                                  difficulty: parseInt(e.target.value) 
+                                                });
+                                              }}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                </form>
+                              </Form>
                             </div>
                           ) : (
                             <div className="flex gap-4">
-                              <Button
-                                onClick={() => {
-                                  form.reset();
-                                  form.handleSubmit((data) =>
-                                    handleSubmitQuestion(round.id, index, data)
-                                  )();
-                                }}
-                              >
-                                Написать вопрос
-                              </Button>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button>
+                                    Написать вопрос
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Создать новый вопрос</DialogTitle>
+                                    <DialogDescription>
+                                      Заполните форму для создания нового вопроса
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <Form {...form}>
+                                    <form 
+                                      onSubmit={form.handleSubmit((data) => handleSubmitQuestion(round.id, index, data))}
+                                      className="space-y-4"
+                                    >
+                                      <FormField
+                                        control={form.control}
+                                        name="title"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel>Заголовок вопроса</FormLabel>
+                                            <FormControl>
+                                              <Input placeholder="Введите заголовок" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <FormItem>
+                                        <FormLabel>Содержание вопроса</FormLabel>
+                                        <WysiwygEditor
+                                          content={form.getValues("content")}
+                                          onChange={(content) => form.setValue("content", content)}
+                                          className="min-h-[200px]"
+                                        />
+                                        <FormMessage />
+                                      </FormItem>
+                                      <FormField
+                                        control={form.control}
+                                        name="answer"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel>Ответ</FormLabel>
+                                            <FormControl>
+                                              <Input placeholder="Введите ответ" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                      <div className="flex gap-4">
+                                        <FormField
+                                          control={form.control}
+                                          name="topic"
+                                          render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                              <FormLabel>Тема</FormLabel>
+                                              <FormControl>
+                                                <Input placeholder="Введите тему" {...field} />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          )}
+                                        />
+                                        <FormField
+                                          control={form.control}
+                                          name="difficulty"
+                                          render={({ field }) => (
+                                            <FormItem>
+                                              <FormLabel>Сложность</FormLabel>
+                                              <FormControl>
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  max={5}
+                                                  className="w-20"
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          )}
+                                        />
+                                      </div>
+                                      <Button type="submit">Создать вопрос</Button>
+                                    </form>
+                                  </Form>
+                                </DialogContent>
+                              </Dialog>
                               <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
                                 <DialogTrigger asChild>
                                   <Button variant="outline">
@@ -635,7 +727,6 @@ export default function PackageEditor() {
                                       </Button>
                                     </form>
                                   </Form>
-
                                   <ScrollArea className="h-[400px] mt-4">
                                     <div className="space-y-4">
                                       {availableQuestions.map((q) => {
@@ -669,7 +760,6 @@ export default function PackageEditor() {
                                       })}
                                     </div>
                                   </ScrollArea>
-
                                   <div className="mt-4 flex justify-end">
                                     <Button
                                       onClick={() => handleAddSelectedQuestions(round.id)}
