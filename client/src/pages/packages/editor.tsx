@@ -408,36 +408,60 @@ export default function PackageEditor() {
         description: "Описание раунда",
         questionCount: 5,
         orderIndex,
+        packageId: parseInt(params.id),
       };
 
-      const response = await fetch(`/api/packages/${params.id}/rounds`, {
+      const response = await fetch(`/api/rounds`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         credentials: "include",
         body: JSON.stringify(roundData),
       });
 
-      const responseData = await response.json();
-      console.log('New round response:', responseData);
+      console.log('Round creation response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Parsed response data:', responseData);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error(`Invalid server response: ${responseText}`);
+      }
 
       if (!response.ok) {
-        throw new Error(`Failed to add round: ${response.statusText}`);
+        throw new Error(responseData?.error || `Failed to add round: ${response.statusText}`);
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
       });
 
       if (!updatedResponse.ok) {
         throw new Error("Failed to fetch updated package data");
       }
 
-      const updatedPackage = await updatedResponse.json();
-      console.log('Updated package after adding round:', updatedPackage);
-      setPackageData(updatedPackage);
+      const updatedText = await updatedResponse.text();
+      console.log('Raw updated package response:', updatedText);
 
+      let updatedData;
+      try {
+        updatedData = JSON.parse(updatedText);
+        console.log('Parsed package data:', updatedData);
+      } catch (e) {
+        console.error('Failed to parse updated package data:', e);
+        throw new Error(`Invalid package response: ${updatedText}`);
+      }
+
+      setPackageData(updatedData);
       toast({
         title: "Успех",
         description: "Раунд добавлен",
@@ -459,7 +483,7 @@ export default function PackageEditor() {
         console.log('Auto-saving question:', questionId, data);
 
         const response = await fetch(`/api/questions/${questionId}`, {
-          method: "PATCH",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -468,17 +492,21 @@ export default function PackageEditor() {
           body: JSON.stringify(data),
         });
 
+        console.log('Question update response status:', response.status);
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+
         let responseData;
         try {
-          responseData = await response.json();
-          console.log('Save question response:', responseData);
+          responseData = JSON.parse(responseText);
+          console.log('Parsed response data:', responseData);
         } catch (e) {
           console.error('Failed to parse response:', e);
-          throw new Error('Invalid server response');
+          throw new Error(`Invalid server response: ${responseText}`);
         }
 
         if (!response.ok) {
-          throw new Error(responseData?.message || `Failed to save question: ${response.statusText}`);
+          throw new Error(responseData?.error || `Failed to save question: ${response.statusText}`);
         }
 
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
@@ -492,13 +520,16 @@ export default function PackageEditor() {
           throw new Error("Failed to fetch updated package data");
         }
 
+        const updatedText = await updatedResponse.text();
+        console.log('Raw updated package response:', updatedText);
+
         let updatedData;
         try {
-          updatedData = await updatedResponse.json();
-          console.log('Updated package data:', updatedData);
+          updatedData = JSON.parse(updatedText);
+          console.log('Parsed package data:', updatedData);
         } catch (e) {
           console.error('Failed to parse updated package data:', e);
-          throw new Error('Invalid server response for package data');
+          throw new Error(`Invalid package response: ${updatedText}`);
         }
 
         setPackageData(updatedData);
@@ -522,6 +553,7 @@ export default function PackageEditor() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
@@ -530,18 +562,47 @@ export default function PackageEditor() {
         }),
       });
 
+      console.log('Add question response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Parsed response data:', responseData);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error(`Invalid server response: ${responseText}`);
+      }
+
       if (!response.ok) {
-        throw new Error("Failed to add question to round");
+        throw new Error(responseData?.error || `Failed to add question to round: ${response.statusText}`);
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
       });
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
+
+      if (!updatedResponse.ok) {
+        throw new Error("Failed to fetch updated package data");
       }
 
+      const updatedText = await updatedResponse.text();
+      console.log('Raw updated package response:', updatedText);
+
+      let updatedData;
+      try {
+        updatedData = JSON.parse(updatedText);
+        console.log('Parsed package data:', updatedData);
+      } catch (e) {
+        console.error('Failed to parse updated package data:', e);
+        throw new Error(`Invalid package response: ${updatedText}`);
+      }
+
+      setPackageData(updatedData);
       setIsSearchDialogOpen(false);
 
       toast({

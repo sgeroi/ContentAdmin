@@ -638,15 +638,57 @@ export function registerRoutes(app: Express): Server {
         .returning();
 
       console.log('Round created:', round);
-      res.json(round);
+      res.json({
+        success: true,
+        data: round,
+      });
     } catch (error: any) {
       console.error('Error creating round:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: error.message,
+        details: error.toString()
+      });
     }
   });
 
+  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      console.log('Updating round:', req.params.id, 'with data:', req.body);
 
-  // Round questions management
+      const [round] = await db
+        .update(rounds)
+        .set({
+          name: req.body.name,
+          description: req.body.description,
+          updatedAt: new Date(),
+        })
+        .where(eq(rounds.id, parseInt(req.params.id)))
+        .returning();
+
+      res.json({
+        success: true,
+        data: round,
+      });
+    } catch (error: any) {
+      console.error('Error updating round:', error);
+      res.status(500).json({
+        error: error.message,
+        details: error.toString()
+      });
+    }
+  });
+
+  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+    try {
+      await db
+        .delete(rounds)
+        .where(eq(rounds.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).send(error.message);
+    }
+  });
+
   app.post("/api/rounds/:roundId/questions", requireAuth, async (req, res) => {
     try {
       const roundId = parseInt(req.params.roundId);
@@ -661,10 +703,16 @@ export function registerRoutes(app: Express): Server {
         })
         .returning();
 
-      res.json(result);
+      res.json({
+        success: true,
+        data: result,
+      });
     } catch (error: any) {
       console.error('Error adding question to round:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        error: error.message,
+        details: error.toString()
+      });
     }
   });
 
@@ -688,6 +736,31 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
+  app.put("/api/questions/:id", requireAuth, async (req, res) => {
+    try {
+      const [question] = await db
+        .update(questions)
+        .set({
+          ...req.body,
+          updatedAt: new Date(),
+        })
+        .where(eq(questions.id, parseInt(req.params.id)))
+        .returning();
+
+      res.json({
+        success: true,
+        data: question,
+      });
+    } catch (error: any) {
+      console.error('Error updating question:', error);
+      res.status(500).json({
+        error: error.message,
+        details: error.toString()
+      });
+    }
+  });
+
 
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
@@ -765,29 +838,6 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error('Error adding round to template:', error);
       res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.put("/api/rounds/:id", requireAuth, async (req, res) => {
-    try {
-      const [round] = await db
-        .update(rounds)
-        .set({
-          name: req.body.name,
-          description: req.body.description,
-          questionCount: req.body.questionCount,
-          orderIndex: req.body.orderIndex,
-          updatedAt: new Date(),
-        })
-        .where(eq(rounds.id, parseInt(req.params.id)))
-        .returning();
-
-      res.json(round);
-    } catch (error: any) {
-      res.status(500).json({ 
-        error: error.message,
-        details: error.toString()
-      });
     }
   });
 
