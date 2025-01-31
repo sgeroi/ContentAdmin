@@ -79,19 +79,17 @@ interface QuestionItemProps {
   roundId: number;
   roundQuestionCount: number;
   handleAutoSave: (questionId: number, data: any) => void;
-  handleRemoveQuestion: (roundId: number, questionId: number) => void;
-  handleMoveQuestion: (fromRoundId: number, toRoundId: number, questionId: number) => void;
   form: any;
   packageData: PackageWithRounds;
 }
 
-function NavigationItem({ 
-  round, 
-  activeQuestionId, 
+function NavigationItem({
+  round,
+  activeQuestionId,
   onQuestionClick,
-  onEdit 
-}: { 
-  round: Round; 
+  onEdit
+}: {
+  round: Round;
   activeQuestionId: string | null;
   onQuestionClick: (id: string) => void;
   onEdit: () => void;
@@ -137,13 +135,11 @@ function QuestionItem({
   roundId,
   roundQuestionCount,
   handleAutoSave,
-  handleRemoveQuestion,
-  handleMoveQuestion,
   form,
   packageData,
 }: QuestionItemProps) {
   return (
-    <div className="relative rounded-lg border bg-card p-4">
+    <div className="rounded-lg border bg-card p-4">
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium">
@@ -188,45 +184,6 @@ function QuestionItem({
             </form>
           </Form>
         </div>
-      </div>
-
-      <div className="absolute top-3 right-[-40px] flex flex-col gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleRemoveQuestion(roundId, question.id)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoveVertical className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Переместить вопрос</DialogTitle>
-              <DialogDescription>
-                Выберите раунд, в который хотите переместить вопрос
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              {packageData.rounds
-                .filter(r => r.id !== roundId)
-                .map((targetRound) => (
-                  <Button
-                    key={targetRound.id}
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => handleMoveQuestion(roundId, targetRound.id, question.id)}
-                  >
-                    Раунд {targetRound.orderIndex + 1}: {targetRound.name}
-                  </Button>
-                ))}
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
@@ -330,6 +287,7 @@ export default function PackageEditor() {
 
   const handleAddRound = async () => {
     try {
+      const orderIndex = packageData?.rounds.length || 0;
       const response = await fetch(`/api/packages/${params.id}/rounds`, {
         method: 'POST',
         headers: {
@@ -340,7 +298,7 @@ export default function PackageEditor() {
           name: 'Новый раунд',
           description: 'Описание раунда',
           questionCount: 5,
-          orderIndex: packageData?.rounds.length || 0,
+          orderIndex,
         }),
       });
 
@@ -348,21 +306,24 @@ export default function PackageEditor() {
         throw new Error('Failed to add round');
       }
 
-      // Немедленно добавляем новый раунд
       const newRound = await response.json();
+
+      // Сразу открываем диалог редактирования с небольшой задержкой
+      setTimeout(() => {
+        setEditingRound({
+          id: newRound.id,
+          name: 'Новый раунд',
+          description: 'Описание раунда'
+        });
+      }, 100);
+
+      // Обновляем состояние сразу
       setPackageData(prevData => {
         if (!prevData) return null;
         return {
           ...prevData,
           rounds: [...prevData.rounds, newRound]
         };
-      });
-
-      // Сразу открываем диалог редактирования
-      setEditingRound({
-        id: newRound.id,
-        name: newRound.name,
-        description: newRound.description
       });
 
       toast({
@@ -629,8 +590,6 @@ export default function PackageEditor() {
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
-                          handleRemoveQuestion={handleRemoveQuestion}
-                          handleMoveQuestion={handleMoveQuestion}
                           form={form}
                           packageData={packageData}
                         />
@@ -662,7 +621,16 @@ export default function PackageEditor() {
             </DialogDescription>
           </DialogHeader>
           {editingRound && (
-            <div className="space-y-4">
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleUpdateRound(editingRound.id, {
+                  name: editingRound.name,
+                  description: editingRound.description,
+                });
+              }}
+            >
               <div className="space-y-2">
                 <Label htmlFor="roundName">Название</Label>
                 <Input
@@ -680,17 +648,14 @@ export default function PackageEditor() {
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingRound(null)}>
+                <Button type="button" variant="outline" onClick={() => setEditingRound(null)}>
                   Отмена
                 </Button>
-                <Button onClick={() => handleUpdateRound(editingRound.id, {
-                  name: editingRound.name,
-                  description: editingRound.description,
-                })}>
+                <Button type="submit">
                   Сохранить
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>
