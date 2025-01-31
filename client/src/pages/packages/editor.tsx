@@ -31,6 +31,16 @@ import {
 } from '@dnd-kit/sortable';
 import { cn } from "@/lib/utils";
 
+// Custom hook for DnD sensors
+function useDndSensors() {
+  return useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+}
+
 type PackageQuestion = Question & {
   author: { username: string; };
 };
@@ -271,6 +281,8 @@ export default function PackageEditor() {
       query: "",
     },
   });
+
+  const sensors = useDndSensors();
 
   const toggleRound = (roundId: number) => {
     const newExpanded = new Set(expandedRounds);
@@ -545,6 +557,14 @@ export default function PackageEditor() {
     }
   };
 
+  // Find active question data
+  const activeQuestionData = activeQuestion 
+    ? packageData?.rounds.find(r => r.id === activeQuestion.roundId)?.questions[activeQuestion.index]
+    : null;
+  const activeRound = activeQuestion
+    ? packageData?.rounds.find(r => r.id === activeQuestion.roundId)
+    : null;
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -552,21 +572,6 @@ export default function PackageEditor() {
   if (!packageData) {
     return <div>Package not found</div>;
   }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Find active question data
-  const activeQuestionData = activeQuestion 
-    ? packageData.rounds.find(r => r.id === activeQuestion.roundId)?.questions[activeQuestion.index]
-    : null;
-  const activeRound = activeQuestion
-    ? packageData.rounds.find(r => r.id === activeQuestion.roundId)
-    : null;
 
   return (
     <div className="container py-6">
