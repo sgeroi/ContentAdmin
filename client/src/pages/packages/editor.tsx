@@ -261,6 +261,159 @@ function AddQuestionDialog({
   );
 }
 
+function CreateQuestionDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { content: any; answer: string; difficulty: number }) => Promise<void>;
+}) {
+  const form = useForm<{ content: any; answer: string; difficulty: number }>({
+    defaultValues: {
+      content: {},
+      answer: "",
+      difficulty: 1,
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Создать новый вопрос</DialogTitle>
+          <DialogDescription>
+            Напишите текст вопроса и укажите правильный ответ
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="content"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Текст вопроса</FormLabel>
+                  <FormControl>
+                    <WysiwygEditor
+                      content={field.value}
+                      onChange={field.onChange}
+                      className="min-h-[200px]"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="answer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ответ</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="difficulty"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Сложность</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} max={5} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Отмена
+              </Button>
+              <Button type="submit">Создать</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GenerateQuestionsDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { prompt: string; count: number }) => Promise<void>;
+}) {
+  const form = useForm<{ prompt: string; count: number }>({
+    defaultValues: {
+      prompt: "",
+      count: 1,
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Сгенерировать вопросы</DialogTitle>
+          <DialogDescription>
+            Опишите тему и укажите количество вопросов для генерации
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="prompt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Тема или описание</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Например: Вопросы про историю России 19 века, сложность средняя"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Количество вопросов</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} max={10} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Отмена
+              </Button>
+              <Button type="submit">Генерировать</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -272,6 +425,8 @@ export default function PackageEditor() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
+  const [isCreateQuestionDialogOpen, setIsCreateQuestionDialogOpen] = useState(false);
+  const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const form = useForm<QuestionFormData>({
@@ -649,14 +804,124 @@ export default function PackageEditor() {
     setIsAddQuestionDialogOpen(false);
     switch (type) {
       case "manual":
-        // TODO: Добавить создание нового вопроса
+        setIsCreateQuestionDialogOpen(true);
         break;
       case "search":
         setIsSearchDialogOpen(true);
         break;
       case "generate":
-        // TODO: Добавить генерацию вопроса
+        setIsGenerateQuestionsDialogOpen(true);
         break;
+    }
+  };
+
+  const handleCreateQuestion = async (data: { content: any; answer: string; difficulty: number }) => {
+    try {
+      const response = await fetch('/api/questions', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          title: "Вопрос",
+          ...data,
+        }),
+      });
+
+      console.log('Create question response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Parsed response data:', responseData);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error(`Invalid server response: ${responseText}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData?.error || `Failed to create question: ${response.statusText}`);
+      }
+
+      // Add the new question to the current round
+      if (currentRoundId) {
+        const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+        if (round) {
+          await handleAddQuestion(currentRoundId, responseData.data.id, round.questions?.length || 0);
+        }
+      }
+
+      setIsCreateQuestionDialogOpen(false);
+      toast({
+        title: "Успех",
+        description: "Вопрос создан",
+      });
+    } catch (error: any) {
+      console.error('Error creating question:', error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
+    try {
+      const response = await fetch('/api/questions/generate', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      console.log('Generate questions response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Parsed response data:', responseData);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error(`Invalid server response: ${responseText}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData?.error || `Failed to generate questions: ${response.statusText}`);
+      }
+
+      // Add all generated questions to the current round
+      if (currentRoundId) {
+        const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+        if (round) {
+          let position = round.questions?.length || 0;
+          for (const question of responseData.data) {
+            await handleAddQuestion(currentRoundId, question.id, position++);
+          }
+        }
+      }
+
+      setIsGenerateQuestionsDialogOpen(false);
+      toast({
+        title: "Успех",
+        description: `Сгенерировано ${responseData.data.length} вопросов`,
+      });
+    } catch (error: any) {
+      console.error('Error generating questions:', error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -743,7 +1008,7 @@ export default function PackageEditor() {
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
                           "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                          activeQuestionId === `${roundid}-${question.id}` && "ring-2 ring-primary"
                         )}
                       >
                         <QuestionItem
@@ -777,6 +1042,21 @@ export default function PackageEditor() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      <AddQuestionDialog
+        open={isAddQuestionDialogOpen}
+        onOpenChange={setIsAddQuestionDialogOpen}
+        onSelect={handleAddQuestionSelect}
+      />
+      <CreateQuestionDialog
+        open={isCreateQuestionDialogOpen}
+        onOpenChange={setIsCreateQuestionDialogOpen}
+        onSubmit={handleCreateQuestion}
+      />
+      <GenerateQuestionsDialog
+        open={isGenerateQuestionsDialogOpen}
+        onOpenChange={setIsGenerateQuestionsDialogOpen}
+        onSubmit={handleGenerateQuestions}
+      />
       <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -831,11 +1111,6 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-      <AddQuestionDialog
-        open={isAddQuestionDialogOpen}
-        onOpenChange={setIsAddQuestionDialogOpen}
-        onSelect={handleAddQuestionSelect}
-      />
     </div>
   );
 }
