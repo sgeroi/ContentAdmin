@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, PlusCircle, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, X, Database, PlusCircle, ArrowUpDown, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
+import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import {
   Form,
   FormControl,
@@ -15,14 +16,14 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -31,6 +32,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import debounce from "lodash/debounce";
 
 type PackageQuestion = Question & {
   author: { username: string };
@@ -51,10 +53,18 @@ type PackageWithRounds = Package & {
 
 type QuestionFormData = {
   title: string;
-  content: string;
+  content: any;
   answer: string;
   topic: string;
   difficulty: number;
+};
+
+type QuestionSearchFilters = {
+  query: string;
+  author?: string;
+  tag?: string;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export default function PackageEditor() {
@@ -64,14 +74,27 @@ export default function PackageEditor() {
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRound, setExpandedRound] = useState<number | null>(null);
+  const [searchFilters, setSearchFilters] = useState<QuestionSearchFilters>({ query: "" });
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set());
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
 
   const form = useForm<QuestionFormData>({
     defaultValues: {
       title: "",
-      content: "",
+      content: {},
       answer: "",
       topic: "",
       difficulty: 1,
+    },
+  });
+
+  const searchForm = useForm<QuestionSearchFilters>({
+    defaultValues: {
+      query: "",
+      author: "",
+      tag: "",
+      dateFrom: "",
+      dateTo: "",
     },
   });
 
@@ -86,19 +109,9 @@ export default function PackageEditor() {
           throw new Error('Failed to fetch package data');
         }
         const packageResult = await packageResponse.json();
-        console.log('Package data received:', packageResult);
         setPackageData(packageResult);
 
-        console.log('Fetching questions...');
-        const questionsResponse = await fetch('/api/questions', {
-          credentials: 'include'
-        });
-        if (!questionsResponse.ok) {
-          throw new Error('Failed to fetch questions');
-        }
-        const questionsResult = await questionsResponse.json();
-        console.log('Questions received:', questionsResult);
-        setAvailableQuestions(questionsResult.questions);
+        await fetchQuestions();
       } catch (error: any) {
         console.error('Error fetching data:', error);
         toast({
@@ -114,28 +127,86 @@ export default function PackageEditor() {
     fetchData();
   }, [params.id]);
 
-  const handleSubmitQuestion = async (roundId: number, position: number, data: QuestionFormData) => {
+  const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
     try {
-      const createQuestionResponse = await fetch('/api/questions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(data),
+      const queryParams = new URLSearchParams();
+      if (filters.query) queryParams.append("q", filters.query);
+      if (filters.author) queryParams.append("author", filters.author);
+      if (filters.tag) queryParams.append("tag", filters.tag);
+      if (filters.dateFrom) queryParams.append("from", filters.dateFrom);
+      if (filters.dateTo) queryParams.append("to", filters.dateTo);
+
+      const response = await fetch(`/api/questions?${queryParams}`, {
+        credentials: 'include'
       });
-
-      if (!createQuestionResponse.ok) {
-        throw new Error('Failed to create question');
+      if (!response.ok) {
+        throw new Error('Failed to fetch questions');
       }
+      const result = await response.json();
+      setAvailableQuestions(result.questions);
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
-      const newQuestion = await createQuestionResponse.json();
-      await handleAddQuestion(roundId, newQuestion.id, position);
-      form.reset();
+  const debouncedSearch = useCallback(
+    debounce((filters: QuestionSearchFilters) => {
+      fetchQuestions(filters);
+    }, 300),
+    []
+  );
+
+  const handleSearch = (data: QuestionSearchFilters) => {
+    setSearchFilters(data);
+    debouncedSearch(data);
+  };
+
+  const handleAutoSave = useCallback(
+    debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
+      try {
+        const response = await fetch(`/api/questions/${questionId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save question');
+        }
+
+        toast({
+          title: "Сохранено",
+          description: "Изменения автоматически сохранены",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Ошибка автосохранения",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }, 1000),
+    []
+  );
+
+  const handleAddSelectedQuestions = async (roundId: number) => {
+    try {
+      for (const questionId of selectedQuestions) {
+        await handleAddQuestion(roundId, questionId, 0);
+      }
+      setSelectedQuestions(new Set());
+      setIsSearchDialogOpen(false);
 
       toast({
         title: "Успех",
-        description: "Новый вопрос создан и добавлен в раунд",
+        description: "Выбранные вопросы добавлены в раунд",
       });
     } catch (error: any) {
       toast({
@@ -189,7 +260,6 @@ export default function PackageEditor() {
 
   const handleRemoveQuestion = async (roundId: number, questionId: number) => {
     try {
-      console.log('Removing question:', { roundId, questionId });
       const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -220,6 +290,39 @@ export default function PackageEditor() {
       });
     }
   };
+
+  const handleSubmitQuestion = async (roundId: number, position: number, data: QuestionFormData) => {
+    try {
+      const createQuestionResponse = await fetch('/api/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      if (!createQuestionResponse.ok) {
+        throw new Error('Failed to create question');
+      }
+
+      const newQuestion = await createQuestionResponse.json();
+      await handleAddQuestion(roundId, newQuestion.id, position);
+      form.reset();
+
+      toast({
+        title: "Успех",
+        description: "Новый вопрос создан и добавлен в раунд",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -317,156 +420,266 @@ export default function PackageEditor() {
                                 <Badge variant="secondary">Дополнительный вопрос</Badge>
                               )}
                             </div>
+                            {question && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveQuestion(round.id, question.id)}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Удалить
+                              </Button>
+                            )}
                           </div>
 
                           {question ? (
-                            <div className="space-y-2">
-                              <div className="font-medium">{question.title}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {question.topic}
-                              </div>
-                              <div className="flex gap-2">
-                                <Link href={`/questions/${question.id}`}>
-                                  <Button variant="outline" size="sm">
-                                    Редактировать
-                                  </Button>
-                                </Link>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveQuestion(round.id, question.id)}
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Удалить
-                                </Button>
+                            <div className="space-y-4">
+                              <FormField
+                                control={form.control}
+                                name="title"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Заголовок вопроса</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        defaultValue={question.title}
+                                        onChange={(e) => {
+                                          field.onChange(e);
+                                          handleAutoSave(question.id, { title: e.target.value });
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <FormItem>
+                                <FormLabel>Содержание вопроса</FormLabel>
+                                <WysiwygEditor
+                                  content={question.content}
+                                  onChange={(content) => handleAutoSave(question.id, { content })}
+                                />
+                              </FormItem>
+                              <FormField
+                                control={form.control}
+                                name="answer"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Ответ</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        defaultValue={question.answer || ""}
+                                        onChange={(e) => {
+                                          field.onChange(e);
+                                          handleAutoSave(question.id, { answer: e.target.value });
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="flex gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name="topic"
+                                  render={({ field }) => (
+                                    <FormItem className="flex-1">
+                                      <FormLabel>Тема</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          defaultValue={question.topic}
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            handleAutoSave(question.id, { topic: e.target.value });
+                                          }}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="difficulty"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Сложность</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          max={5}
+                                          className="w-20"
+                                          defaultValue={question.difficulty}
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            handleAutoSave(question.id, { 
+                                              difficulty: parseInt(e.target.value) 
+                                            });
+                                          }}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-4">
-                              <Form {...form}>
-                                <form
-                                  onSubmit={form.handleSubmit((data) =>
+                            <div className="flex gap-4">
+                              <Button
+                                onClick={() => {
+                                  form.reset();
+                                  form.handleSubmit((data) =>
                                     handleSubmitQuestion(round.id, index, data)
-                                  )}
-                                  className="space-y-4"
-                                >
-                                  <FormField
-                                    control={form.control}
-                                    name="title"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Заголовок вопроса</FormLabel>
-                                        <FormControl>
-                                          <Input placeholder="Введите заголовок" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                  <FormField
-                                    control={form.control}
-                                    name="content"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Текст вопроса</FormLabel>
-                                        <FormControl>
-                                          <Textarea
-                                            placeholder="Введите текст вопроса"
-                                            className="min-h-[100px]"
-                                            {...field}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                  <FormField
-                                    control={form.control}
-                                    name="answer"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Ответ</FormLabel>
-                                        <FormControl>
-                                          <Textarea
-                                            placeholder="Введите ответ"
-                                            className="min-h-[100px]"
-                                            {...field}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                  <div className="flex gap-4">
-                                    <FormField
-                                      control={form.control}
-                                      name="topic"
-                                      render={({ field }) => (
-                                        <FormItem className="flex-1">
-                                          <FormLabel>Тема</FormLabel>
-                                          <FormControl>
-                                            <Input placeholder="Введите тему" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-                                    <FormField
-                                      control={form.control}
-                                      name="difficulty"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Сложность</FormLabel>
-                                          <FormControl>
-                                            <Input
-                                              type="number"
-                                              min={1}
-                                              max={5}
-                                              className="w-20"
-                                              {...field}
-                                            />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <Button type="submit">Создать вопрос</Button>
-                                    <Sheet>
-                                      <SheetTrigger asChild>
-                                        <Button variant="outline">
-                                          <Database className="h-4 w-4 mr-2" />
-                                          Выбрать из базы
-                                        </Button>
-                                      </SheetTrigger>
-                                      <SheetContent>
-                                        <SheetHeader>
-                                          <SheetTitle>Выбрать существующий вопрос</SheetTitle>
-                                        </SheetHeader>
-                                        <ScrollArea className="h-[600px]">
-                                          <div className="space-y-4 py-4">
-                                            {availableQuestions.map((q) => (
-                                              <div
-                                                key={q.id}
-                                                className="p-4 border rounded-lg cursor-pointer hover:bg-accent"
-                                                onClick={() => {
-                                                  handleAddQuestion(round.id, q.id, index);
-                                                }}
-                                              >
-                                                <div className="font-medium">{q.title}</div>
-                                                <div className="text-sm text-muted-foreground">
-                                                  {q.topic}
-                                                </div>
-                                              </div>
-                                            ))}
+                                  )();
+                                }}
+                              >
+                                Написать вопрос
+                              </Button>
+                              <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline">
+                                    <Database className="h-4 w-4 mr-2" />
+                                    Выбрать из базы
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl max-h-[80vh]">
+                                  <DialogHeader>
+                                    <DialogTitle>Поиск вопросов</DialogTitle>
+                                    <DialogDescription>
+                                      Найдите и выберите вопросы для добавления в раунд
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <Form {...searchForm}>
+                                    <form 
+                                      onSubmit={searchForm.handleSubmit(handleSearch)}
+                                      className="space-y-4"
+                                    >
+                                      <div className="flex gap-4">
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="query"
+                                          render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                              <FormControl>
+                                                <Input 
+                                                  placeholder="Поиск по тексту..."
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="author"
+                                          render={({ field }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <Input 
+                                                  placeholder="Автор"
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                      </div>
+                                      <div className="flex gap-4">
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="tag"
+                                          render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                              <FormControl>
+                                                <Input 
+                                                  placeholder="Тег"
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="dateFrom"
+                                          render={({ field }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <Input 
+                                                  type="date"
+                                                  placeholder="От"
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="dateTo"
+                                          render={({ field }) => (
+                                            <FormItem>
+                                              <FormControl>
+                                                <Input 
+                                                  type="date"
+                                                  placeholder="До"
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                      </div>
+                                      <Button type="submit">
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Поиск
+                                      </Button>
+                                    </form>
+                                  </Form>
+
+                                  <ScrollArea className="h-[400px] mt-4">
+                                    <div className="space-y-4">
+                                      {availableQuestions.map((q) => {
+                                        const isSelected = selectedQuestions.has(q.id);
+                                        return (
+                                          <div
+                                            key={q.id}
+                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                                              isSelected ? 'bg-primary/10' : 'hover:bg-accent'
+                                            }`}
+                                            onClick={() => {
+                                              const newSelected = new Set(selectedQuestions);
+                                              if (isSelected) {
+                                                newSelected.delete(q.id);
+                                              } else {
+                                                newSelected.add(q.id);
+                                              }
+                                              setSelectedQuestions(newSelected);
+                                            }}
+                                          >
+                                            <div className="font-medium">{q.title}</div>
+                                            <div className="text-sm text-muted-foreground">
+                                              {q.topic} • {q.author?.username} • 
+                                              {new Date(q.createdAt).toLocaleDateString()}
+                                            </div>
+                                            {isSelected && (
+                                              <Badge className="mt-2">Выбрано</Badge>
+                                            )}
                                           </div>
-                                        </ScrollArea>
-                                      </SheetContent>
-                                    </Sheet>
+                                        );
+                                      })}
+                                    </div>
+                                  </ScrollArea>
+
+                                  <div className="mt-4 flex justify-end">
+                                    <Button
+                                      onClick={() => handleAddSelectedQuestions(round.id)}
+                                      disabled={selectedQuestions.size === 0}
+                                    >
+                                      Добавить выбранные вопросы ({selectedQuestions.size})
+                                    </Button>
                                   </div>
-                                </form>
-                              </Form>
+                                </DialogContent>
+                              </Dialog>
                             </div>
                           )}
                         </div>
