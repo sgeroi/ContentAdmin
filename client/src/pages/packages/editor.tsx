@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2, CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -38,6 +38,18 @@ import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useUsers } from "@/hooks/use-users"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+
 
 type PackageQuestion = Question & {
   author: { username: string; };
@@ -190,9 +202,7 @@ function RoundHeader({
             >
               Отмена
             </Button>
-            <Button type="submit">
-              Сохранить
-            </Button>
+            <Button type="submit">Сохранить</Button>
           </div>
         </form>
       ) : (
@@ -371,6 +381,159 @@ function QuestionItem({
           onChange={(e) => handleAutoSave(question.id, { answer: e.target.value })}
         />
       </div>
+    </div>
+  );
+}
+
+function PackageHeader({ 
+  packageData,
+  onSave,
+}: { 
+  packageData: PackageWithRounds;
+  onSave: (data: Partial<Package>) => Promise<void>;
+}) {
+  const [editMode, setEditMode] = useState(false);
+  const [title, setTitle] = useState(packageData.title);
+  const [description, setDescription] = useState(packageData.description || "");
+  const [playDate, setPlayDate] = useState<Date | undefined>(packageData.playDate ? new Date(packageData.playDate) : undefined);
+  const [authorId, setAuthorId] = useState<number>(packageData.authorId);
+  const { users } = useUsers();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setTitle(packageData.title);
+    setDescription(packageData.description || "");
+    setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
+    setAuthorId(packageData.authorId);
+  }, [packageData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSave({
+        title,
+        description,
+        playDate: playDate ? playDate.toISOString() : undefined,
+        authorId,
+      });
+      setEditMode(false);
+      toast({
+        title: "Успех",
+        description: "Пакет обновлен",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (editMode) {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Название</Label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Название пакета"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Описание</Label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Описание пакета"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Дата игры</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !playDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {playDate ? format(playDate, "PPP") : <span>Выберите дату</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={playDate}
+                onSelect={setPlayDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="space-y-2">
+          <Label>Автор</Label>
+          <Select 
+            value={authorId.toString()} 
+            onValueChange={(value) => setAuthorId(parseInt(value))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Выберите автора" />
+            </SelectTrigger>
+            <SelectContent>
+              {users?.map((user) => (
+                <SelectItem key={user.id} value={user.id.toString()}>
+                  {user.username}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setEditMode(false);
+              setTitle(packageData.title);
+              setDescription(packageData.description || "");
+              setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
+              setAuthorId(packageData.authorId);
+            }}
+          >
+            Отмена
+          </Button>
+          <Button type="submit">Сохранить</Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex justify-between items-start">
+      <div>
+        <h1 className="text-2xl font-bold">{title}</h1>
+        {description && <p className="text-muted-foreground mt-1">{description}</p>}
+        <div className="flex gap-2 mt-2">
+          {playDate && (
+            <Badge variant="secondary">
+              <CalendarIcon className="h-4 w-4 mr-1" />
+              {format(new Date(playDate), "PP")}
+            </Badge>
+          )}
+          {packageData.author && (
+            <Badge variant="outline">
+              Автор: {packageData.author.username}
+            </Badge>
+          )}
+        </div>
+      </div>
+      <Button variant="ghost" size="icon" onClick={() => setEditMode(true)}>
+        <Edit2 className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
@@ -940,6 +1103,34 @@ export default function PackageEditor() {
     }
   };
 
+  const handleUpdatePackage = async (data: Partial<Package>) => {
+    try {
+      const response = await fetch(`/api/packages/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const updatedPackage = await response.json();
+      setPackageData(updatedPackage);
+    } catch (error: any) {
+      console.error("Error updating package:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -969,16 +1160,18 @@ export default function PackageEditor() {
     <div className="h-screen flex flex-col">
       <div className="border-b">
         <div className="container py-4">
-          <div className="space-y-1">
+          <div className="space-y-4">
             <Link href="/packages">
               <Button variant="ghost" className="pl-0">
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Назад к пакетам
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold">{packageData.title}</h1>
-            {packageData.description && (
-              <p className="text-muted-foreground">{packageData.description}</p>
+            {packageData && (
+              <PackageHeader
+                packageData={packageData}
+                onSave={handleUpdatePackage}
+              />
             )}
           </div>
         </div>
@@ -1026,7 +1219,7 @@ export default function PackageEditor() {
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
                           "rounded-lg border bg-card p-4",
-activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
                         )}
                       >
                         <QuestionItem

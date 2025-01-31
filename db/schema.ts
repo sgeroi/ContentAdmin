@@ -32,6 +32,7 @@ export const packages = pgTable("packages", {
   description: text("description"),
   templateId: integer("template_id").references(() => templates.id),
   authorId: integer("author_id").references(() => users.id).notNull(),
+  playDate: timestamp("play_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
