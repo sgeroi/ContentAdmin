@@ -273,6 +273,8 @@ export function registerRoutes(app: Express): Server {
         .set({
           title: req.body.title,
           description: req.body.description || "",
+          playDate: req.body.playDate || null,
+          authorId: req.body.authorId || null,
           templateId: req.body.templateId || null,
           updatedAt: new Date(),
         })
@@ -303,6 +305,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(packages.id, pkg.id),
         with: {
           template: true,
+          author: true, // Include author data
           rounds: {
             with: {
               roundQuestions: {
@@ -325,6 +328,10 @@ export function registerRoutes(app: Express): Server {
         },
         limit: 1,
       });
+
+      if (!result) {
+        return res.status(404).json({ error: 'Package not found' });
+      }
 
       // Transform the result to match the expected format
       const transformedResult = {
@@ -359,6 +366,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(packages.id, parseInt(req.params.id)),
         with: {
           template: true,
+          author: true, // Include author data
           rounds: {
             with: {
               roundQuestions: {
@@ -401,6 +409,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
 
 
   // Upload image endpoint
