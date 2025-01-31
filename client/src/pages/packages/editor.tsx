@@ -133,13 +133,12 @@ function RoundHeader({
   onSave,
 }: {
   round: Round;
-  onSave: (id: number, data: { name: string; description: string }) => void;
+  onSave: (id: number, data: { name: string; description: string }) => Promise<void>;
 }) {
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState(round.name);
   const [description, setDescription] = useState(round.description);
 
-  // Update local state when round data changes
   useEffect(() => {
     setName(round.name);
     setDescription(round.description);
@@ -147,7 +146,16 @@ function RoundHeader({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSave(round.id, { name, description });
+    try {
+      await onSave(round.id, { 
+        name: name || "Новый раунд", 
+        description: description || "Описание раунда" 
+      });
+      setEditMode(false);
+    } catch (error) {
+      // Ошибка будет обработана в родительском компоненте
+      console.error("Failed to save round:", error);
+    }
   };
 
   return (
@@ -176,7 +184,6 @@ function RoundHeader({
               variant="outline" 
               onClick={() => {
                 setEditMode(false);
-                // Reset to original values
                 setName(round.name);
                 setDescription(round.description);
               }}
@@ -328,17 +335,25 @@ export default function PackageEditor() {
           "Accept": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description
+        }),
       });
 
-      const responseData = await response.json();
-      console.log('Update round response:', responseData);
-
-      if (!response.ok) {
-        throw new Error(responseData.message || `Failed to update round: ${response.statusText}`);
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('Update round response:', responseData);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error('Invalid server response');
       }
 
-      // Запрашиваем обновленные данные пакета
+      if (!response.ok) {
+        throw new Error(responseData?.message || `Failed to update round: ${response.statusText}`);
+      }
+
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
         headers: {
@@ -350,8 +365,14 @@ export default function PackageEditor() {
         throw new Error("Failed to fetch updated package data");
       }
 
-      const updatedData = await updatedResponse.json();
-      console.log('Updated package data:', updatedData);
+      let updatedData;
+      try {
+        updatedData = await updatedResponse.json();
+        console.log('Updated package data:', updatedData);
+      } catch (e) {
+        console.error('Failed to parse updated package data:', e);
+        throw new Error('Invalid server response for package data');
+      }
 
       setPackageData(updatedData);
       toast({
@@ -440,14 +461,19 @@ export default function PackageEditor() {
           body: JSON.stringify(data),
         });
 
-        const responseData = await response.json();
-        console.log('Save question response:', responseData);
-
-        if (!response.ok) {
-          throw new Error(responseData.message || `Failed to save question: ${response.statusText}`);
+        let responseData;
+        try {
+          responseData = await response.json();
+          console.log('Save question response:', responseData);
+        } catch (e) {
+          console.error('Failed to parse response:', e);
+          throw new Error('Invalid server response');
         }
 
-        // Запрашиваем обновленные данные пакета
+        if (!response.ok) {
+          throw new Error(responseData?.message || `Failed to save question: ${response.statusText}`);
+        }
+
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
           headers: {
@@ -459,10 +485,16 @@ export default function PackageEditor() {
           throw new Error("Failed to fetch updated package data");
         }
 
-        const updatedData = await updatedResponse.json();
-        console.log('Updated package data:', updatedData);
-        setPackageData(updatedData);
+        let updatedData;
+        try {
+          updatedData = await updatedResponse.json();
+          console.log('Updated package data:', updatedData);
+        } catch (e) {
+          console.error('Failed to parse updated package data:', e);
+          throw new Error('Invalid server response for package data');
+        }
 
+        setPackageData(updatedData);
       } catch (error: any) {
         console.error('Error auto-saving:', error);
         toast({
