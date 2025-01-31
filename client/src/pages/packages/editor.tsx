@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, Plus, ChevronRight, Search, MoveVertical, GripVertical, Edit2 } from "lucide-react";
+import { ChevronLeft, X, Database, Plus, ChevronRight, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -22,16 +22,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
   CollapsibleContent,
@@ -46,6 +37,8 @@ import {
 import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Edit2 } from "lucide-react";
 
 type PackageQuestion = Question & {
   author: { username: string; };
@@ -87,7 +80,7 @@ function NavigationItem({
   round,
   activeQuestionId,
   onQuestionClick,
-  onEdit
+  onEdit,
 }: {
   round: Round;
   activeQuestionId: string | null;
@@ -195,8 +188,9 @@ export default function PackageEditor() {
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [editingRound, setEditingRound] = useState<{ id: number, name: string, description: string } | null>(null);
+  const [editingRound, setEditingRound] = useState<{ id: number; name: string; description: string } | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -217,7 +211,7 @@ export default function PackageEditor() {
     setActiveQuestionId(id);
     const element = questionRefs.current[id];
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
@@ -225,17 +219,17 @@ export default function PackageEditor() {
     const fetchData = async () => {
       try {
         const packageResponse = await fetch(`/api/packages/${params.id}`, {
-          credentials: 'include'
+          credentials: "include",
         });
         if (!packageResponse.ok) {
-          throw new Error('Failed to fetch package data');
+          throw new Error("Failed to fetch package data");
         }
         const packageResult = await packageResponse.json();
         setPackageData(packageResult);
 
         await fetchQuestions();
       } catch (error: any) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
         toast({
           title: "Ошибка",
           description: error.message,
@@ -249,23 +243,23 @@ export default function PackageEditor() {
     fetchData();
   }, [params.id]);
 
-  const handleUpdateRound = async (id: number, data: { name: string, description: string }) => {
+  const handleUpdateRound = async (id: number, data: { name: string; description: string }) => {
     try {
       const response = await fetch(`/api/rounds/${id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(data),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update round');
+        throw new Error("Failed to update round");
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: 'include'
+        credentials: "include",
       });
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
@@ -289,41 +283,42 @@ export default function PackageEditor() {
     try {
       const orderIndex = packageData?.rounds.length || 0;
       const response = await fetch(`/api/packages/${params.id}/rounds`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify({
-          name: 'Новый раунд',
-          description: 'Описание раунда',
+          name: "Новый раунд",
+          description: "Описание раунда",
           questionCount: 5,
           orderIndex,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add round');
+        throw new Error("Failed to add round");
       }
 
-      const newRound = await response.json();
+      // Сразу получаем обновленные данные
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: "include",
+      });
 
-      // Сразу открываем диалог редактирования с небольшой задержкой
-      setTimeout(() => {
-        setEditingRound({
-          id: newRound.id,
-          name: 'Новый раунд',
-          description: 'Описание раунда'
-        });
-      }, 100);
+      if (!updatedResponse.ok) {
+        throw new Error("Failed to fetch updated package data");
+      }
 
-      // Обновляем состояние сразу
-      setPackageData(prevData => {
-        if (!prevData) return null;
-        return {
-          ...prevData,
-          rounds: [...prevData.rounds, newRound]
-        };
+      const updatedPackage = await updatedResponse.json();
+      setPackageData(updatedPackage);
+
+      const newRound = updatedPackage.rounds[updatedPackage.rounds.length - 1];
+
+      // Открываем диалог редактирования для нового раунда
+      setEditingRound({
+        id: newRound.id,
+        name: newRound.name,
+        description: newRound.description,
       });
 
       toast({
@@ -343,16 +338,16 @@ export default function PackageEditor() {
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
       try {
         const response = await fetch(`/api/questions/${questionId}`, {
-          method: 'PATCH',
+          method: "PATCH",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          credentials: 'include',
+          credentials: "include",
           body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to save question');
+          throw new Error("Failed to save question");
         }
       } catch (error: any) {
         toast({
@@ -368,11 +363,11 @@ export default function PackageEditor() {
   const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
     try {
       const response = await fetch(`/api/rounds/${roundId}/questions`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify({
           questionId,
           orderIndex: position,
@@ -380,11 +375,11 @@ export default function PackageEditor() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add question to round');
+        throw new Error("Failed to add question to round");
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: 'include'
+        credentials: "include",
       });
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
@@ -398,7 +393,7 @@ export default function PackageEditor() {
         description: "Вопрос добавлен в раунд",
       });
     } catch (error: any) {
-      console.error('Error adding question:', error);
+      console.error("Error adding question:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -406,66 +401,6 @@ export default function PackageEditor() {
       });
     }
   };
-
-  const handleRemoveQuestion = async (roundId: number, questionId: number) => {
-    try {
-      const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove question from round');
-      }
-
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: 'include'
-      });
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
-      }
-
-      toast({
-        title: "Успех",
-        description: "Вопрос удален из раунда",
-      });
-    } catch (error: any) {
-      console.error('Error removing question:', error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleMoveQuestion = async (fromRoundId: number, toRoundId: number, questionId: number) => {
-    try {
-      const response = await fetch(`/api/rounds/${fromRoundId}/questions/${questionId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove question from round');
-      }
-
-      await handleAddQuestion(toRoundId, questionId, 0);
-
-      toast({
-        title: "Успех",
-        description: "Вопрос перемещен в другой раунд",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
 
   const handleSearch = useCallback((data: QuestionSearchFilters) => {
     fetchQuestions(data);
@@ -477,10 +412,10 @@ export default function PackageEditor() {
       if (filters.query) queryParams.append("q", filters.query);
 
       const response = await fetch(`/api/questions?${queryParams}`, {
-        credentials: 'include'
+        credentials: "include",
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch questions');
+        throw new Error("Failed to fetch questions");
       }
       const result = await response.json();
       setAvailableQuestions(result.questions);
@@ -578,7 +513,7 @@ export default function PackageEditor() {
                     {round.questions?.map((question, index) => (
                       <div
                         key={`${round.id}-${question.id}`}
-                        ref={el => questionRefs.current[`${round.id}-${question.id}`] = el}
+                        ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
                           "rounded-lg border bg-card",
                           activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
@@ -599,7 +534,10 @@ export default function PackageEditor() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => setIsSearchDialogOpen(true)}
+                      onClick={() => {
+                        setCurrentRoundId(round.id);
+                        setIsSearchDialogOpen(true);
+                      }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Добавить вопрос
@@ -622,7 +560,6 @@ export default function PackageEditor() {
           </DialogHeader>
           {editingRound && (
             <form
-              className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 handleUpdateRound(editingRound.id, {
@@ -630,21 +567,30 @@ export default function PackageEditor() {
                   description: editingRound.description,
                 });
               }}
+              className="space-y-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="roundName">Название</Label>
+                <Label>Название</Label>
                 <Input
-                  id="roundName"
+                  type="text"
                   value={editingRound.name}
-                  onChange={(e) => setEditingRound({ ...editingRound, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingRound((prev) =>
+                      prev ? { ...prev, name: e.target.value } : null
+                    )
+                  }
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="roundDescription">Описание</Label>
+                <Label>Описание</Label>
                 <Textarea
-                  id="roundDescription"
+                  type="text"
                   value={editingRound.description}
-                  onChange={(e) => setEditingRound({ ...editingRound, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditingRound((prev) =>
+                      prev ? { ...prev, description: e.target.value } : null
+                    )
+                  }
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -669,10 +615,7 @@ export default function PackageEditor() {
             </DialogDescription>
           </DialogHeader>
           <Form {...searchForm}>
-            <form
-              onSubmit={searchForm.handleSubmit(handleSearch)}
-              className="space-y-4"
-            >
+            <form onSubmit={searchForm.handleSubmit(handleSearch)} className="space-y-4">
               <FormField
                 control={searchForm.control}
                 name="query"
@@ -680,10 +623,7 @@ export default function PackageEditor() {
                   <FormItem>
                     <FormControl>
                       <div className="flex gap-2">
-                        <Input
-                          placeholder="Поиск по тексту..."
-                          {...field}
-                        />
+                        <Input placeholder="Поиск по тексту..." {...field} />
                         <Button type="submit">
                           <Search className="h-4 w-4" />
                         </Button>
@@ -701,7 +641,12 @@ export default function PackageEditor() {
                   key={question.id}
                   className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
                   onClick={() => {
-                    handleAddQuestion(packageData.rounds[0].id, question.id, packageData.rounds[0].questions.length);
+                    if (currentRoundId) {
+                      const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+                      if (round) {
+                        handleAddQuestion(currentRoundId, question.id, round.questions.length);
+                      }
+                    }
                   }}
                 >
                   <div>{getContentPreview(question.content)}</div>
@@ -722,9 +667,9 @@ export default function PackageEditor() {
 function getContentPreview(content: any): string {
   try {
     if (content?.content) {
-      let preview = '';
+      let preview = "";
       const extractText = (nodes: any[]): string => {
-        let text = '';
+        let text = "";
         for (const node of nodes) {
           if (node.text) {
             text += node.text;
@@ -736,11 +681,11 @@ function getContentPreview(content: any): string {
         return text;
       };
       preview = extractText(content.content);
-      return preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
+      return preview.length > 50 ? preview.slice(0, 50) + "..." : preview;
     }
-    return 'Нет содержания';
+    return "Нет содержания";
   } catch (error) {
-    console.error('Error parsing content:', error);
-    return 'Ошибка контента';
+    console.error("Error parsing content:", error);
+    return "Ошибка контента";
   }
 }
