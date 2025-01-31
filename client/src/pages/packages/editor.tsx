@@ -1,17 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, Search, MoveVertical, GripVertical, ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronLeft, X, Database, Search, MoveVertical, GripVertical, ChevronRight, ChevronDown, PencilIcon, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Package, Question } from "@db/schema";
+import type { Package, Question, Template } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import debounce from "lodash/debounce";
 import {
   DndContext,
@@ -30,6 +32,32 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { cn } from "@/lib/utils";
+
+function getContentPreview(content: any): string {
+  try {
+    if (content?.content) {
+      let preview = '';
+      const extractText = (nodes: any[]): string => {
+        let text = '';
+        for (const node of nodes) {
+          if (node.text) {
+            text += node.text;
+          }
+          if (node.content) {
+            text += extractText(node.content);
+          }
+        }
+        return text;
+      };
+      preview = extractText(content.content);
+      return preview.length > 30 ? preview.slice(0, 30) + '...' : preview;
+    }
+    return 'Нет содержания';
+  } catch (error) {
+    console.error('Error parsing content:', error);
+    return 'Ошибка контента';
+  }
+}
 
 // Custom hook for DnD sensors
 function useDndSensors() {
@@ -73,6 +101,7 @@ interface TreeItemProps {
   isFolder?: boolean;
   isExpanded?: boolean;
   label: string;
+  questionPreview?: string;
   badge?: string;
   onToggle?: () => void;
   onClick?: () => void;
@@ -85,6 +114,7 @@ function TreeItem({
   isFolder,
   isExpanded,
   label,
+  questionPreview,
   badge,
   onToggle,
   onClick,
@@ -104,6 +134,11 @@ function TreeItem({
     transition
   } : undefined;
 
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle?.();
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -118,28 +153,36 @@ function TreeItem({
       {...attributes}
       {...listeners}
     >
-      <div style={{ paddingLeft: `${depth * 12}px` }} className="flex items-center gap-2">
-        {isFolder && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle?.();
-            }}
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
+      <div style={{ paddingLeft: `${depth * 12}px` }} className="flex items-center gap-2 w-full">
+        {isFolder ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-4 w-4 p-0"
+              onClick={handleToggleClick}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+            <span className="text-sm font-medium">{label}</span>
+          </>
+        ) : (
+          <>
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-sm shrink-0">{label}.</span>
+              {questionPreview && (
+                <span className="text-sm text-muted-foreground truncate">{questionPreview}</span>
+              )}
+            </div>
+          </>
         )}
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{label}</span>
         {badge && (
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="text-xs ml-auto">
             {badge}
           </Badge>
         )}
@@ -258,6 +301,19 @@ function QuestionEditor({
   );
 }
 
+type EditRoundData = {
+  name: string;
+  description: string;
+  questionCount: number;
+};
+
+type CreateRoundData = {
+  name: string;
+  description: string;
+  questionCount: number;
+  templateId?: number;
+};
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -268,6 +324,12 @@ export default function PackageEditor() {
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [showNewQuestionForm, setShowNewQuestionForm] = useState<{roundId: number, index: number} | null>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const [isEditRoundDialogOpen, setIsEditRoundDialogOpen] = useState(false);
+  const [editingRound, setEditingRound] = useState<Round | null>(null);
+  const [isCreateRoundDialogOpen, setIsCreateRoundDialogOpen] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [createRoundMode, setCreateRoundMode] = useState<"template" | "manual">("template");
 
   const form = useForm<QuestionFormData>({
     defaultValues: {
@@ -282,17 +344,38 @@ export default function PackageEditor() {
     },
   });
 
+  const editRoundForm = useForm<EditRoundData>();
+  const createRoundForm = useForm<CreateRoundData>();
+
   const sensors = useDndSensors();
 
-  const toggleRound = (roundId: number) => {
-    const newExpanded = new Set(expandedRounds);
-    if (newExpanded.has(roundId)) {
-      newExpanded.delete(roundId);
-    } else {
-      newExpanded.add(roundId);
+  const toggleRound = useCallback((roundId: number) => {
+    setExpandedRounds(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(roundId)) {
+        newExpanded.delete(roundId);
+      } else {
+        newExpanded.add(roundId);
+      }
+      return newExpanded;
+    });
+  }, []);
+
+  const scrollToQuestion = useCallback((roundId: number, index: number) => {
+    const element = document.getElementById(`question-${round.id}-${index}`);
+    if (element && rightPanelRef.current) {
+      rightPanelRef.current.scrollTo({
+        top: element.offsetTop - 20,
+        behavior: 'smooth'
+      });
     }
-    setExpandedRounds(newExpanded);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeQuestion) {
+      scrollToQuestion(activeQuestion.roundId, activeQuestion.index);
+    }
+  }, [activeQuestion, scrollToQuestion]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -306,16 +389,15 @@ export default function PackageEditor() {
         const packageResult = await packageResponse.json();
         setPackageData(packageResult);
 
-        // Expand all rounds by default
-        const initialExpanded = new Set(packageResult.rounds.map((r: Round) => r.id));
-        setExpandedRounds(initialExpanded);
-
-        // Set first question as active
-        if (packageResult.rounds.length > 0 && packageResult.rounds[0].questions.length > 0) {
-          setActiveQuestion({
-            roundId: packageResult.rounds[0].id,
-            index: 0,
-          });
+        // Expand the first round by default
+        if (packageResult.rounds.length > 0) {
+          setExpandedRounds(new Set([packageResult.rounds[0].id]));
+          if (packageResult.rounds[0].questions.length > 0) {
+            setActiveQuestion({
+              roundId: packageResult.rounds[0].id,
+              index: 0,
+            });
+          }
         }
 
         await fetchQuestions();
@@ -557,8 +639,117 @@ export default function PackageEditor() {
     }
   };
 
+  // Fetch templates
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch('/api/templates', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data);
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
+
+
+  const handleEditRound = (round: Round) => {
+    setEditingRound(round);
+    editRoundForm.reset({
+      name: round.name,
+      description: round.description,
+      questionCount: round.questionCount,
+    });
+    setIsEditRoundDialogOpen(true);
+  };
+
+  const handleUpdateRound = async (data: EditRoundData) => {
+    if (!editingRound) return;
+
+    try {
+      const response = await fetch(`/api/rounds/${editingRound.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update round');
+      }
+
+      // Update package data
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: 'include'
+      });
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setPackageData(updatedData);
+      }
+
+      toast({
+        title: "Успех",
+        description: "Раунд обновлен",
+      });
+      setIsEditRoundDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateRound = async (data: CreateRoundData) => {
+    try {
+      const response = await fetch(`/api/packages/${params.id}/rounds`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create round');
+      }
+
+      // Update package data
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: 'include'
+      });
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setPackageData(updatedData);
+      }
+
+      toast({
+        title: "Успех",
+        description: "Новый раунд создан",
+      });
+      setIsCreateRoundDialogOpen(false);
+      createRoundForm.reset();
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Find active question data
-  const activeQuestionData = activeQuestion 
+  const activeQuestionData = activeQuestion
     ? packageData?.rounds.find(r => r.id === activeQuestion.roundId)?.questions[activeQuestion.index]
     : null;
   const activeRound = activeQuestion
@@ -588,6 +779,12 @@ export default function PackageEditor() {
             <p className="text-muted-foreground">{packageData.description}</p>
           )}
         </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsCreateRoundDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить раунд
+          </Button>
+        </div>
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
@@ -601,33 +798,48 @@ export default function PackageEditor() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={(packageData?.rounds ?? []).flatMap(round => 
+                  items={(packageData?.rounds ?? []).flatMap(round =>
                     (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
                   )}
                   strategy={verticalListSortingStrategy}
                 >
                   {packageData.rounds.map((round) => (
                     <div key={round.id} className="space-y-1">
-                      <TreeItem
-                        id={`round-${round.id}`}
-                        depth={0}
-                        isFolder
-                        isExpanded={expandedRounds.has(round.id)}
-                        label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
-                        onToggle={() => toggleRound(round.id)}
-                      />
+                      <div className="flex items-center justify-between">
+                        <TreeItem
+                          id={`round-${round.id}`}
+                          depth={0}
+                          isFolder
+                          isExpanded={expandedRounds.has(round.id)}
+                          label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
+                          onToggle={() => toggleRound(round.id)}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleEditRound(round)}
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
                       {expandedRounds.has(round.id) && [...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
                         const question = round.questions?.[index];
                         const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
+                        const questionPreview = question ? getContentPreview(question.content) : undefined;
                         return (
                           <TreeItem
                             key={`${round.id}-${index}`}
                             id={`${round.id}-${index}`}
                             depth={1}
-                            label={`Вопрос ${index + 1}${!question ? " (пустой)" : ""}`}
-                            badge={index >= (round.questionCount || 0) ? "Дополнительный" : undefined}
+                            label={String(index + 1)}
+                            questionPreview={questionPreview}
+                            badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
                             isActive={isActive}
-                            onClick={() => setActiveQuestion({ roundId: round.id, index })}
+                            onClick={() => {
+                              setActiveQuestion({ roundId: round.id, index });
+                              scrollToQuestion(round.id, index);
+                            }}
                           />
                         );
                       })}
@@ -640,117 +852,300 @@ export default function PackageEditor() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={75}>
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              {activeQuestionData && activeRound ? (
-                <QuestionEditor
-                  question={activeQuestionData}
-                  index={activeQuestion!.index}
-                  roundId={activeRound.id}
-                  roundQuestionCount={activeRound.questionCount || 0}
-                  handleAutoSave={handleAutoSave}
-                  handleRemoveQuestion={handleRemoveQuestion}
-                  handleMoveQuestion={handleMoveQuestion}
-                  form={form}
-                  packageData={packageData}
-                />
-              ) : activeQuestion ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <h2 className="text-2xl font-bold">
-                        Вопрос {activeQuestion.index + 1}
-                      </h2>
-                      {activeQuestion.index >= (activeRound?.questionCount || 0) && (
-                        <Badge variant="secondary">Дополнительный вопрос</Badge>
-                      )}
-                    </div>
+          <ScrollArea className="h-full" ref={rightPanelRef}>
+            <div className="p-6 space-y-8">
+              {packageData?.rounds.map((round) => (
+                <div key={round.id} className="space-y-6">
+                  <div className="sticky top-0 bg-background z-10 py-2">
+                    <h2 className="text-2xl font-bold">
+                      Раунд {round.orderIndex + 1}: {round.name}
+                    </h2>
+                    {round.description && (
+                      <p className="text-muted-foreground">{round.description}</p>
+                    )}
                   </div>
-                  <div className="flex gap-4">
-                    <Button
-                      onClick={() => setShowNewQuestionForm({
-                        roundId: activeQuestion.roundId,
-                        index: activeQuestion.index,
-                      })}
-                    >
-                      Написать вопрос
-                    </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline">
-                          <Database className="h-4 w-4 mr-2" />
-                          Выбрать из базы
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Поиск вопросов</DialogTitle>
-                          <DialogDescription>
-                            Найдите вопросы для добавления в раунд
-                          </DialogDescription>
-                        </DialogHeader>
-                        <Form {...searchForm}>
-                          <form
-                            onSubmit={searchForm.handleSubmit(handleSearch)}
-                            className="space-y-3"
-                          >
-                            <div className="flex gap-3">
-                              <FormField
-                                control={searchForm.control}
-                                name="query"
-                                render={({ field }) => (
-                                  <FormItem className="flex-1">
-                                    <FormControl>
-                                      <Input
-                                        placeholder="Поиск по тексту..."
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
+                  {[...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
+                    const question = round.questions?.[index];
+                    const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
+                    return (
+                      <div
+                        key={`${round.id}-${index}`}
+                        id={`question-${round.id}-${index}`}
+                        className={cn(
+                          "p-6 rounded-lg border",
+                          isActive && "ring-2 ring-primary"
+                        )}
+                      >
+                        {question ? (
+                          <QuestionEditor
+                            question={question}
+                            index={index}
+                            roundId={round.id}
+                            roundQuestionCount={round.questionCount || 0}
+                            handleAutoSave={handleAutoSave}
+                            handleRemoveQuestion={handleRemoveQuestion}
+                            handleMoveQuestion={handleMoveQuestion}
+                            form={form}
+                            packageData={packageData}
+                          />
+                        ) : (
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <h3 className="text-lg font-semibold">
+                                  Вопрос {index + 1}
+                                </h3>
+                                {index >= (round.questionCount || 0) && (
+                                  <Badge variant="secondary">Дополнительный вопрос</Badge>
                                 )}
-                              />
-                              <Button type="submit">
-                                <Search className="h-4 w-4 mr-2" />
-                                Поиск
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                        <ScrollArea className="h-[400px]">
-                          <div className="space-y-3">
-                            {availableQuestions.map((q) => (
-                              <div
-                                key={q.id}
-                                className="p-3 border rounded-lg cursor-pointer hover:bg-accent"
-                                onClick={() => {
-                                  handleAddQuestion(activeQuestion.roundId, q.id, activeQuestion.index);
-                                  setIsSearchDialogOpen(false);
-                                }}
-                              >
-                                <div className="text-sm">
-                                  {q.content && typeof q.content === 'object' && 'content' in q.content && Array.isArray(q.content.content) && q.content.content[0]?.content?.[0]?.text || "Нет текста"}
-                                </div>
-                                <div className="text-sm text-muted-foreground mt-2">
-                                  Автор: {(q.author as any)?.username} •
-                                  Создан: {new Date(q.createdAt).toLocaleDateString()}
-                                </div>
                               </div>
-                            ))}
+                            </div>
+                            <div className="flex gap-4">
+                              <Button
+                                onClick={() => setShowNewQuestionForm({
+                                  roundId: round.id,
+                                  index,
+                                })}
+                              >
+                                Написать вопрос
+                              </Button>
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline">
+                                    <Database className="h-4 w-4 mr-2" />
+                                    Выбрать из базы
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Поиск вопросов</DialogTitle>
+                                    <DialogDescription>
+                                      Найдите вопросы для добавления в раунд
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <Form {...searchForm}>
+                                    <form
+                                      onSubmit={searchForm.handleSubmit(handleSearch)}
+                                      className="space-y-3"
+                                    >
+                                      <div className="flex gap-3">
+                                        <FormField
+                                          control={searchForm.control}
+                                          name="query"
+                                          render={({ field }) => (
+                                            <FormItem className="flex-1">
+                                              <FormControl>
+                                                <Input
+                                                  placeholder="Поиск по тексту..."
+                                                  {...field}
+                                                />
+                                              </FormControl>
+                                            </FormItem>
+                                          )}
+                                        />
+                                        <Button type="submit">
+                                          <Search className="h-4 w-4 mr-2" />
+                                          Поиск
+                                        </Button>
+                                      </div>
+                                    </form>
+                                  </Form>
+                                  <ScrollArea className="h-[400px]">
+                                    <div className="space-y-3">
+                                      {availableQuestions.map((q) => (
+                                        <div
+                                          key={q.id}
+                                          className="p-3 border rounded-lg cursor-pointer hover:bg-accent"
+                                          onClick={() => {
+                                            handleAddQuestion(activeQuestion!.roundId, q.id, activeQuestion!.index);
+                                            setIsSearchDialogOpen(false);
+                                          }}
+                                        >
+                                          <div className="text-sm">
+                                            {q.content && typeof q.content === 'object' && 'content' in q.content && Array.isArray(q.content.content) && q.content.content[0]?.content?.[0]?.text || "Нет текста"}
+                                          </div>
+                                          <div className="text-sm text-muted-foreground mt-2">
+                                            Автор: {(q.author as any)?.username} •
+                                            Создан: {new Date(q.createdAt).toLocaleDateString()}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
                           </div>
-                        </ScrollArea>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Выберите вопрос для редактирования
-                </div>
-              )}
+              ))}
             </div>
           </ScrollArea>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <Dialog open={isEditRoundDialogOpen} onOpenChange={setIsEditRoundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать раунд</DialogTitle>
+            <DialogDescription>
+              Измените информацию о раунде
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editRoundForm}>
+            <form onSubmit={editRoundForm.handleSubmit(handleUpdateRound)} className="space-y-4">
+              <FormField
+                control={editRoundForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Введите название раунда" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editRoundForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Введите описание раунда" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <<FormField
+                control={editRoundForm.control}
+                name="questionCount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Количество вопросов</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="submit">Сохранить</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateRoundDialogOpen} onOpenChange={setIsCreateRoundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Создать новый раунд</DialogTitle>
+            <DialogDescription>
+              Создайте новый раунд, выбрав шаблон или заполнив информацию вручную
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs value={createRoundMode} onValueChange={(value) => setCreateRoundMode(value as "template" | "manual")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="template">Использовать шаблон</TabsTrigger>
+              <TabsTrigger value="manual">Создать вручную</TabsTrigger>
+            </TabsList>
+            <Form {...createRoundForm}>
+              <form onSubmit={createRoundForm.handleSubmit(handleCreateRound)} className="space-y-4">
+                <TabsContent value="template">
+                  <FormField
+                    control={createRoundForm.control}
+                    name="templateId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Шаблон</FormLabel>
+                        <FormControl>
+                          <select
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            className="w-full p-2 border rounded-md"
+                          >
+                            <option value="">Выберите шаблон</option>
+                            {templates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {template.name}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                <TabsContent value="manual">
+                  <div className="space-y-4">
+                    <FormField
+                      control={createRoundForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Название</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Введите название раунда" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={createRoundForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Описание</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Введите описание раунда" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={createRoundForm.control}
+                      name="questionCount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Количество вопросов</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+                <DialogFooter>
+                  <Button type="submit">Создать раунд</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
