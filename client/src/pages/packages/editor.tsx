@@ -169,13 +169,13 @@ function TreeItem({
                 <ChevronRight className="h-4 w-4" />
               )}
             </Button>
-            <span className="text-sm font-medium">{label}</span>
+            <span className="text-sm font-medium" onClick={handleToggleClick}>{label}</span>
           </>
         ) : (
           <>
             <GripVertical className="h-4 w-4 text-muted-foreground" />
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-sm shrink-0">{label}.</span>
+              <span className="text-sm shrink-0" onClick={onClick}>{label}.</span>
               {questionPreview && (
                 <span className="text-sm text-muted-foreground truncate">{questionPreview}</span>
               )}
@@ -780,19 +780,19 @@ export default function PackageEditor() {
             <p className="text-muted-foreground">{packageData.description}</p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsCreateRoundDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Добавить раунд
-          </Button>
-        </div>
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
         <ResizablePanel defaultSize={25} minSize={15}>
           <ScrollArea className="h-full">
-            <div className="p-4 space-y-2">
-              <div className="font-medium mb-4">Содержание</div>
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="font-medium">Содержание</div>
+                <Button variant="outline" size="sm" onClick={() => setIsCreateRoundDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Добавить раунд
+                </Button>
+              </div>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -815,14 +815,28 @@ export default function PackageEditor() {
                           label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
                           onToggle={() => toggleRound(round.id)}
                         />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEditRound(round)}
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditRound(round)}
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              const nextIndex = round.questions?.length || 0;
+                              setActiveQuestion({ roundId: round.id, index: nextIndex });
+                              scrollToQuestion(round.id, nextIndex);
+                            }}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       {expandedRounds.has(round.id) && [...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
                         const question = round.questions?.[index];
@@ -1001,7 +1015,7 @@ export default function PackageEditor() {
               <FormField
                 control={editRoundForm.control}
                 name="name"
-                render={({ field }) => (
+                render={({field }) => (
                   <FormItem>
                     <FormLabel>Название</FormLabel>
                     <FormControl>
@@ -1019,7 +1033,7 @@ export default function PackageEditor() {
                     <FormLabel>Описание</FormLabel>
                     <FormControl>
                       <Textarea {...field} placeholder="Введите описание раунда" />
-                                        </FormControl>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
