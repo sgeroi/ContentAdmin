@@ -139,10 +139,15 @@ function RoundHeader({
   const [name, setName] = useState(round.name);
   const [description, setDescription] = useState(round.description);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update local state when round data changes
+  useEffect(() => {
+    setName(round.name);
+    setDescription(round.description);
+  }, [round]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(round.id, { name, description });
-    setEditMode(false);
+    await onSave(round.id, { name, description });
   };
 
   return (
@@ -166,7 +171,16 @@ function RoundHeader({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setEditMode(false)}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                setEditMode(false);
+                // Reset to original values
+                setName(round.name);
+                setDescription(round.description);
+              }}
+            >
               Отмена
             </Button>
             <Button type="submit">
@@ -178,9 +192,9 @@ function RoundHeader({
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-lg font-semibold">
-              Раунд {round.orderIndex + 1}: {name}
+              Раунд {round.orderIndex + 1}: {round.name}
             </h2>
-            <p className="text-sm text-muted-foreground">{description}</p>
+            <p className="text-sm text-muted-foreground">{round.description}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setEditMode(true)}>
             <Edit2 className="h-4 w-4" />
@@ -306,21 +320,30 @@ export default function PackageEditor() {
     setIsSaving(true);
     try {
       console.log('Updating round:', id, data);
+
       const response = await fetch(`/api/rounds/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         credentials: "include",
         body: JSON.stringify(data),
       });
 
+      const responseData = await response.json();
+      console.log('Update round response:', responseData);
+
       if (!response.ok) {
-        throw new Error(`Failed to update round: ${response.statusText}`);
+        throw new Error(responseData.message || `Failed to update round: ${response.statusText}`);
       }
 
+      // Запрашиваем обновленные данные пакета
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
       });
 
       if (!updatedResponse.ok) {
@@ -329,8 +352,8 @@ export default function PackageEditor() {
 
       const updatedData = await updatedResponse.json();
       console.log('Updated package data:', updatedData);
-      setPackageData(updatedData);
 
+      setPackageData(updatedData);
       toast({
         title: "Успех",
         description: "Раунд обновлен",
@@ -406,24 +429,30 @@ export default function PackageEditor() {
       setIsSaving(true);
       try {
         console.log('Auto-saving question:', questionId, data);
+
         const response = await fetch(`/api/questions/${questionId}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json",
           },
           credentials: "include",
           body: JSON.stringify(data),
         });
 
+        const responseData = await response.json();
+        console.log('Save question response:', responseData);
+
         if (!response.ok) {
-          throw new Error(`Failed to save question: ${response.statusText}`);
+          throw new Error(responseData.message || `Failed to save question: ${response.statusText}`);
         }
 
-        const savedData = await response.json();
-        console.log('Saved question data:', savedData);
-
+        // Запрашиваем обновленные данные пакета
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
+          headers: {
+            "Accept": "application/json",
+          },
         });
 
         if (!updatedResponse.ok) {
