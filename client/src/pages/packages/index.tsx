@@ -29,11 +29,11 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, Eye, FileText, Edit } from "lucide-react";
+import { Plus, Trash2, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import type { Package } from "@db/schema";
 
 type Round = {
@@ -61,6 +61,7 @@ export default function Packages() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [manualRounds, setManualRounds] = useState<Round[]>([]);
   const [createMode, setCreateMode] = useState<"template" | "manual">("template");
+  const [, setLocation] = useLocation();
 
   const resetForm = () => {
     setTitle("");
@@ -126,6 +127,10 @@ export default function Packages() {
 
   const removeRound = (index: number) => {
     setManualRounds(manualRounds.filter((_, i) => i !== index));
+  };
+
+  const handleRowClick = (id: number) => {
+    setLocation(`/packages/${id}/edit`);
   };
 
   return (
@@ -302,41 +307,27 @@ export default function Packages() {
               <TableHead>Описание</TableHead>
               <TableHead>Шаблон</TableHead>
               <TableHead>Создан</TableHead>
-              <TableHead className="w-[280px]">Действия</TableHead>
+              <TableHead className="w-[120px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {packages.map((pkg) => (
-              <TableRow key={pkg.id}>
+              <TableRow
+                key={pkg.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => handleRowClick(pkg.id)}
+              >
                 <TableCell className="font-medium">{pkg.title}</TableCell>
                 <TableCell>{pkg.description}</TableCell>
                 <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
                 <TableCell>{new Date(pkg.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Link href={`/packages/${pkg.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="whitespace-nowrap"
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Просмотр
-                      </Button>
-                    </Link>
-                    <Link href={`/packages/${pkg.id}/edit`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Изменить
-                      </Button>
-                    </Link>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         toast({
                           title: "Скоро",
                           description: "Функция скачивания PDF будет доступна в ближайшее время",
@@ -349,9 +340,12 @@ export default function Packages() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deletePackage(pkg.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deletePackage(pkg.id);
+                      }}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                       Удалить
                     </Button>
                   </div>
