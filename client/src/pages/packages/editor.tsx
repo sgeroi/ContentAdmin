@@ -21,7 +21,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  UniqueIdentifier,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -462,10 +461,10 @@ export default function PackageEditor() {
 
   const handleMoveQuestion = async (fromRoundId: number, toRoundId: number, questionId: number) => {
     try {
-      // Сначала удаляем вопрос из текущего раунда
+      // Remove from current round first
       await handleRemoveQuestion(fromRoundId, questionId);
 
-      // Затем добавляем его в новый раунд
+      // Then add to new round
       await handleAddQuestion(toRoundId, questionId, 0);
 
       toast({
@@ -486,8 +485,8 @@ export default function PackageEditor() {
 
     if (!over || active.id === over.id) return;
 
-    const [activeRoundId, activeIndex] = (active.id as string).split('-');
-    const [overRoundId, overIndex] = (over.id as string).split('-');
+    const [activeRoundId, activeIndex] = active.id.toString().split('-');
+    const [overRoundId, overIndex] = over.id.toString().split('-');
 
     if (activeRoundId === overRoundId) {
       const round = packageData?.rounds.find(r => r.id === parseInt(activeRoundId));
@@ -612,7 +611,7 @@ export default function PackageEditor() {
                         label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
                         onToggle={() => toggleRound(round.id)}
                       />
-                      {expandedRounds.has(round.id) && [...Array(Math.max(round.questionCount, (round.questions?.length || 0) + 1))].map((_, index) => {
+                      {expandedRounds.has(round.id) && [...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
                         const question = round.questions?.[index];
                         const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
                         return (
@@ -621,7 +620,7 @@ export default function PackageEditor() {
                             id={`${round.id}-${index}`}
                             depth={1}
                             label={`Вопрос ${index + 1}${!question ? " (пустой)" : ""}`}
-                            badge={index >= round.questionCount ? "Дополнительный" : undefined}
+                            badge={index >= (round.questionCount || 0) ? "Дополнительный" : undefined}
                             isActive={isActive}
                             onClick={() => setActiveQuestion({ roundId: round.id, index })}
                           />
@@ -643,7 +642,7 @@ export default function PackageEditor() {
                   question={activeQuestionData}
                   index={activeQuestion!.index}
                   roundId={activeRound.id}
-                  roundQuestionCount={activeRound.questionCount}
+                  roundQuestionCount={activeRound.questionCount || 0}
                   handleAutoSave={handleAutoSave}
                   handleRemoveQuestion={handleRemoveQuestion}
                   handleMoveQuestion={handleMoveQuestion}
@@ -724,12 +723,10 @@ export default function PackageEditor() {
                                 }}
                               >
                                 <div className="text-sm">
-                                  {q.content && typeof q.content === 'object' && q.content.content ?
-                                    q.content.content[0]?.content?.[0]?.text || "Нет текста"
-                                    : "Нет содержания"}
+                                  {q.content && typeof q.content === 'object' && 'content' in q.content && Array.isArray(q.content.content) && q.content.content[0]?.content?.[0]?.text || "Нет текста"}
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-2">
-                                  Автор: {q.author?.username} •
+                                  Автор: {(q.author as any)?.username} •
                                   Создан: {new Date(q.createdAt).toLocaleDateString()}
                                 </div>
                               </div>
