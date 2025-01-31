@@ -2,20 +2,15 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, MoveVertical, GripVertical, ChevronRight, ChevronDown, PencilIcon, Plus } from "lucide-react";
+import { ChevronLeft, X, MoveVertical, GripVertical, ChevronRight, ChevronDown, PencilIcon, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Package, Question, Template } from "@db/schema";
+import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import debounce from "lodash/debounce";
 import {
   DndContext,
   closestCenter,
@@ -23,7 +18,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -36,7 +30,7 @@ import { cn } from "@/lib/utils";
 
 // Типы данных
 type PackageQuestion = Question & {
-  author: { username: string; };
+  author: { username: string; } | null;
 };
 
 type Round = {
@@ -51,6 +45,32 @@ type Round = {
 type PackageWithRounds = Package & {
   rounds: Round[];
 };
+
+function getContentPreview(content: any): string {
+  try {
+    if (content?.content) {
+      let preview = '';
+      const extractText = (nodes: any[]): string => {
+        let text = '';
+        for (const node of nodes) {
+          if (node.text) {
+            text += node.text;
+          }
+          if (node.content) {
+            text += extractText(node.content);
+          }
+        }
+        return text;
+      };
+      preview = extractText(content.content);
+      return preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
+    }
+    return 'Нет содержания';
+  } catch (error) {
+    console.error('Error parsing content:', error);
+    return 'Ошибка контента';
+  }
+}
 
 // TreeItem компонент для левой панели
 function TreeItem({
@@ -267,43 +287,20 @@ function QuestionEditor({
   );
 }
 
-function getContentPreview(content: any): string {
-  try {
-    if (content?.content) {
-      let preview = '';
-      const extractText = (nodes: any[]): string => {
-        let text = '';
-        for (const node of nodes) {
-          if (node.text) {
-            text += node.text;
-          }
-          if (node.content) {
-            text += extractText(node.content);
-          }
-        }
-        return text;
-      };
-      preview = extractText(content.content);
-      return preview.length > 30 ? preview.slice(0, 30) + '...' : preview;
-    }
-    return 'Нет содержания';
-  } catch (error) {
-    console.error('Error parsing content:', error);
-    return 'Ошибка контента';
-  }
-}
 
-// Основной компонент редактора пакетов
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
-  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
-  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState<number | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<{roundId: number, index: number} | null>(null);
 
-  const leftPanelRef = useRef<HTMLDivElement>(null);
-  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Загрузка данных пакета
   useEffect(() => {
@@ -322,7 +319,6 @@ export default function PackageEditor() {
 
         // Выбираем первый раунд по умолчанию
         if (data.rounds.length > 0) {
-          setSelectedRoundId(data.rounds[0].id);
           setExpandedRounds(new Set([data.rounds[0].id]));
         }
       } catch (error: any) {
@@ -337,7 +333,90 @@ export default function PackageEditor() {
     fetchPackageData();
   }, [params.id]);
 
-  // Обработчики событий
+  const handleDragEnd = async (event: any) => {
+    const { active, over } = event;
+    if (!over || !packageData) return;
+
+    const activeId = active.id.toString();
+    const overId = over.id.toString();
+
+    // Перемещение раундов
+    if (!activeId.includes('-') && !overId.includes('-')) {
+      const oldIndex = packageData.rounds.findIndex(r => r.id.toString() === activeId);
+      const newIndex = packageData.rounds.findIndex(r => r.id.toString() === overId);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        try {
+          const response = await fetch(`/api/packages/${params.id}/rounds/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              roundIds: arrayMove(packageData.rounds.map(r => r.id), oldIndex, newIndex),
+            }),
+          });
+
+          if (!response.ok) throw new Error('Failed to reorder rounds');
+
+          const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+            credentials: 'include'
+          });
+
+          if (updatedResponse.ok) {
+            setPackageData(await updatedResponse.json());
+          }
+        } catch (error: any) {
+          toast({
+            title: "Ошибка",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      }
+      return;
+    }
+
+    // Перемещение вопросов
+    const [activeRoundId, activeIndex] = activeId.split('-');
+    const [overRoundId, overIndex] = overId.split('-');
+
+    if (activeRoundId === overRoundId) {
+      const round = packageData.rounds.find(r => r.id.toString() === activeRoundId);
+      if (!round?.questions) return;
+
+      try {
+        const response = await fetch(`/api/rounds/${activeRoundId}/questions/reorder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            questionIds: arrayMove(
+              round.questions.map(q => q.id),
+              parseInt(activeIndex),
+              parseInt(overIndex)
+            ),
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to reorder questions');
+
+        const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+          credentials: 'include'
+        });
+
+        if (updatedResponse.ok) {
+          setPackageData(await updatedResponse.json());
+        }
+      } catch (error: any) {
+        toast({
+          title: "Ошибка",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const handleToggleRound = (roundId: number) => {
     setExpandedRounds(prev => {
       const next = new Set(prev);
@@ -350,41 +429,7 @@ export default function PackageEditor() {
     });
   };
 
-  const handleSelectQuestion = (roundId: number, index: number) => {
-    setSelectedRoundId(roundId);
-    setSelectedQuestionIndex(index);
-  };
-
-  const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
-    try {
-      const response = await fetch(`/api/rounds/${roundId}/questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ questionId, orderIndex: position }),
-      });
-
-      if (!response.ok) throw new Error('Failed to add question');
-
-      // Обновляем данные пакета
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: 'include'
-      });
-
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSaveQuestion = debounce(async (questionId: number, data: any) => {
+  const handleSaveQuestion = async (questionId: number, data: any) => {
     try {
       const response = await fetch(`/api/questions/${questionId}`, {
         method: 'PATCH',
@@ -406,7 +451,7 @@ export default function PackageEditor() {
         variant: "destructive",
       });
     }
-  }, 1000);
+  };
 
   const handleRemoveQuestion = async (roundId: number, questionId: number) => {
     try {
@@ -417,19 +462,16 @@ export default function PackageEditor() {
 
       if (!response.ok) throw new Error('Failed to remove question');
 
-      // Обновляем данные пакета
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: 'include'
       });
 
       if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
+        setPackageData(await updatedResponse.json());
       }
 
-      // Сбрасываем выбранный вопрос если он был удален
-      if (selectedRoundId === roundId && selectedQuestionIndex !== null) {
-        setSelectedQuestionIndex(null);
+      if (selectedQuestion?.roundId === roundId) {
+        setSelectedQuestion(null);
       }
     } catch (error: any) {
       toast({
@@ -443,7 +485,9 @@ export default function PackageEditor() {
   const handleMoveQuestion = async (fromRoundId: number, toRoundId: number, questionId: number) => {
     try {
       await handleRemoveQuestion(fromRoundId, questionId);
-      await handleAddQuestion(toRoundId, questionId, 0);
+      // Add question to the new round -  the handleAddQuestion is not provided in the edited snippet, it should be added based on the existing implementation in original code.
+      // This is a placeholder, you should replace it with the actual implementation
+      await addQuestionToRound(toRoundId, questionId, 0); // Placeholder
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -453,7 +497,33 @@ export default function PackageEditor() {
     }
   };
 
-  // Отрисовка интерфейса
+  const addQuestionToRound = async (roundId: number, questionId: number, position: number) => {
+    try {
+      const response = await fetch(`/api/rounds/${roundId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ questionId, orderIndex: position }),
+      });
+
+      if (!response.ok) throw new Error('Failed to add question');
+
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: 'include'
+      });
+
+      if (updatedResponse.ok) {
+        setPackageData(await updatedResponse.json());
+      }
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!packageData) {
     return <div>Loading...</div>;
   }
@@ -475,202 +545,100 @@ export default function PackageEditor() {
         </div>
       </div>
 
-      <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
-        <ResizablePanel defaultSize={25} minSize={15}>
-          <ScrollArea className="h-full" ref={leftPanelRef}>
-            <div className="p-4 space-y-4">
+      <div className="flex gap-6 min-h-[800px]">
+        {/* Левая панель - фиксированная */}
+        <div className="w-1/4 border rounded-lg">
+          <ScrollArea className="h-[800px]">
+            <div className="p-4">
               <DndContext
-                sensors={useSensors(
-                  useSensor(PointerSensor),
-                  useSensor(KeyboardSensor, {
-                    coordinateGetter: sortableKeyboardCoordinates,
-                  })
-                )}
+                sensors={sensors}
                 collisionDetection={closestCenter}
-                onDragEnd={async (event) => {
-                  const { active, over } = event;
-                  if (!over || active.id === over.id) return;
-
-                  const activeId = active.id.toString();
-                  const overId = over.id.toString();
-
-                  // Перемещение раундов
-                  if (!activeId.includes('-') && !overId.includes('-')) {
-                    const oldIndex = packageData.rounds.findIndex(r => r.id === parseInt(activeId));
-                    const newIndex = packageData.rounds.findIndex(r => r.id === parseInt(overId));
-
-                    try {
-                      const response = await fetch(`/api/packages/${params.id}/rounds/reorder`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                          roundIds: arrayMove(packageData.rounds.map(r => r.id), oldIndex, newIndex),
-                        }),
-                      });
-
-                      if (!response.ok) throw new Error('Failed to reorder rounds');
-
-                      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-                        credentials: 'include'
-                      });
-
-                      if (updatedResponse.ok) {
-                        const updatedData = await updatedResponse.json();
-                        setPackageData(updatedData);
-                      }
-                    } catch (error: any) {
-                      toast({
-                        title: "Ошибка",
-                        description: error.message,
-                        variant: "destructive",
-                      });
-                    }
-                  }
-                  // Перемещение вопросов
-                  else if (activeId.includes('-') && overId.includes('-')) {
-                    const [activeRoundId, activeIndex] = activeId.split('-');
-                    const [overRoundId, overIndex] = overId.split('-');
-
-                    if (activeRoundId === overRoundId) {
-                      const round = packageData.rounds.find(r => r.id === parseInt(activeRoundId));
-                      if (!round?.questions) return;
-
-                      try {
-                        const response = await fetch(`/api/rounds/${activeRoundId}/questions/reorder`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({
-                            questionIds: arrayMove(
-                              round.questions.map(q => q.id),
-                              parseInt(activeIndex),
-                              parseInt(overIndex)
-                            ),
-                          }),
-                        });
-
-                        if (!response.ok) throw new Error('Failed to reorder questions');
-
-                        const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-                          credentials: 'include'
-                        });
-
-                        if (updatedResponse.ok) {
-                          const updatedData = await updatedResponse.json();
-                          setPackageData(updatedData);
-                        }
-                      } catch (error: any) {
-                        toast({
-                          title: "Ошибка",
-                          description: error.message,
-                          variant: "destructive",
-                        });
-                      }
-                    }
-                  }
-                }}
+                onDragEnd={handleDragEnd}
               >
                 <SortableContext
                   items={[
                     ...packageData.rounds.map(r => r.id.toString()),
                     ...packageData.rounds.flatMap(round =>
-                      (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
+                      round.questions.map((_, index) => `${round.id}-${index}`)
                     )
                   ]}
                   strategy={verticalListSortingStrategy}
                 >
-                  {packageData.rounds.map((round) => (
-                    <div key={round.id} className="space-y-1">
-                      <TreeItem
-                        id={round.id.toString()}
-                        depth={0}
-                        isFolder
-                        isExpanded={expandedRounds.has(round.id)}
-                        label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
-                        onToggle={() => handleToggleRound(round.id)}
-                        isActive={selectedRoundId === round.id && selectedQuestionIndex === null}
-                      />
-                      {expandedRounds.has(round.id) && (
-                        <>
-                          {[...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
-                            const question = round.questions?.[index];
-                            return (
+                  <div className="space-y-4">
+                    {packageData.rounds.map((round) => (
+                      <div key={round.id} className="space-y-1">
+                        <TreeItem
+                          id={round.id.toString()}
+                          depth={0}
+                          isFolder
+                          isExpanded={expandedRounds.has(round.id)}
+                          label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
+                          onToggle={() => handleToggleRound(round.id)}
+                        />
+                        {expandedRounds.has(round.id) && (
+                          <div className="pl-4 space-y-1">
+                            {round.questions.map((question, index) => (
                               <TreeItem
                                 key={`${round.id}-${index}`}
                                 id={`${round.id}-${index}`}
                                 depth={1}
                                 label={String(index + 1)}
-                                questionPreview={question ? getContentPreview(question.content) : undefined}
-                                badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
-                                isActive={selectedRoundId === round.id && selectedQuestionIndex === index}
-                                onClick={() => handleSelectQuestion(round.id, index)}
+                                questionPreview={getContentPreview(question.content)}
+                                isActive={selectedQuestion?.roundId === round.id && selectedQuestion?.index === index}
+                                onClick={() => setSelectedQuestion({ roundId: round.id, index })}
                               />
-                            );
-                          })}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start pl-8 text-muted-foreground"
-                            onClick={() => {
-                              const nextIndex = round.questions?.length || 0;
-                              handleSelectQuestion(round.id, nextIndex);
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Добавить вопрос
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                            ))}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-muted-foreground"
+                              onClick={() => setSelectedQuestion({ 
+                                roundId: round.id, 
+                                index: round.questions.length 
+                              })}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Добавить вопрос
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </SortableContext>
               </DndContext>
-              {/* <Button
-                variant="ghost"
+              <Button
+                variant="outline"
                 size="sm"
-                className="w-full justify-start text-muted-foreground mt-4"
-                onClick={() => {
-                  // TODO: Implement creating new round
-                }}
+                className="w-full mt-4"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Добавить раунд
-              </Button> */}
+              </Button>
             </div>
           </ScrollArea>
-        </ResizablePanel>
+        </div>
 
-        <ResizableHandle />
-
-        <ResizablePanel defaultSize={75}>
-          <ScrollArea className="h-full" ref={rightPanelRef}>
+        {/* Правая панель - скроллируемая */}
+        <div className="flex-1 border rounded-lg">
+          <ScrollArea className="h-[800px]">
             <div className="p-6">
-              {selectedRoundId !== null && selectedQuestionIndex !== null && (
-                <div>
-                  {/* Редактор вопроса */}
-                  {packageData.rounds
-                    .find(r => r.id === selectedRoundId)
-                    ?.questions?.[selectedQuestionIndex] && (
-                    <QuestionEditor
-                      question={packageData.rounds
-                        .find(r => r.id === selectedRoundId)!
-                        .questions[selectedQuestionIndex]}
-                      index={selectedQuestionIndex}
-                      roundId={selectedRoundId}
-                      roundQuestionCount={packageData.rounds.find(r => r.id === selectedRoundId)!.questionCount}
-                      onSave={handleSaveQuestion}
-                      onRemove={handleRemoveQuestion}
-                      onMove={handleMoveQuestion}
-                      packageData={packageData}
-                    />
-                  )}
-                </div>
+              {selectedQuestion && packageData.rounds.find(r => r.id === selectedQuestion.roundId)?.questions[selectedQuestion.index] && (
+                <QuestionEditor
+                  question={packageData.rounds.find(r => r.id === selectedQuestion.roundId)!.questions[selectedQuestion.index]}
+                  index={selectedQuestion.index}
+                  roundId={selectedQuestion.roundId}
+                  roundQuestionCount={packageData.rounds.find(r => r.id === selectedQuestion.roundId)!.questionCount}
+                  onSave={handleSaveQuestion}
+                  onRemove={handleRemoveQuestion}
+                  onMove={handleMoveQuestion}
+                  packageData={packageData}
+                />
               )}
             </div>
           </ScrollArea>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        </div>
+      </div>
     </div>
   );
 }
