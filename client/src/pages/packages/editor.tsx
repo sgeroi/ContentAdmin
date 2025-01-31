@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -71,6 +71,7 @@ interface QuestionItemProps {
   roundId: number;
   roundQuestionCount: number;
   handleAutoSave: (questionId: number, data: any) => void;
+  handleDelete: (roundId: number, questionId: number) => Promise<void>;
   form: any;
   packageData: PackageWithRounds;
 }
@@ -327,6 +328,50 @@ function GenerateQuestionsDialog({
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function QuestionItem({
+  question,
+  index,
+  roundId,
+  roundQuestionCount,
+  handleAutoSave,
+  handleDelete,
+  form,
+  packageData,
+}: QuestionItemProps) {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-start gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm text-muted-foreground">Вопрос {index + 1} из {roundQuestionCount}</span>
+            <Badge variant="outline">{question.author.username}</Badge>
+          </div>
+          <WysiwygEditor
+            content={question.content}
+            onChange={(content) => handleAutoSave(question.id, { content })}
+            className="min-h-[200px]"
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive"
+          onClick={() => handleDelete(roundId, question.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+      <div>
+        <Label>Ответ</Label>
+        <Input
+          value={question.answer}
+          onChange={(e) => handleAutoSave(question.id, { answer: e.target.value })}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -851,6 +896,50 @@ export default function PackageEditor() {
     }
   };
 
+  const handleDeleteQuestion = async (roundId: number, questionId: number) => {
+    try {
+      const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+      }
+
+      // Обновляем данные пакета после удаления вопроса
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!updatedResponse.ok) {
+        throw new Error("Failed to fetch updated package data");
+      }
+
+      const updatedData = await updatedResponse.json();
+      setPackageData(updatedData);
+
+      toast({
+        title: "Успех",
+        description: "Вопрос удален из раунда",
+      });
+    } catch (error: any) {
+      console.error('Error deleting question:', error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -937,7 +1026,7 @@ export default function PackageEditor() {
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
                           "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
                         )}
                       >
                         <QuestionItem
@@ -946,6 +1035,7 @@ export default function PackageEditor() {
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
+                          handleDelete={handleDeleteQuestion}
                           form={form}
                           packageData={packageData}
                         />
@@ -1095,64 +1185,6 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function QuestionItem({
-  question,
-  index,
-  roundId,
-  roundQuestionCount,
-  handleAutoSave,
-  form,
-  packageData,
-}: QuestionItemProps) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-medium">
-          Вопрос {index + 1}
-        </h3>
-        {index >= roundQuestionCount && (
-          <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <Form {...form}>
-          <form className="space-y-3">
-            <FormItem>
-              <FormLabel>Содержание вопроса</FormLabel>
-              <WysiwygEditor
-                content={question.content}
-                onChange={(content) => handleAutoSave(question.id, { content })}
-                className="min-h-[150px]"
-              />
-              <FormMessage />
-            </FormItem>
-            <FormField
-              control={form.control}
-              name="answer"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ответ</FormLabel>
-                  <FormControl>
-                    <Input
-                      defaultValue={question.answer || ""}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        handleAutoSave(question.id, { answer: e.target.value });
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </form>
-        </Form>
-      </div>
     </div>
   );
 }
