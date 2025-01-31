@@ -772,7 +772,11 @@ export default function PackageEditor() {
       if (currentRoundId) {
         const round = packageData?.rounds.find((r) => r.id === currentRoundId);
         if (round) {
-          await handleAddQuestion(currentRoundId, responseData.data.id, round.questions?.length || 0);
+          const questionId = responseData.id || responseData.data?.id;
+          if (!questionId) {
+            throw new Error('No question ID in response');
+          }
+          await handleAddQuestion(currentRoundId, questionId, round.questions?.length || 0);
         }
       }
 

@@ -528,6 +528,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Обновляем POST endpoint для создания вопросов
   app.post("/api/questions", requireAuth, async (req, res) => {
     try {
       console.log('Creating question:', req.body);
@@ -536,30 +537,16 @@ export function registerRoutes(app: Express): Server {
         .values({
           ...req.body,
           authorId: (req.user as any).id,
-          isValidated: false, // Mark as not validated initially
+          isValidated: false,
         })
         .returning();
 
-      // Start validation in the background if requested
-      if (req.body.validate) {
-        validateQuestion(
-          question.title,
-          question.content,
-          question.topic
-        ).then(async (validation) => {
-          if (validation.isValid) {
-            await db
-              .update(questions)
-              .set({
-                isValidated: true,
-                validatedAt: new Date(),
-              })
-              .where(eq(questions.id, question.id));
-          }
-        }).catch(console.error);
-      }
+      console.log('Question created:', question);
 
-      res.json(question);
+      res.json({
+        id: question.id,
+        ...question,
+      });
     } catch (error: any) {
       console.error('Error creating question:', error);
       res.status(500).json({ error: error.message });
