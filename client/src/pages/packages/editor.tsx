@@ -524,6 +524,12 @@ export default function PackageEditor() {
     }
   };
 
+  const handleEditRound = (round: Round) => {
+    // Placeholder for editing a round.  Implementation needed.
+    console.log("Editing round:", round);
+  };
+
+
   if (!packageData) {
     return <div>Loading...</div>;
   }
@@ -538,17 +544,17 @@ export default function PackageEditor() {
               Назад к пакетам
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">{packageData.title}</h1>
-          {packageData.description && (
+          <h1 className="text-3xl font-bold">{packageData?.title}</h1>
+          {packageData?.description && (
             <p className="text-muted-foreground">{packageData.description}</p>
           )}
         </div>
       </div>
 
-      <div className="flex gap-6 min-h-[800px]">
+      <div className="flex gap-6">
         {/* Левая панель - фиксированная */}
-        <div className="w-1/4 border rounded-lg">
-          <ScrollArea className="h-[800px]">
+        <div className="w-1/4 border rounded-lg" style={{ height: '800px' }}>
+          <ScrollArea className="h-full">
             <div className="p-4">
               <DndContext
                 sensors={sensors}
@@ -585,16 +591,18 @@ export default function PackageEditor() {
                                 label={String(index + 1)}
                                 questionPreview={getContentPreview(question.content)}
                                 isActive={selectedQuestion?.roundId === round.id && selectedQuestion?.index === index}
-                                onClick={() => setSelectedQuestion({ roundId: round.id, index })}
+                                onClick={() => {
+                                  setSelectedQuestion({ roundId: round.id, index });
+                                }}
                               />
                             ))}
                             <Button
                               variant="ghost"
                               size="sm"
                               className="w-full justify-start text-muted-foreground"
-                              onClick={() => setSelectedQuestion({ 
-                                roundId: round.id, 
-                                index: round.questions.length 
+                              onClick={() => setSelectedQuestion({
+                                roundId: round.id,
+                                index: round.questions.length
                               })}
                             >
                               <Plus className="h-4 w-4 mr-2" />
@@ -622,19 +630,70 @@ export default function PackageEditor() {
         {/* Правая панель - скроллируемая */}
         <div className="flex-1 border rounded-lg">
           <ScrollArea className="h-[800px]">
-            <div className="p-6">
-              {selectedQuestion && packageData.rounds.find(r => r.id === selectedQuestion.roundId)?.questions[selectedQuestion.index] && (
-                <QuestionEditor
-                  question={packageData.rounds.find(r => r.id === selectedQuestion.roundId)!.questions[selectedQuestion.index]}
-                  index={selectedQuestion.index}
-                  roundId={selectedQuestion.roundId}
-                  roundQuestionCount={packageData.rounds.find(r => r.id === selectedQuestion.roundId)!.questionCount}
-                  onSave={handleSaveQuestion}
-                  onRemove={handleRemoveQuestion}
-                  onMove={handleMoveQuestion}
-                  packageData={packageData}
-                />
-              )}
+            <div className="p-6 space-y-8">
+              {packageData.rounds.map((round) => (
+                <div key={round.id} className="space-y-6">
+                  <div id={`round-${round.id}-description`} className="sticky top-0 bg-background z-10 py-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold">
+                        Раунд {round.orderIndex + 1}: {round.name}
+                      </h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditRound(round)}
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {round.description && (
+                      <p className="text-muted-foreground">{round.description}</p>
+                    )}
+                  </div>
+                  <div className="space-y-8">
+                    {round.questions.map((question, index) => (
+                      <div
+                        key={question.id}
+                        id={`question-${round.id}-${index}`}
+                        className={cn(
+                          "p-6 border rounded-lg transition-colors",
+                          selectedQuestion?.roundId === round.id && selectedQuestion?.index === index && "border-primary"
+                        )}
+                      >
+                        {selectedQuestion?.roundId === round.id && selectedQuestion?.index === index ? (
+                          <QuestionEditor
+                            question={question}
+                            index={index}
+                            roundId={round.id}
+                            roundQuestionCount={round.questionCount}
+                            onSave={handleSaveQuestion}
+                            onRemove={handleRemoveQuestion}
+                            onMove={handleMoveQuestion}
+                            packageData={packageData}
+                          />
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <h3 className="text-lg font-medium">Вопрос {index + 1}</h3>
+                                {index >= round.questionCount && (
+                                  <Badge variant="secondary">Дополнительный вопрос</Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="prose prose-sm max-w-none">
+                              <div dangerouslySetInnerHTML={{ __html: getContentPreview(question.content) }} />
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Ответ: {question.answer}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </ScrollArea>
         </div>
