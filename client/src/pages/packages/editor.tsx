@@ -1295,65 +1295,45 @@ export default function PackageEditor() {
     );
   }
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event) => {
+  const handleDragEnd = useCallback(async (event: any) => {
     const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
 
-    if (active.id !== over.id) {
-      setPackageData((packageData) => {
-        const oldIndex = packageData.rounds.findIndex((round) => round.id === active.id);
-        const newIndex = packageData.rounds.findIndex((round) => round.id === over.id);
+    const activeId = active.id;
+    const overId = over.id;
 
-        return {
-          ...packageData,
-          rounds: arrayMove(packageData.rounds, oldIndex, newIndex).map((round, index) => ({
-            ...round,
-            orderIndex: index
-          }))
-        };
-      });
+    if (!packageData) return;
 
-      // Update rounds order in the backend
-      handleUpdateRoundsOrder(active.id, over.id);
-    }
-  };
-
-  const handleUpdateRoundsOrder = async (activeId: number, overId: number) => {
     try {
-      const response = await fetch('/api/rounds/reorder', {
-        method: 'PUT',
+      const response = await fetch(`/api/rounds/reorder`, {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
+          "Accept": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify({
           activeId,
           overId,
-          packageId: params.id,
+          packageId: packageData.id,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update rounds order');
+        throw new Error("Failed to reorder rounds");
       }
 
       const updatedPackage = await response.json();
       setPackageData(updatedPackage);
-    } catch (error) {
-      console.error('Error updating rounds order:', error);
+    } catch (error: any) {
+      console.error("Error reordering rounds:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to update rounds order',
-        variant: 'destructive',
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
       });
     }
-  };
+  }, [packageData, toast]);
 
   return (
     <div className="h-screen flex flex-col">
