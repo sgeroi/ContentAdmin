@@ -147,9 +147,9 @@ function RoundHeader({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await onSave(round.id, { 
-        name: name || "Новый раунд", 
-        description: description || "Описание раунда" 
+      await onSave(round.id, {
+        name: name || "Новый раунд",
+        description: description || "Описание раунда"
       });
       setEditMode(false);
     } catch (error) {
@@ -179,9 +179,9 @@ function RoundHeader({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => {
                 setEditMode(false);
                 setName(round.name);
@@ -1008,7 +1008,7 @@ export default function PackageEditor() {
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
                           "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${roundid}-${question.id}` && "ring-2 ring-primary"
+                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
                         )}
                       >
                         <QuestionItem
@@ -1028,8 +1028,7 @@ export default function PackageEditor() {
                       className="w-full"
                       onClick={() => {
                         setCurrentRoundId(round.id);
-                        setIsAddQuestionDialogOpen(true);
-                      }}
+                        setIsAddQuestionDialogOpen(true);                      }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Добавить вопрос
