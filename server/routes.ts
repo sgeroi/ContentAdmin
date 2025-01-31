@@ -202,50 +202,14 @@ export function registerRoutes(app: Express): Server {
   // Package management routes
   app.get("/api/packages", requireAuth, async (req, res) => {
     try {
-      console.log('Fetching packages');
       const result = await db.query.packages.findMany({
         with: {
           template: true,
-          rounds: {
-            with: {
-              roundQuestions: {
-                with: {
-                  question: {
-                    with: {
-                      author: true,
-                      questionTags: {
-                        with: {
-                          tag: true
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: asc(rounds.orderIndex)
-          }
+          rounds: true,
         },
-        author: {
-          columns: {
-            id: true,
-            username: true
-          }
-        },
-        orderBy: desc(packages.createdAt)
+        orderBy: desc(packages.createdAt),
       });
-
-      // Transform the data to match the expected format
-      const transformedResult = result.map(pkg => ({
-        ...pkg,
-        rounds: pkg.rounds.map(round => ({
-          ...round,
-          questions: round.roundQuestions?.map(rq => rq.question) || []
-        }))
-      }));
-
-      console.log('Packages fetched:', transformedResult);
-      res.json(transformedResult);
+      res.json(result);
     } catch (error: any) {
       console.error('Error fetching packages:', error);
       res.status(500).json({ error: error.message });
@@ -784,6 +748,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
     try {
@@ -912,73 +877,6 @@ export function registerRoutes(app: Express): Server {
         error: error.message,
         details: error.toString()
       });
-    }
-  });
-
-  //Helper function for array reordering.
-  const arrayMove = (arr: any[], fromIndex: number, toIndex: number) => {
-    const newArr = [...arr];
-    const element = newArr.splice(fromIndex, 1)[0];
-    newArr.splice(toIndex, 0, element);
-    return newArr;
-  };
-
-  app.put("/api/rounds/reorder", requireAuth, async (req, res) => {
-    try {
-      const { activeId, overId, packageId } = req.body;
-
-      // Get all rounds for the package
-      const packageRounds = await db.query.rounds.findMany({
-        where: eq(rounds.packageId, parseInt(packageId)),
-        orderBy: asc(rounds.orderIndex),
-      });
-
-      const activeIndex = packageRounds.findIndex(r => r.id === activeId);
-      const overIndex = packageRounds.findIndex(r => r.id === overId);
-
-      // Reorder the rounds
-      const reorderedRounds = arrayMove(packageRounds, activeIndex, overIndex);
-
-      // Update orderIndex for all affected rounds
-      for (let i = 0; i < reorderedRounds.length; i++) {
-        await db
-          .update(rounds)
-          .set({ orderIndex: i })
-          .where(eq(rounds.id, reorderedRounds[i].id));
-      }
-
-      // Fetch and return the updated package
-      const [updatedPackage] = await db.query.packages.findMany({
-        where: eq(packages.id, parseInt(packageId)),
-        with: {
-          template: true,
-          rounds: {
-            with: {
-              roundQuestions: {
-                with: {
-                  question: {
-                    with: {
-                      author: true,
-                      questionTags: {
-                        with: {
-                          tag: true
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: asc(rounds.orderIndex),
-          },
-        },
-        limit: 1,
-      });
-
-      res.json(updatedPackage);
-    } catch (error) {
-      console.error('Error reordering rounds:', error);
-      res.status(500).json({ error: error.message });
     }
   });
 

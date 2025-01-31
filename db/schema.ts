@@ -30,7 +30,6 @@ export const packages = pgTable("packages", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  playDate: timestamp("play_date"),
   templateId: integer("template_id").references(() => templates.id),
   authorId: integer("author_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -211,8 +210,6 @@ export type Template = typeof templates.$inferSelect & {
 };
 export type InsertTemplate = typeof templates.$inferInsert;
 export type Round = typeof rounds.$inferSelect & {
-  package?: Package;
-  template?: Template;
   questions?: Question[];
 };
 export type InsertRound = typeof rounds.$inferInsert;
