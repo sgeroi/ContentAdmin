@@ -153,7 +153,6 @@ function RoundHeader({
       });
       setEditMode(false);
     } catch (error) {
-      // Ошибка будет обработана в родительском компоненте
       console.error("Failed to save round:", error);
     }
   };
@@ -261,89 +260,6 @@ function AddQuestionDialog({
   );
 }
 
-function CreateQuestionDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { content: any; answer: string; difficulty: number }) => Promise<void>;
-}) {
-  const form = useForm<{ content: any; answer: string; difficulty: number }>({
-    defaultValues: {
-      content: {},
-      answer: "",
-      difficulty: 1,
-    },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Создать новый вопрос</DialogTitle>
-          <DialogDescription>
-            Напишите текст вопроса и укажите правильный ответ
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Текст вопроса</FormLabel>
-                  <FormControl>
-                    <WysiwygEditor
-                      content={field.value}
-                      onChange={field.onChange}
-                      className="min-h-[200px]"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="answer"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ответ</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="difficulty"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Сложность</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={1} max={5} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Отмена
-              </Button>
-              <Button type="submit">Создать</Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function GenerateQuestionsDialog({
   open,
@@ -425,20 +341,25 @@ export default function PackageEditor() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
-  const [isCreateQuestionDialogOpen, setIsCreateQuestionDialogOpen] = useState(false);
   const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
+  const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-
   const form = useForm<QuestionFormData>({
     defaultValues: {
       content: {},
       answer: "",
     },
   });
-
   const searchForm = useForm<QuestionSearchFilters>({
     defaultValues: {
       query: "",
+    },
+  });
+  const createQuestionForm = useForm<{ content: any; answer: string; difficulty: number }>({
+    defaultValues: {
+      content: {},
+      answer: "",
+      difficulty: 1,
     },
   });
 
@@ -484,7 +405,7 @@ export default function PackageEditor() {
       console.log('Updating round:', id, data);
 
       const response = await fetch(`/api/rounds/${id}`, {
-        method: "PUT",  // Изменяем на PUT для соответствия серверному роуту
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
@@ -804,7 +725,7 @@ export default function PackageEditor() {
     setIsAddQuestionDialogOpen(false);
     switch (type) {
       case "manual":
-        setIsCreateQuestionDialogOpen(true);
+        setIsCreatingQuestion(true);
         break;
       case "search":
         setIsSearchDialogOpen(true);
@@ -855,7 +776,8 @@ export default function PackageEditor() {
         }
       }
 
-      setIsCreateQuestionDialogOpen(false);
+      setIsCreatingQuestion(false);
+      createQuestionForm.reset();
       toast({
         title: "Успех",
         description: "Вопрос создан",
@@ -999,10 +921,13 @@ export default function PackageEditor() {
           <ScrollArea className="h-full">
             <div className="container py-6 space-y-8 pl-12 pr-16">
               {packageData.rounds.map((round) => (
-                <div key={round.id} id={`round-${round.id}`} className="space-y-4">
-                  <RoundHeader round={round} onSave={handleUpdateRound} />
+                <div key={round.id} className="space-y-4">
+                  <RoundHeader
+                    round={round}
+                    onSave={handleUpdateRound}
+                  />
                   <div className="space-y-4">
-                    {round.questions?.map((question, index) => (
+                    {round.questions.map((question, index) => (
                       <div
                         key={`${round.id}-${question.id}`}
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
@@ -1022,13 +947,74 @@ export default function PackageEditor() {
                         />
                       </div>
                     ))}
-
+                    {isCreatingQuestion && currentRoundId === round.id && (
+                      <div className="rounded-lg border bg-card p-4">
+                        <Form {...createQuestionForm}>
+                          <form onSubmit={createQuestionForm.handleSubmit(handleCreateQuestion)} className="space-y-4">
+                            <FormField
+                              control={createQuestionForm.control}
+                              name="content"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Текст вопроса</FormLabel>
+                                  <FormControl>
+                                    <WysiwygEditor
+                                      content={field.value}
+                                      onChange={field.onChange}
+                                      className="min-h-[200px]"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createQuestionForm.control}
+                              name="answer"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Ответ</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={createQuestionForm.control}
+                              name="difficulty"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Сложность</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" min={1} max={5} {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsCreatingQuestion(false)}
+                              >
+                                Отмена
+                              </Button>
+                              <Button type="submit">Создать</Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       className="w-full"
                       onClick={() => {
                         setCurrentRoundId(round.id);
-                        setIsAddQuestionDialogOpen(true);                      }}
+                        setIsAddQuestionDialogOpen(true);
+                      }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Добавить вопрос
@@ -1045,11 +1031,6 @@ export default function PackageEditor() {
         open={isAddQuestionDialogOpen}
         onOpenChange={setIsAddQuestionDialogOpen}
         onSelect={handleAddQuestionSelect}
-      />
-      <CreateQuestionDialog
-        open={isCreateQuestionDialogOpen}
-        onOpenChange={setIsCreateQuestionDialogOpen}
-        onSubmit={handleCreateQuestion}
       />
       <GenerateQuestionsDialog
         open={isGenerateQuestionsDialogOpen}
