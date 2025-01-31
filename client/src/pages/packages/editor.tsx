@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, PlusCircle, ArrowUpDown, Search } from "lucide-react";
+import { ChevronLeft, X, Database, PlusCircle, ArrowUpDown, Search, MoveVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -296,6 +296,28 @@ export default function PackageEditor() {
     }
   };
 
+  const handleMoveQuestion = async (fromRoundId: number, toRoundId: number, questionId: number) => {
+    try {
+      // Сначала удаляем вопрос из текущего раунда
+      await handleRemoveQuestion(fromRoundId, questionId);
+
+      // Затем добавляем его в новый раунд
+      await handleAddQuestion(toRoundId, questionId, 0);
+
+      toast({
+        title: "Успех",
+        description: "Вопрос перемещен в другой раунд",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -393,14 +415,46 @@ export default function PackageEditor() {
                               )}
                             </div>
                             {question && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveQuestion(round.id, question.id)}
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Удалить
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveQuestion(round.id, question.id)}
+                                >
+                                  <X className="h-4 w-4 mr-2" />
+                                  Удалить
+                                </Button>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoveVertical className="h-4 w-4 mr-2" />
+                                      Переместить
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Переместить вопрос</DialogTitle>
+                                      <DialogDescription>
+                                        Выберите раунд, в который хотите переместить вопрос
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      {packageData.rounds
+                                        .filter(r => r.id !== round.id)
+                                        .map((targetRound) => (
+                                          <Button
+                                            key={targetRound.id}
+                                            variant="outline"
+                                            className="w-full justify-start"
+                                            onClick={() => handleMoveQuestion(round.id, targetRound.id, question.id)}
+                                          >
+                                            Раунд {targetRound.orderIndex + 1}: {targetRound.name}
+                                          </Button>
+                                        ))}
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
                             )}
                           </div>
 
@@ -443,7 +497,7 @@ export default function PackageEditor() {
                             <div>
                               {showNewQuestionForm?.roundId === round.id && showNewQuestionForm?.index === index ? (
                                 <Form {...form}>
-                                  <form 
+                                  <form
                                     onSubmit={form.handleSubmit((data) => handleSubmitQuestion(round.id, index, data))}
                                     className="space-y-4"
                                   >
@@ -471,8 +525,8 @@ export default function PackageEditor() {
                                     />
                                     <div className="flex gap-2">
                                       <Button type="submit">Сохранить</Button>
-                                      <Button 
-                                        type="button" 
+                                      <Button
+                                        type="button"
                                         variant="outline"
                                         onClick={() => setShowNewQuestionForm(null)}
                                       >
@@ -503,7 +557,7 @@ export default function PackageEditor() {
                                         </DialogDescription>
                                       </DialogHeader>
                                       <Form {...searchForm}>
-                                        <form 
+                                        <form
                                           onSubmit={searchForm.handleSubmit(handleSearch)}
                                           className="space-y-4"
                                         >
@@ -514,7 +568,7 @@ export default function PackageEditor() {
                                               render={({ field }) => (
                                                 <FormItem className="flex-1">
                                                   <FormControl>
-                                                    <Input 
+                                                    <Input
                                                       placeholder="Поиск по тексту..."
                                                       {...field}
                                                     />
@@ -541,12 +595,12 @@ export default function PackageEditor() {
                                               }}
                                             >
                                               <div className="text-sm">
-                                                {q.content && typeof q.content === 'object' && q.content.content ? 
-                                                  q.content.content[0]?.content?.[0]?.text || "Нет текста" 
+                                                {q.content && typeof q.content === 'object' && q.content.content ?
+                                                  q.content.content[0]?.content?.[0]?.text || "Нет текста"
                                                   : "Нет содержания"}
                                               </div>
                                               <div className="text-sm text-muted-foreground mt-2">
-                                                Автор: {q.author?.username} • 
+                                                Автор: {q.author?.username} •
                                                 Создан: {new Date(q.createdAt).toLocaleDateString()}
                                               </div>
                                             </div>
@@ -568,7 +622,10 @@ export default function PackageEditor() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => setExpandedRound(round.id)}
+                    onClick={() => {
+                      const newIndex = round.questions?.length || 0;
+                      setShowNewQuestionForm({ roundId: round.id, index: newIndex });
+                    }}
                   >
                     <PlusCircle className="h-4 w-4 mr-2" />
                     Добавить дополнительный вопрос
