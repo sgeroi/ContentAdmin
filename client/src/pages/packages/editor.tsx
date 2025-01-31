@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, Plus, Search, MoveVertical, GripVertical } from "lucide-react";
+import { ChevronLeft, X, Database, Plus, ChevronRight, Search, MoveVertical, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -32,7 +32,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import debounce from "lodash/debounce";
 import {
   DndContext,
@@ -590,7 +600,7 @@ export default function PackageEditor() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
       <div className="border-b">
         <div className="container py-4">
           <div className="space-y-1">
@@ -608,125 +618,144 @@ export default function PackageEditor() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <div className="container py-6">
-          <div className="max-w-[900px] mx-auto space-y-8">
-            {packageData.rounds.map((round) => (
-              <div key={round.id} id={`round-${round.id}`} className="space-y-4">
-                <div className="sticky top-0 bg-background z-10 py-2 border-b">
-                  <h2 className="text-lg font-semibold">
-                    Раунд {round.orderIndex + 1}: {round.name}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">{round.description}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={round.questions?.map((q, index) => `${round.id}-${index}`) || []}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {round.questions?.map((question, index) => (
-                        <div
-                          key={`${round.id}-${question.id}`}
-                          ref={el => questionRefs.current[`${round.id}-${question.id}`] = el}
-                          className={cn(
-                            "rounded-lg border bg-card",
-                            activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
-                          )}
-                        >
-                          <QuestionItem
-                            id={`${round.id}-${index}`}
-                            question={question}
-                            index={index}
-                            roundId={round.id}
-                            roundQuestionCount={round.questionCount}
-                            handleAutoSave={handleAutoSave}
-                            handleRemoveQuestion={handleRemoveQuestion}
-                            handleMoveQuestion={handleMoveQuestion}
-                            form={form}
-                            packageData={packageData}
-                          />
-                        </div>
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-
-                  <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setIsSearchDialogOpen(true)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Добавить вопрос
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Добавить вопрос</DialogTitle>
-                        <DialogDescription>
-                          Найдите существующий вопрос для добавления в раунд
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Form {...searchForm}>
-                        <form
-                          onSubmit={searchForm.handleSubmit(handleSearch)}
-                          className="space-y-4"
-                        >
-                          <FormField
-                            control={searchForm.control}
-                            name="query"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <div className="flex gap-2">
-                                    <Input
-                                      placeholder="Поиск по тексту..."
-                                      {...field}
-                                    />
-                                    <Button type="submit">
-                                      <Search className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </form>
-                      </Form>
-                      <ScrollArea className="h-[400px] mt-4">
-                        <div className="space-y-2">
-                          {availableQuestions.map((question) => (
-                            <div
-                              key={question.id}
-                              className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
-                              onClick={() => {
-                                handleAddQuestion(round.id, question.id, round.questions.length);
-                              }}
-                            >
-                              <div>{getContentPreview(question.content)}</div>
-                              <div className="text-sm text-muted-foreground mt-1">
-                                Автор: {question.author?.username} •
-                                Создан: {new Date(question.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </DialogContent>
-                  </Dialog>
-                </div>
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
+        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+          <div className="h-full border-r">
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-4">
+                {packageData.rounds.map((round) => (
+                  <NavigationItem
+                    key={round.id}
+                    round={round}
+                    activeQuestionId={activeQuestionId}
+                    onQuestionClick={handleQuestionClick}
+                  />
+                ))}
               </div>
-            ))}
+            </ScrollArea>
           </div>
-        </div>
-      </div>
+        </ResizablePanel>
+        <ResizableHandle />
+        <ResizablePanel defaultSize={75}>
+          <ScrollArea className="h-full">
+            <div className="container py-6 space-y-8">
+              {packageData.rounds.map((round) => (
+                <div key={round.id} id={`round-${round.id}`} className="space-y-4">
+                  <div className="sticky top-0 bg-background z-10 py-2 -mx-6 px-6 border-b">
+                    <h2 className="text-lg font-semibold">
+                      Раунд {round.orderIndex + 1}: {round.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{round.description}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={round.questions?.map((q, index) => `${round.id}-${index}`) || []}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {round.questions?.map((question, index) => (
+                          <div
+                            key={`${round.id}-${question.id}`}
+                            ref={el => questionRefs.current[`${round.id}-${question.id}`] = el}
+                            className={cn(
+                              "rounded-lg border bg-card",
+                              activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                            )}
+                          >
+                            <QuestionItem
+                              id={`${round.id}-${index}`}
+                              question={question}
+                              index={index}
+                              roundId={round.id}
+                              roundQuestionCount={round.questionCount}
+                              handleAutoSave={handleAutoSave}
+                              handleRemoveQuestion={handleRemoveQuestion}
+                              handleMoveQuestion={handleMoveQuestion}
+                              form={form}
+                              packageData={packageData}
+                            />
+                          </div>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+
+                    <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setIsSearchDialogOpen(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Добавить вопрос
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Добавить вопрос</DialogTitle>
+                          <DialogDescription>
+                            Найдите существующий вопрос для добавления в раунд
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Form {...searchForm}>
+                          <form
+                            onSubmit={searchForm.handleSubmit(handleSearch)}
+                            className="space-y-4"
+                          >
+                            <FormField
+                              control={searchForm.control}
+                              name="query"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Поиск по тексту..."
+                                        {...field}
+                                      />
+                                      <Button type="submit">
+                                        <Search className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </form>
+                        </Form>
+                        <ScrollArea className="h-[400px] mt-4">
+                          <div className="space-y-2">
+                            {availableQuestions.map((question) => (
+                              <div
+                                key={question.id}
+                                className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
+                                onClick={() => {
+                                  handleAddQuestion(round.id, question.id, round.questions.length);
+                                }}
+                              >
+                                <div>{getContentPreview(question.content)}</div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  Автор: {question.author?.username} •
+                                  Создан: {new Date(question.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
