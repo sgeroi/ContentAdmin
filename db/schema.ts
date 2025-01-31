@@ -64,15 +64,6 @@ export const roundQuestions = pgTable("round_questions", {
   orderIndex: integer("order_index").notNull(),
 });
 
-export const packageQuestionVersions = pgTable("package_question_versions", {
-  id: serial("id").primaryKey(),
-  roundQuestionId: integer("round_question_id").references(() => roundQuestions.id, { onDelete: 'cascade' }).notNull(),
-  content: json("content").notNull(),
-  answer: text("answer"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 export const templateRoundSettings = pgTable("template_round_settings", {
   id: serial("id").primaryKey(),
   templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }).notNull(),
@@ -149,7 +140,7 @@ export const templatesRelations = relations(templates, ({ one, many }) => ({
   roundSettings: many(templateRoundSettings),
 }));
 
-export const roundQuestionsRelations = relations(roundQuestions, ({ one, many }) => ({
+export const roundQuestionsRelations = relations(roundQuestions, ({ one }) => ({
   round: one(rounds, {
     fields: [roundQuestions.roundId],
     references: [rounds.id],
@@ -158,16 +149,7 @@ export const roundQuestionsRelations = relations(roundQuestions, ({ one, many })
     fields: [roundQuestions.questionId],
     references: [questions.id],
   }),
-  versions: many(packageQuestionVersions),
 }));
-
-export const packageQuestionVersionsRelations = relations(packageQuestionVersions, ({ one }) => ({
-  roundQuestion: one(roundQuestions, {
-    fields: [packageQuestionVersions.roundQuestionId],
-    references: [roundQuestions.id],
-  }),
-}));
-
 
 export const templateRoundSettingsRelations = relations(templateRoundSettings, ({ one }) => ({
   template: one(templates, {
@@ -210,8 +192,6 @@ export const insertPackageSchema = createInsertSchema(packages);
 export const selectPackageSchema = createSelectSchema(packages);
 export const insertTemplateRoundSettingsSchema = createInsertSchema(templateRoundSettings);
 export const selectTemplateRoundSettingsSchema = createSelectSchema(templateRoundSettings);
-export const insertPackageQuestionVersionSchema = createInsertSchema(packageQuestionVersions);
-export const selectPackageQuestionVersionSchema = createSelectSchema(packageQuestionVersions);
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -241,5 +221,3 @@ export type Package = typeof packages.$inferSelect & {
 export type InsertPackage = typeof packages.$inferInsert;
 export type TemplateRoundSettings = typeof templateRoundSettings.$inferSelect;
 export type InsertTemplateRoundSettings = typeof templateRoundSettings.$inferInsert;
-export type PackageQuestionVersion = typeof packageQuestionVersions.$inferSelect;
-export type InsertPackageQuestionVersion = typeof packageQuestionVersions.$inferInsert;

@@ -405,39 +405,29 @@ export default function PackageEditor() {
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
       setIsSaving(true);
       try {
-        console.log('Auto-saving question with data:', JSON.stringify(data, null, 2));
-
-        // Send to the package-specific version endpoint
-        const response = await fetch(`/api/packages/${params.id}/questions/${questionId}/version`, {
-          method: "POST",
+        console.log('Auto-saving question:', questionId, data);
+        const response = await fetch(`/api/questions/${questionId}`, {
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
           },
           credentials: "include",
-          body: JSON.stringify({
-            content: typeof data.content === 'string' ? JSON.parse(data.content) : data.content,
-            answer: data.answer,
-          }),
+          body: JSON.stringify(data),
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Server response:', response.status, errorText);
-          throw new Error(`Failed to save question version: ${errorText}`);
+          throw new Error(`Failed to save question: ${response.statusText}`);
         }
 
         const savedData = await response.json();
-        console.log('Saved question version data:', savedData);
+        console.log('Saved question data:', savedData);
 
-        // Refresh package data to get updated versions
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
         });
 
         if (!updatedResponse.ok) {
-          const errorText = await updatedResponse.text();
-          throw new Error(`Failed to fetch updated package data: ${errorText}`);
+          throw new Error("Failed to fetch updated package data");
         }
 
         const updatedData = await updatedResponse.json();
