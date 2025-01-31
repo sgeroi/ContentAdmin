@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2, Calendar, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -38,6 +38,9 @@ import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 type PackageQuestion = Question & {
   author: { username: string; };
@@ -54,16 +57,10 @@ type Round = {
 
 type PackageWithRounds = Package & {
   rounds: Round[];
+  playDate?: Date;
+  author?: { username: string };
 };
 
-type QuestionFormData = {
-  content: any;
-  answer: string;
-};
-
-type QuestionSearchFilters = {
-  query: string;
-};
 
 interface QuestionItemProps {
   question: PackageQuestion;
@@ -71,6 +68,7 @@ interface QuestionItemProps {
   roundId: number;
   roundQuestionCount: number;
   handleAutoSave: (questionId: number, data: any) => void;
+  handleRemove: (roundId: number, questionId: number) => void;
   form: any;
   packageData: PackageWithRounds;
 }
@@ -329,6 +327,338 @@ function GenerateQuestionsDialog({
     </Dialog>
   );
 }
+
+function QuestionItem({
+  question,
+  index,
+  roundId,
+  roundQuestionCount,
+  handleAutoSave,
+  handleRemove,
+  form,
+  packageData,
+}: QuestionItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [content, setContent] = useState(question.content);
+  const [answer, setAnswer] = useState(question.answer);
+
+  useEffect(() => {
+    if (isEditing) {
+      form.setValue("content", content);
+      form.setValue("answer", answer);
+    }
+  }, [isEditing, form, content, answer]);
+
+  const handleSave = () => {
+    handleAutoSave(question.id, {
+      content,
+      answer,
+    });
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Вопрос {index + 1} из {roundQuestionCount}</span>
+            <Badge variant="outline">Автор: {question.author?.username || "Неизвестно"}</Badge>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleRemove(roundId, question.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {isEditing ? (
+        <Form {...form}>
+          <form className="space-y-4">
+            <FormField
+              control={form.control}
+              name="content"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <WysiwygEditor
+                      content={content}
+                      onChange={(value) => setContent(value)}
+                      className="min-h-[200px]"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="answer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ответ</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditing(false)}
+              >
+                Отмена
+              </Button>
+              <Button type="button" onClick={handleSave}>
+                Сохранить
+              </Button>
+            </div>
+          </form>
+        </Form>
+      ) : (
+        <div className="space-y-4">
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            {content && typeof content === "object" ? (
+              <WysiwygEditor content={content} readOnly />
+            ) : (
+              <p>{content}</p>
+            )}
+          </div>
+          <div>
+            <Label>Ответ</Label>
+            <p className="text-sm">{answer}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PackageHeader({
+  packageData,
+  onSave,
+}: {
+  packageData: PackageWithRounds;
+  onSave: (data: {
+    title: string;
+    description: string;
+    playDate: string;
+    authorId: number;
+  }) => Promise<void>;
+}) {
+  const [editMode, setEditMode] = useState(false);
+  const [title, setTitle] = useState(packageData.title);
+  const [description, setDescription] = useState(packageData.description);
+  const [playDate, setPlayDate] = useState(
+    packageData.playDate
+      ? new Date(packageData.playDate).toISOString().split('T')[0]
+      : ""
+  );
+  const [authorId, setAuthorId] = useState(packageData.authorId);
+  const [users, setUsers] = useState<Array<{ id: number; username: string }>>([]);
+
+  useEffect(() => {
+    // Загрузка списка пользователей при входе в режим редактирования
+    if (editMode) {
+      fetch('/api/users', { credentials: 'include' })
+        .then(res => res.json())
+        .then(setUsers)
+        .catch(console.error);
+    }
+  }, [editMode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSave({
+        title: title || "Новый пакет",
+        description: description || "",
+        playDate,
+        authorId,
+      });
+      setEditMode(false);
+    } catch (error) {
+      console.error("Failed to save package:", error);
+    }
+  };
+
+  return (
+    <div className="border-b">
+      <div className="container py-4">
+        {editMode ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Название пакета</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Название пакета"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Описание</Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Описание пакета"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Дата игры</Label>
+              <Input
+                type="date"
+                value={playDate}
+                onChange={(e) => setPlayDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Автор</Label>
+              <Select value={authorId.toString()} onValueChange={(value) => setAuthorId(parseInt(value))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите автора" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditMode(false);
+                  setTitle(packageData.title);
+                  setDescription(packageData.description);
+                  setPlayDate(
+                    packageData.playDate
+                      ? new Date(packageData.playDate).toISOString().split('T')[0]
+                      : ""
+                  );
+                  setAuthorId(packageData.authorId);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button type="submit">Сохранить</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold">{packageData.title}</h1>
+                {packageData.description && (
+                  <p className="text-muted-foreground">{packageData.description}</p>
+                )}
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  {packageData.playDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        Дата игры: {new Date(packageData.playDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {packageData.author && (
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span>Автор: {packageData.author.username}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setEditMode(true)}>
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/packages">
+                <Button variant="ghost">
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Назад к пакетам
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DraggableRoundItem({ round, activeQuestionId, onQuestionClick }: {
+  round: Round;
+  activeQuestionId: string | null;
+  onQuestionClick: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: round.id });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    transition,
+  } : undefined;
+
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
+          <div className="flex items-center gap-2">
+            <ChevronRight className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")} />
+            <span>Раунд {round.orderIndex + 1}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{round.questions.length} / {round.questionCount}</Badge>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pl-6 space-y-1">
+          {round.questions.map((question, index) => (
+            <div
+              key={question.id}
+              className={cn(
+                "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2",
+                activeQuestionId === `${round.id}-${question.id}` && "bg-accent"
+              )}
+              onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
+            >
+              <span className="text-muted-foreground">{index + 1}.</span>
+              <span className="truncate">{getContentPreview(question.content)}</span>
+            </div>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 
 export default function PackageEditor() {
   const params = useParams();
@@ -674,7 +1004,7 @@ export default function PackageEditor() {
         updatedData = JSON.parse(updatedText);
         console.log('Parsed package data:', updatedData);
       } catch (e) {
-        console.error('Failed to parse updated package data:', e);
+        console.error('Failed to parseupdated package data:', e);
         throw new Error(`Invalid package response: ${updatedText}`);
       }
 
@@ -682,7 +1012,7 @@ export default function PackageEditor() {
       setIsSearchDialogOpen(false);
 
       toast({
-        title: "Успех",
+        title: "Успеx",
         description: "Вопрос добавлен в раунд",
       });
     } catch (error: any) {
@@ -758,7 +1088,7 @@ export default function PackageEditor() {
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
+        console.log('`Parsed response data:', responseData);
       } catch (e) {
         console.error('Failed to parse response:', e);
         throw new Error(`Invalid server response: ${responseText}`);
@@ -851,6 +1181,46 @@ export default function PackageEditor() {
     }
   };
 
+  const handleRemoveQuestion = useCallback(async (roundId: number, questionId: number) => {
+    try {
+      const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to remove question: ${response.statusText}`);
+      }
+
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+        credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!updatedResponse.ok) {
+        throw new Error("Failed to fetch updated package data");
+      }
+
+      const updatedData = await updatedResponse.json();
+      setPackageData(updatedData);
+      toast({
+        title: "Успех",
+        description: "Вопрос удален",
+      });
+    } catch (error: any) {
+      console.error("Error removing question:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [params.id, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -876,40 +1246,123 @@ export default function PackageEditor() {
     );
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setPackageData((packageData) => {
+        const oldIndex = packageData.rounds.findIndex((round) => round.id === active.id);
+        const newIndex = packageData.rounds.findIndex((round) => round.id === over.id);
+
+        return {
+          ...packageData,
+          rounds: arrayMove(packageData.rounds, oldIndex, newIndex).map((round, index) => ({
+            ...round,
+            orderIndex: index
+          }))
+        };
+      });
+
+      // Update rounds order in the backend
+      handleUpdateRoundsOrder(active.id, over.id);
+    }
+  };
+
+  const handleUpdateRoundsOrder = async (activeId: number, overId: number) => {
+    try {
+      const response = await fetch('/api/rounds/reorder', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          activeId,
+          overId,
+          packageId: params.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update rounds order');
+      }
+
+      const updatedPackage = await response.json();
+      setPackageData(updatedPackage);
+    } catch (error) {
+      console.error('Error updating rounds order:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update rounds order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdatePackage = useCallback(async (data: { title: string; description: string; playDate: string; authorId: number }) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/packages/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update package: ${response.statusText}`);
+      }
+
+      const updatedPackage = await response.json();
+      setPackageData(updatedPackage);
+      toast({ title: "Успех", description: "Пакет обновлен" });
+    } catch (error: any) {
+      console.error("Error updating package:", error);
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [params.id, toast]);
+
   return (
     <div className="h-screen flex flex-col">
-      <div className="border-b">
-        <div className="container py-4">
-          <div className="space-y-1">
-            <Link href="/packages">
-              <Button variant="ghost" className="pl-0">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Назад к пакетам
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">{packageData.title}</h1>
-            {packageData.description && (
-              <p className="text-muted-foreground">{packageData.description}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
+      <PackageHeader packageData={packageData} onSave={handleUpdatePackage} />
       <AutoSaveStatus saving={isSaving} />
-
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
           <div className="h-full border-r flex flex-col container">
             <ScrollArea className="flex-1">
               <div className="space-y-4 py-4">
-                {packageData.rounds.map((round) => (
-                  <NavigationItem
-                    key={round.id}
-                    round={round}
-                    activeQuestionId={activeQuestionId}
-                    onQuestionClick={handleQuestionClick}
-                  />
-                ))}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={packageData.rounds.map(round => round.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {packageData.rounds.map((round) => (
+                      <DraggableRoundItem
+                        key={round.id}
+                        round={round}
+                        activeQuestionId={activeQuestionId}
+                        onQuestionClick={handleQuestionClick}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </ScrollArea>
             <div className="py-4 border-t">
@@ -946,6 +1399,7 @@ export default function PackageEditor() {
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
+                          handleRemove={handleRemoveQuestion}
                           form={form}
                           packageData={packageData}
                         />
@@ -1095,64 +1549,6 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function QuestionItem({
-  question,
-  index,
-  roundId,
-  roundQuestionCount,
-  handleAutoSave,
-  form,
-  packageData,
-}: QuestionItemProps) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-medium">
-          Вопрос {index + 1}
-        </h3>
-        {index >= roundQuestionCount && (
-          <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <Form {...form}>
-          <form className="space-y-3">
-            <FormItem>
-              <FormLabel>Содержание вопроса</FormLabel>
-              <WysiwygEditor
-                content={question.content}
-                onChange={(content) => handleAutoSave(question.id, { content })}
-                className="min-h-[150px]"
-              />
-              <FormMessage />
-            </FormItem>
-            <FormField
-              control={form.control}
-              name="answer"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ответ</FormLabel>
-                  <FormControl>
-                    <Input
-                      defaultValue={question.answer || ""}
-                      onChange={(e) => {
-                        field.onChange(e);
-                        handleAutoSave(question.id, { answer: e.target.value });
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </form>
-        </Form>
-      </div>
     </div>
   );
 }
