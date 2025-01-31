@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -139,41 +139,104 @@ function RoundHeader({
   const [name, setName] = useState(round.name);
   const [description, setDescription] = useState(round.description);
 
-  const handleSave = useCallback(() => {
-    if (name !== round.name || description !== round.description) {
-      onSave(round.id, { name, description });
-    }
-  }, [name, description, round, onSave]);
-
-  // Сохраняем при изменении
-  useEffect(() => {
-    handleSave();
-  }, [name, description, handleSave]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(round.id, { name, description });
+    setEditMode(false);
+  };
 
   return (
     <div className="sticky top-0 bg-background z-10 py-2 -mx-6 px-6 border-b">
       {editMode ? (
-        <div className="space-y-2">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Название раунда"
-          />
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Описание раунда"
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <div className="space-y-2">
+            <Label>Название</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Название раунда"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Описание</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Описание раунда"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setEditMode(false)}>
+              Отмена
+            </Button>
+            <Button type="submit">
+              Сохранить
+            </Button>
+          </div>
+        </form>
       ) : (
-        <div className="space-y-1" onClick={() => setEditMode(true)}>
-          <h2 className="text-lg font-semibold">
-            Раунд {round.orderIndex + 1}: {name}
-          </h2>
-          <p className="text-sm text-muted-foreground">{description}</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Раунд {round.orderIndex + 1}: {name}
+            </h2>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setEditMode(true)}>
+            <Edit2 className="h-4 w-4" />
+          </Button>
         </div>
       )}
     </div>
+  );
+}
+
+function AddQuestionDialog({
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (type: "manual" | "search" | "generate") => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Добавить вопрос</DialogTitle>
+          <DialogDescription>
+            Выберите способ добавления вопроса
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => onSelect("manual")}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Написать вручную
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => onSelect("search")}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            Выбрать из базы
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => onSelect("generate")}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Сгенерировать с помощью AI
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -187,6 +250,7 @@ export default function PackageEditor() {
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const form = useForm<QuestionFormData>({
@@ -239,7 +303,9 @@ export default function PackageEditor() {
   }, [params.id]);
 
   const handleUpdateRound = useCallback(async (id: number, data: { name: string; description: string }) => {
+    setIsSaving(true);
     try {
+      console.log('Updating round:', id, data);
       const response = await fetch(`/api/rounds/${id}`, {
         method: "PATCH",
         headers: {
@@ -250,30 +316,41 @@ export default function PackageEditor() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update round");
+        throw new Error(`Failed to update round: ${response.statusText}`);
       }
 
-      // Обновляем данные после успешного сохранения
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
 
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
+      if (!updatedResponse.ok) {
+        throw new Error("Failed to fetch updated package data");
       }
+
+      const updatedData = await updatedResponse.json();
+      console.log('Updated package data:', updatedData);
+      setPackageData(updatedData);
+
+      toast({
+        title: "Успех",
+        description: "Раунд обновлен",
+      });
     } catch (error: any) {
+      console.error('Error updating round:', error);
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   }, [params.id, toast]);
 
   const handleAddRound = async () => {
     try {
       const orderIndex = packageData?.rounds.length || 0;
+      console.log('Adding new round with index:', orderIndex);
 
       const roundData = {
         name: "Новый раунд",
@@ -291,11 +368,13 @@ export default function PackageEditor() {
         body: JSON.stringify(roundData),
       });
 
+      const responseData = await response.json();
+      console.log('New round response:', responseData);
+
       if (!response.ok) {
-        throw new Error("Failed to add round");
+        throw new Error(`Failed to add round: ${response.statusText}`);
       }
 
-      // Обновляем список раундов
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
@@ -305,6 +384,7 @@ export default function PackageEditor() {
       }
 
       const updatedPackage = await updatedResponse.json();
+      console.log('Updated package after adding round:', updatedPackage);
       setPackageData(updatedPackage);
 
       toast({
@@ -312,6 +392,7 @@ export default function PackageEditor() {
         description: "Раунд добавлен",
       });
     } catch (error: any) {
+      console.error('Error adding round:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -324,6 +405,7 @@ export default function PackageEditor() {
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
       setIsSaving(true);
       try {
+        console.log('Auto-saving question:', questionId, data);
         const response = await fetch(`/api/questions/${questionId}`, {
           method: "PATCH",
           headers: {
@@ -334,18 +416,26 @@ export default function PackageEditor() {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to save question");
+          throw new Error(`Failed to save question: ${response.statusText}`);
         }
 
-        // Обновляем данные после успешного сохранения
+        const savedData = await response.json();
+        console.log('Saved question data:', savedData);
+
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
         });
-        if (updatedResponse.ok) {
-          const updatedData = await updatedResponse.json();
-          setPackageData(updatedData);
+
+        if (!updatedResponse.ok) {
+          throw new Error("Failed to fetch updated package data");
         }
+
+        const updatedData = await updatedResponse.json();
+        console.log('Updated package data:', updatedData);
+        setPackageData(updatedData);
+
       } catch (error: any) {
+        console.error('Error auto-saving:', error);
         toast({
           title: "Ошибка автосохранения",
           description: error.message,
@@ -423,6 +513,21 @@ export default function PackageEditor() {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleAddQuestionSelect = (type: "manual" | "search" | "generate") => {
+    setIsAddQuestionDialogOpen(false);
+    switch (type) {
+      case "manual":
+        // TODO: Добавить создание нового вопроса
+        break;
+      case "search":
+        setIsSearchDialogOpen(true);
+        break;
+      case "generate":
+        // TODO: Добавить генерацию вопроса
+        break;
     }
   };
 
@@ -529,7 +634,7 @@ export default function PackageEditor() {
                       className="w-full"
                       onClick={() => {
                         setCurrentRoundId(round.id);
-                        setIsSearchDialogOpen(true);
+                        setIsAddQuestionDialogOpen(true);
                       }}
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -597,6 +702,11 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <AddQuestionDialog
+        open={isAddQuestionDialogOpen}
+        onOpenChange={setIsAddQuestionDialogOpen}
+        onSelect={handleAddQuestionSelect}
+      />
     </div>
   );
 }
