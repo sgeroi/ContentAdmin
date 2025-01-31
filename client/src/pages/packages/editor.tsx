@@ -52,11 +52,8 @@ type PackageWithRounds = Package & {
 };
 
 type QuestionFormData = {
-  title: string;
   content: any;
   answer: string;
-  topic: string;
-  difficulty: number;
 };
 
 type QuestionSearchFilters = {
@@ -75,16 +72,13 @@ export default function PackageEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRound, setExpandedRound] = useState<number | null>(null);
   const [searchFilters, setSearchFilters] = useState<QuestionSearchFilters>({ query: "" });
-  const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set());
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [showNewQuestionForm, setShowNewQuestionForm] = useState<{roundId: number, index: number} | null>(null);
 
   const form = useForm<QuestionFormData>({
     defaultValues: {
-      title: "",
       content: {},
       answer: "",
-      topic: "",
-      difficulty: 1,
     },
   });
 
@@ -101,7 +95,6 @@ export default function PackageEditor() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('Fetching package data...');
         const packageResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: 'include'
         });
@@ -196,27 +189,6 @@ export default function PackageEditor() {
     []
   );
 
-  const handleAddSelectedQuestions = async (roundId: number) => {
-    try {
-      for (const questionId of selectedQuestions) {
-        await handleAddQuestion(roundId, questionId, 0);
-      }
-      setSelectedQuestions(new Set());
-      setIsSearchDialogOpen(false);
-
-      toast({
-        title: "Успех",
-        description: "Выбранные вопросы добавлены в раунд",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
     try {
       console.log('Adding question:', { roundId, questionId, position });
@@ -309,6 +281,7 @@ export default function PackageEditor() {
       const newQuestion = await createQuestionResponse.json();
       await handleAddQuestion(roundId, newQuestion.id, position);
       form.reset();
+      setShowNewQuestionForm(null);
 
       toast({
         title: "Успех",
@@ -322,7 +295,6 @@ export default function PackageEditor() {
       });
     }
   };
-
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -436,25 +408,6 @@ export default function PackageEditor() {
                             <div className="space-y-4">
                               <Form {...form}>
                                 <form className="space-y-4">
-                                  <FormField
-                                    control={form.control}
-                                    name="title"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Заголовок вопроса</FormLabel>
-                                        <FormControl>
-                                          <Input 
-                                            defaultValue={question.title}
-                                            onChange={(e) => {
-                                              field.onChange(e);
-                                              handleAutoSave(question.id, { title: e.target.value });
-                                            }}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
                                   <FormItem>
                                     <FormLabel>Содержание вопроса</FormLabel>
                                     <WysiwygEditor
@@ -483,293 +436,127 @@ export default function PackageEditor() {
                                       </FormItem>
                                     )}
                                   />
-                                  <div className="flex gap-4">
-                                    <FormField
-                                      control={form.control}
-                                      name="topic"
-                                      render={({ field }) => (
-                                        <FormItem className="flex-1">
-                                          <FormLabel>Тема</FormLabel>
-                                          <FormControl>
-                                            <Input
-                                              defaultValue={question.topic}
-                                              onChange={(e) => {
-                                                field.onChange(e);
-                                                handleAutoSave(question.id, { topic: e.target.value });
-                                              }}
-                                            />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-                                    <FormField
-                                      control={form.control}
-                                      name="difficulty"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Сложность</FormLabel>
-                                          <FormControl>
-                                            <Input
-                                              type="number"
-                                              min={1}
-                                              max={5}
-                                              className="w-20"
-                                              defaultValue={question.difficulty}
-                                              onChange={(e) => {
-                                                field.onChange(e);
-                                                handleAutoSave(question.id, { 
-                                                  difficulty: parseInt(e.target.value) 
-                                                });
-                                              }}
-                                            />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-                                  </div>
                                 </form>
                               </Form>
                             </div>
                           ) : (
-                            <div className="flex gap-4">
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <Button>
+                            <div>
+                              {showNewQuestionForm?.roundId === round.id && showNewQuestionForm?.index === index ? (
+                                <Form {...form}>
+                                  <form 
+                                    onSubmit={form.handleSubmit((data) => handleSubmitQuestion(round.id, index, data))}
+                                    className="space-y-4"
+                                  >
+                                    <FormItem>
+                                      <FormLabel>Содержание вопроса</FormLabel>
+                                      <WysiwygEditor
+                                        content={form.getValues("content")}
+                                        onChange={(content) => form.setValue("content", content)}
+                                        className="min-h-[200px]"
+                                      />
+                                      <FormMessage />
+                                    </FormItem>
+                                    <FormField
+                                      control={form.control}
+                                      name="answer"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Ответ</FormLabel>
+                                          <FormControl>
+                                            <Input placeholder="Введите ответ" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button type="submit">Сохранить</Button>
+                                      <Button 
+                                        type="button" 
+                                        variant="outline"
+                                        onClick={() => setShowNewQuestionForm(null)}
+                                      >
+                                        Отмена
+                                      </Button>
+                                    </div>
+                                  </form>
+                                </Form>
+                              ) : (
+                                <div className="flex gap-4">
+                                  <Button
+                                    onClick={() => setShowNewQuestionForm({ roundId: round.id, index })}
+                                  >
                                     Написать вопрос
                                   </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Создать новый вопрос</DialogTitle>
-                                    <DialogDescription>
-                                      Заполните форму для создания нового вопроса
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <Form {...form}>
-                                    <form 
-                                      onSubmit={form.handleSubmit((data) => handleSubmitQuestion(round.id, index, data))}
-                                      className="space-y-4"
-                                    >
-                                      <FormField
-                                        control={form.control}
-                                        name="title"
-                                        render={({ field }) => (
-                                          <FormItem>
-                                            <FormLabel>Заголовок вопроса</FormLabel>
-                                            <FormControl>
-                                              <Input placeholder="Введите заголовок" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
-                                      <FormItem>
-                                        <FormLabel>Содержание вопроса</FormLabel>
-                                        <WysiwygEditor
-                                          content={form.getValues("content")}
-                                          onChange={(content) => form.setValue("content", content)}
-                                          className="min-h-[200px]"
-                                        />
-                                        <FormMessage />
-                                      </FormItem>
-                                      <FormField
-                                        control={form.control}
-                                        name="answer"
-                                        render={({ field }) => (
-                                          <FormItem>
-                                            <FormLabel>Ответ</FormLabel>
-                                            <FormControl>
-                                              <Input placeholder="Введите ответ" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
-                                      <div className="flex gap-4">
-                                        <FormField
-                                          control={form.control}
-                                          name="topic"
-                                          render={({ field }) => (
-                                            <FormItem className="flex-1">
-                                              <FormLabel>Тема</FormLabel>
-                                              <FormControl>
-                                                <Input placeholder="Введите тему" {...field} />
-                                              </FormControl>
-                                              <FormMessage />
-                                            </FormItem>
-                                          )}
-                                        />
-                                        <FormField
-                                          control={form.control}
-                                          name="difficulty"
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              <FormLabel>Сложность</FormLabel>
-                                              <FormControl>
-                                                <Input
-                                                  type="number"
-                                                  min={1}
-                                                  max={5}
-                                                  className="w-20"
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                              <FormMessage />
-                                            </FormItem>
-                                          )}
-                                        />
-                                      </div>
-                                      <Button type="submit">Создать вопрос</Button>
-                                    </form>
-                                  </Form>
-                                </DialogContent>
-                              </Dialog>
-                              <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
-                                <DialogTrigger asChild>
-                                  <Button variant="outline">
-                                    <Database className="h-4 w-4 mr-2" />
-                                    Выбрать из базы
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl max-h-[80vh]">
-                                  <DialogHeader>
-                                    <DialogTitle>Поиск вопросов</DialogTitle>
-                                    <DialogDescription>
-                                      Найдите и выберите вопросы для добавления в раунд
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <Form {...searchForm}>
-                                    <form 
-                                      onSubmit={searchForm.handleSubmit(handleSearch)}
-                                      className="space-y-4"
-                                    >
-                                      <div className="flex gap-4">
-                                        <FormField
-                                          control={searchForm.control}
-                                          name="query"
-                                          render={({ field }) => (
-                                            <FormItem className="flex-1">
-                                              <FormControl>
-                                                <Input 
-                                                  placeholder="Поиск по тексту..."
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                        <FormField
-                                          control={searchForm.control}
-                                          name="author"
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              <FormControl>
-                                                <Input 
-                                                  placeholder="Автор"
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                      </div>
-                                      <div className="flex gap-4">
-                                        <FormField
-                                          control={searchForm.control}
-                                          name="tag"
-                                          render={({ field }) => (
-                                            <FormItem className="flex-1">
-                                              <FormControl>
-                                                <Input 
-                                                  placeholder="Тег"
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                        <FormField
-                                          control={searchForm.control}
-                                          name="dateFrom"
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              <FormControl>
-                                                <Input 
-                                                  type="date"
-                                                  placeholder="От"
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                        <FormField
-                                          control={searchForm.control}
-                                          name="dateTo"
-                                          render={({ field }) => (
-                                            <FormItem>
-                                              <FormControl>
-                                                <Input 
-                                                  type="date"
-                                                  placeholder="До"
-                                                  {...field}
-                                                />
-                                              </FormControl>
-                                            </FormItem>
-                                          )}
-                                        />
-                                      </div>
-                                      <Button type="submit">
-                                        <Search className="h-4 w-4 mr-2" />
-                                        Поиск
+                                  <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+                                    <DialogTrigger asChild>
+                                      <Button variant="outline">
+                                        <Database className="h-4 w-4 mr-2" />
+                                        Выбрать из базы
                                       </Button>
-                                    </form>
-                                  </Form>
-                                  <ScrollArea className="h-[400px] mt-4">
-                                    <div className="space-y-4">
-                                      {availableQuestions.map((q) => {
-                                        const isSelected = selectedQuestions.has(q.id);
-                                        return (
-                                          <div
-                                            key={q.id}
-                                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                                              isSelected ? 'bg-primary/10' : 'hover:bg-accent'
-                                            }`}
-                                            onClick={() => {
-                                              const newSelected = new Set(selectedQuestions);
-                                              if (isSelected) {
-                                                newSelected.delete(q.id);
-                                              } else {
-                                                newSelected.add(q.id);
-                                              }
-                                              setSelectedQuestions(newSelected);
-                                            }}
-                                          >
-                                            <div className="font-medium">{q.title}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                              {q.topic} • {q.author?.username} • 
-                                              {new Date(q.createdAt).toLocaleDateString()}
-                                            </div>
-                                            {isSelected && (
-                                              <Badge className="mt-2">Выбрано</Badge>
-                                            )}
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-3xl max-h-[80vh]">
+                                      <DialogHeader>
+                                        <DialogTitle>Поиск вопросов</DialogTitle>
+                                        <DialogDescription>
+                                          Найдите вопросы для добавления в раунд
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <Form {...searchForm}>
+                                        <form 
+                                          onSubmit={searchForm.handleSubmit(handleSearch)}
+                                          className="space-y-4"
+                                        >
+                                          <div className="flex gap-4">
+                                            <FormField
+                                              control={searchForm.control}
+                                              name="query"
+                                              render={({ field }) => (
+                                                <FormItem className="flex-1">
+                                                  <FormControl>
+                                                    <Input 
+                                                      placeholder="Поиск по тексту..."
+                                                      {...field}
+                                                    />
+                                                  </FormControl>
+                                                </FormItem>
+                                              )}
+                                            />
+                                            <Button type="submit">
+                                              <Search className="h-4 w-4 mr-2" />
+                                              Поиск
+                                            </Button>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </ScrollArea>
-                                  <div className="mt-4 flex justify-end">
-                                    <Button
-                                      onClick={() => handleAddSelectedQuestions(round.id)}
-                                      disabled={selectedQuestions.size === 0}
-                                    >
-                                      Добавить выбранные вопросы ({selectedQuestions.size})
-                                    </Button>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
+                                        </form>
+                                      </Form>
+                                      <ScrollArea className="h-[400px] mt-4">
+                                        <div className="space-y-4">
+                                          {availableQuestions.map((q) => (
+                                            <div
+                                              key={q.id}
+                                              className="p-4 border rounded-lg cursor-pointer hover:bg-accent"
+                                              onClick={() => {
+                                                handleAddQuestion(round.id, q.id, index);
+                                                setIsSearchDialogOpen(false);
+                                              }}
+                                            >
+                                              <div className="text-sm">
+                                                {q.content && typeof q.content === 'object' && q.content.content ? 
+                                                  q.content.content[0]?.content?.[0]?.text || "Нет текста" 
+                                                  : "Нет содержания"}
+                                              </div>
+                                              <div className="text-sm text-muted-foreground mt-2">
+                                                Автор: {q.author?.username} • 
+                                                Создан: {new Date(q.createdAt).toLocaleDateString()}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </ScrollArea>
+                                    </DialogContent>
+                                  </Dialog>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
