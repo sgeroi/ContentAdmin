@@ -721,6 +721,41 @@ export default function PackageEditor() {
     }
   }, []);
 
+  const handleDragEnd = useCallback(async (event: any) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id || !packageData) return;
+
+    try {
+      const response = await fetch(`/api/rounds/reorder`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          activeId: active.id,
+          overId: over.id,
+          packageId: packageData.id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reorder rounds");
+      }
+
+      const updatedPackage = await response.json();
+      setPackageData(updatedPackage);
+    } catch (error: any) {
+      console.error("Error reordering rounds:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }, [packageData, toast]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -1295,46 +1330,6 @@ export default function PackageEditor() {
     );
   }
 
-  const handleDragEnd = useCallback(async (event: any) => {
-    const { active, over } = event;
-    if (!active || !over || active.id === over.id) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (!packageData) return;
-
-    try {
-      const response = await fetch(`/api/rounds/reorder`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          activeId,
-          overId,
-          packageId: packageData.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to reorder rounds");
-      }
-
-      const updatedPackage = await response.json();
-      setPackageData(updatedPackage);
-    } catch (error: any) {
-      console.error("Error reordering rounds:", error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  }, [packageData, toast]);
-
   return (
     <div className="h-screen flex flex-col">
       {packageData && (
@@ -1346,19 +1341,29 @@ export default function PackageEditor() {
       <AutoSaveStatus saving={isSaving} />
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="h-full border-r flex flex-col container">
+          <div className="h-full flex flex-col">
+            <div className="p-4 border-b">
+              <Button
+                className="w-full"
+                onClick={handleAddRound}
+                disabled={isLoading}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Добавить раунд
+              </Button>
+            </div>
             <ScrollArea className="flex-1">
-              <div className="space-y-4 py-4">
+              <div className="p-4 space-y-2">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={packageData.rounds.map(round => round.id)}
+                    items={packageData?.rounds.map(round => round.id) || []}
                     strategy={verticalListSortingStrategy}
                   >
-                    {packageData.rounds.map((round) => (
+                    {packageData?.rounds.map((round) => (
                       <DraggableRoundItem
                         key={round.id}
                         round={round}
@@ -1370,12 +1375,6 @@ export default function PackageEditor() {
                 </DndContext>
               </div>
             </ScrollArea>
-            <div className="py-4 border-t">
-              <Button className="w-full" onClick={handleAddRound}>
-                <Plus className="h-4 w-4 mr-2" />
-                Добавить раунд
-              </Button>
-            </div>
           </div>
         </ResizablePanel>
         <ResizableHandle />
