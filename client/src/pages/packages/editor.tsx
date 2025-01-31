@@ -32,6 +32,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { cn } from "@/lib/utils";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 function getContentPreview(content: any): string {
   try {
@@ -362,7 +363,7 @@ export default function PackageEditor() {
   }, []);
 
   const scrollToQuestion = useCallback((roundId: number, index: number) => {
-    const element = document.getElementById(`question-${round.id}-${index}`);
+    const element = document.getElementById(`question-${roundId}-${index}`);
     if (element && rightPanelRef.current) {
       rightPanelRef.current.scrollTo({
         top: element.offsetTop - 20,
@@ -1018,12 +1019,12 @@ export default function PackageEditor() {
                     <FormLabel>Описание</FormLabel>
                     <FormControl>
                       <Textarea {...field} placeholder="Введите описание раунда" />
-                    </FormControl>
+                                        </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <<FormField
+              <FormField
                 control={editRoundForm.control}
                 name="questionCount"
                 render={({ field }) => (
@@ -1034,7 +1035,7 @@ export default function PackageEditor() {
                         type="number"
                         min={1}
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1050,7 +1051,7 @@ export default function PackageEditor() {
       </Dialog>
 
       <Dialog open={isCreateRoundDialogOpen} onOpenChange={setIsCreateRoundDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Создать новый раунд</DialogTitle>
             <DialogDescription>
@@ -1064,31 +1065,46 @@ export default function PackageEditor() {
             </TabsList>
             <Form {...createRoundForm}>
               <form onSubmit={createRoundForm.handleSubmit(handleCreateRound)} className="space-y-4">
-                <TabsContent value="template">
+                <TabsContent value="template" className="space-y-4">
                   <FormField
                     control={createRoundForm.control}
                     name="templateId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Шаблон</FormLabel>
-                        <FormControl>
-                          <select
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            className="w-full p-2 border rounded-md"
-                          >
-                            <option value="">Выберите шаблон</option>
+                        <Select
+                          value={field.value?.toString()}
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите шаблон" />
+                          </SelectTrigger>
+                          <SelectContent>
                             {templates.map((template) => (
-                              <option key={template.id} value={template.id}>
+                              <SelectItem key={template.id} value={template.id.toString()}>
                                 {template.name}
-                              </option>
+                              </SelectItem>
                             ))}
-                          </select>
-                        </FormControl>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                  {templates.find(t => t.id === parseInt(createRoundForm.watch("templateId")))?.roundSettings && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Параметры шаблона:</p>
+                      {templates
+                        .find(t => t.id === parseInt(createRoundForm.watch("templateId")))
+                        ?.roundSettings?.map((round) => (
+                          <div key={round.id} className="p-3 border rounded-lg">
+                            <div className="font-medium">{round.name}</div>
+                            <div className="text-sm text-muted-foreground">{round.description}</div>
+                            <Badge variant="secondary">{round.questionCount} вопросов</Badge>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </TabsContent>
                 <TabsContent value="manual">
                   <div className="space-y-4">
@@ -1129,7 +1145,7 @@ export default function PackageEditor() {
                               type="number"
                               min={1}
                               {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value))}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                             />
                           </FormControl>
                           <FormMessage />
