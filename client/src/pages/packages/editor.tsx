@@ -682,18 +682,29 @@ export default function PackageEditor() {
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
   const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
+
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const form = useForm<QuestionFormData>({
     defaultValues: {
       content: {},
       answer: "",
     },
   });
+
   const searchForm = useForm<QuestionSearchFilters>({
     defaultValues: {
       query: "",
     },
   });
+
   const createQuestionForm = useForm<{ content: any; answer: string; difficulty: number }>({
     defaultValues: {
       content: {},
@@ -702,13 +713,13 @@ export default function PackageEditor() {
     },
   });
 
-  const handleQuestionClick = (id: string) => {
+  const handleQuestionClick = useCallback((id: string) => {
     setActiveQuestionId(id);
     const element = questionRefs.current[id];
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1230,6 +1241,35 @@ export default function PackageEditor() {
     }
   }, [params.id, toast]);
 
+  const handleUpdatePackage = useCallback(async (data: { title: string; description: string; playDate: string; authorId: number }) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/packages/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update package: ${response.statusText}`);
+      }
+
+      const updatedPackage = await response.json();
+      setPackageData(updatedPackage);
+      toast({ title: "Успех", description: "Пакет обновлен" });
+    } catch (error: any) {
+      console.error("Error updating package:", error);
+      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [params.id, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1315,38 +1355,14 @@ export default function PackageEditor() {
     }
   };
 
-  const handleUpdatePackage = useCallback(async (data: { title: string; description: string; playDate: string; authorId: number }) => {
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/packages/${params.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update package: ${response.statusText}`);
-      }
-
-      const updatedPackage = await response.json();
-      setPackageData(updatedPackage);
-      toast({ title: "Успех", description: "Пакет обновлен" });
-    } catch (error: any) {
-      console.error("Error updating package:", error);
-      toast({ title: "Ошибка", description: error.message, variant: "destructive" });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [params.id, toast]);
-
   return (
     <div className="h-screen flex flex-col">
-      <PackageHeader packageData={packageData} onSave={handleUpdatePackage} />
+      {packageData && (
+        <PackageHeader
+          packageData={packageData}
+          onSave={handleUpdatePackage}
+        />
+      )}
       <AutoSaveStatus saving={isSaving} />
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
