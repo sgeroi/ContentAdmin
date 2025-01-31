@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, Plus, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, X, Database, Plus, ChevronRight, Search, Edit2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -38,7 +38,7 @@ import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Edit2 } from "lucide-react";
+
 
 type PackageQuestion = Question & {
   author: { username: string; };
@@ -122,62 +122,14 @@ function NavigationItem({
   );
 }
 
-function QuestionItem({
-  question,
-  index,
-  roundId,
-  roundQuestionCount,
-  handleAutoSave,
-  form,
-  packageData,
-}: QuestionItemProps) {
+function AutoSaveStatus({ saving }: { saving: boolean }) {
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium">
-            Вопрос {index + 1}
-          </h3>
-          {index >= roundQuestionCount && (
-            <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <Form {...form}>
-            <form className="space-y-3">
-              <FormItem>
-                <FormLabel>Содержание вопроса</FormLabel>
-                <WysiwygEditor
-                  content={question.content}
-                  onChange={(content) => handleAutoSave(question.id, { content })}
-                  className="min-h-[150px]"
-                />
-                <FormMessage />
-              </FormItem>
-              <FormField
-                control={form.control}
-                name="answer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ответ</FormLabel>
-                    <FormControl>
-                      <Input
-                        defaultValue={question.answer || ""}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          handleAutoSave(question.id, { answer: e.target.value });
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </div>
-      </div>
+    <div className="fixed top-4 right-4 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className={cn(
+        "h-2 w-2 rounded-full",
+        saving ? "bg-yellow-500" : "bg-green-500"
+      )} />
+      {saving ? "Сохранение..." : "Все изменения сохранены"}
     </div>
   );
 }
@@ -192,6 +144,7 @@ export default function PackageEditor() {
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<{ id: number; name: string; description: string } | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const form = useForm<QuestionFormData>({
@@ -258,6 +211,7 @@ export default function PackageEditor() {
         throw new Error("Failed to update round");
       }
 
+      // Обновляем данные после успешного сохранения
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
@@ -300,7 +254,9 @@ export default function PackageEditor() {
         throw new Error("Failed to add round");
       }
 
-      // Сразу получаем обновленные данные
+      const newRound = await response.json();
+
+      // Обновляем данные после успешного создания
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
@@ -312,14 +268,15 @@ export default function PackageEditor() {
       const updatedPackage = await updatedResponse.json();
       setPackageData(updatedPackage);
 
-      const newRound = updatedPackage.rounds[updatedPackage.rounds.length - 1];
-
-      // Открываем диалог редактирования для нового раунда
-      setEditingRound({
-        id: newRound.id,
-        name: newRound.name,
-        description: newRound.description,
-      });
+      // Открываем диалог редактирования нового раунда
+      const lastRound = updatedPackage.rounds[updatedPackage.rounds.length - 1];
+      if (lastRound) {
+        setEditingRound({
+          id: lastRound.id,
+          name: lastRound.name,
+          description: lastRound.description,
+        });
+      }
 
       toast({
         title: "Успех",
@@ -336,6 +293,7 @@ export default function PackageEditor() {
 
   const handleAutoSave = useCallback(
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
+      setIsSaving(true);
       try {
         const response = await fetch(`/api/questions/${questionId}`, {
           method: "PATCH",
@@ -355,6 +313,8 @@ export default function PackageEditor() {
           description: error.message,
           variant: "destructive",
         });
+      } finally {
+        setIsSaving(false);
       }
     }, 1000),
     []
@@ -472,23 +432,29 @@ export default function PackageEditor() {
         </div>
       </div>
 
+      <AutoSaveStatus saving={isSaving} />
+
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="h-full border-r flex flex-col">
+          <div className="h-full border-r flex flex-col px-4">
             <ScrollArea className="flex-1">
-              <div className="p-4 space-y-4">
+              <div className="space-y-4 py-4">
                 {packageData.rounds.map((round) => (
                   <NavigationItem
                     key={round.id}
                     round={round}
                     activeQuestionId={activeQuestionId}
                     onQuestionClick={handleQuestionClick}
-                    onEdit={() => setEditingRound({ id: round.id, name: round.name, description: round.description })}
+                    onEdit={() => setEditingRound({
+                      id: round.id,
+                      name: round.name,
+                      description: round.description,
+                    })}
                   />
                 ))}
               </div>
             </ScrollArea>
-            <div className="p-4 border-t">
+            <div className="py-4 border-t">
               <Button className="w-full" onClick={handleAddRound}>
                 <Plus className="h-4 w-4 mr-2" />
                 Добавить раунд
@@ -510,7 +476,7 @@ export default function PackageEditor() {
                   </div>
 
                   <div className="space-y-4">
-                    {round.questions?.map((question, index) => (
+                    {round.questions.map((question, index) => (
                       <div
                         key={`${round.id}-${question.id}`}
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
@@ -559,49 +525,63 @@ export default function PackageEditor() {
             </DialogDescription>
           </DialogHeader>
           {editingRound && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleUpdateRound(editingRound.id, {
-                  name: editingRound.name,
-                  description: editingRound.description,
-                });
-              }}
-              className="space-y-4"
-            >
-              <div className="space-y-2">
-                <Label>Название</Label>
-                <Input
-                  type="text"
-                  value={editingRound.name}
-                  onChange={(e) =>
-                    setEditingRound((prev) =>
-                      prev ? { ...prev, name: e.target.value } : null
-                    )
-                  }
+            <Form {...form}>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUpdateRound(editingRound.id, {
+                    name: editingRound.name,
+                    description: editingRound.description,
+                  });
+                }}
+                className="space-y-4"
+              >
+                <FormField
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Название</FormLabel>
+                      <FormControl>
+                        <Input
+                          value={editingRound.name}
+                          onChange={(e) =>
+                            setEditingRound((prev) =>
+                              prev ? { ...prev, name: e.target.value } : null
+                            )
+                          }
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Описание</Label>
-                <Textarea
-                  type="text"
-                  value={editingRound.description}
-                  onChange={(e) =>
-                    setEditingRound((prev) =>
-                      prev ? { ...prev, description: e.target.value } : null
-                    )
-                  }
+                <FormField
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Описание</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          value={editingRound.description}
+                          onChange={(e) =>
+                            setEditingRound((prev) =>
+                              prev ? { ...prev, description: e.target.value } : null
+                            )
+                          }
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditingRound(null)}>
-                  Отмена
-                </Button>
-                <Button type="submit">
-                  Сохранить
-                </Button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditingRound(null)}>
+                    Отмена
+                  </Button>
+                  <Button type="submit">
+                    Сохранить
+                  </Button>
+                </div>
+              </form>
+            </Form>
           )}
         </DialogContent>
       </Dialog>
@@ -642,7 +622,7 @@ export default function PackageEditor() {
                   className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
                   onClick={() => {
                     if (currentRoundId) {
-                      const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+                      const round = packageData.rounds.find((r) => r.id === currentRoundId);
                       if (round) {
                         handleAddQuestion(currentRoundId, question.id, round.questions.length);
                       }
@@ -651,7 +631,7 @@ export default function PackageEditor() {
                 >
                   <div>{getContentPreview(question.content)}</div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    Автор: {question.author?.username} •
+                    Автор: {question.author.username} •
                     Создан: {new Date(question.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -660,6 +640,66 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function QuestionItem({
+  question,
+  index,
+  roundId,
+  roundQuestionCount,
+  handleAutoSave,
+  form,
+  packageData,
+}: QuestionItemProps) {
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">
+            Вопрос {index + 1}
+          </h3>
+          {index >= roundQuestionCount && (
+            <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <Form {...form}>
+            <form className="space-y-3">
+              <FormItem>
+                <FormLabel>Содержание вопроса</FormLabel>
+                <WysiwygEditor
+                  content={question.content}
+                  onChange={(content) => handleAutoSave(question.id, { content })}
+                  className="min-h-[150px]"
+                />
+                <FormMessage />
+              </FormItem>
+              <FormField
+                control={form.control}
+                name="answer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ответ</FormLabel>
+                    <FormControl>
+                      <Input
+                        defaultValue={question.answer || ""}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          handleAutoSave(question.id, { answer: e.target.value });
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+        </div>
+      </div>
     </div>
   );
 }
