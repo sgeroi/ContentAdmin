@@ -2,27 +2,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, GripVertical } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
   Form,
   FormControl,
@@ -73,85 +56,63 @@ type PackageWithRounds = Package & {
   rounds: Round[];
 };
 
-interface SortableItemProps {
-  id: string;
-  children: React.ReactNode;
-}
+type QuestionFormData = {
+  content: any;
+  answer: string;
+};
 
-function SortableItem({ id, children }: SortableItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+type QuestionSearchFilters = {
+  query: string;
+};
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <div className="flex items-center gap-2">
-        <button className="p-1 hover:bg-accent rounded">
-          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-        </button>
-        {children}
-      </div>
-    </div>
-  );
+interface QuestionItemProps {
+  question: PackageQuestion;
+  index: number;
+  roundId: number;
+  roundQuestionCount: number;
+  handleAutoSave: (questionId: number, data: any) => void;
+  form: any;
+  packageData: PackageWithRounds;
 }
 
 function NavigationItem({
   round,
   activeQuestionId,
   onQuestionClick,
-  roundId,
 }: {
   round: Round;
   activeQuestionId: string | null;
   onQuestionClick: (id: string) => void;
-  roundId: string;
 }) {
   const [isOpen, setIsOpen] = useState(true);
-  const questionIds = round.questions.map((q) => `${round.id}-${q.id}`);
 
   return (
-    <SortableItem id={roundId}>
-      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
-        <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
-          <div className="flex items-center gap-2">
-            <ChevronRight className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")} />
-            <span>Раунд {round.orderIndex + 1}</span>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
+        <div className="flex items-center gap-2">
+          <ChevronRight className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")} />
+          <span>Раунд {round.orderIndex + 1}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">{round.questions.length} / {round.questionCount}</Badge>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pl-6 space-y-1">
+        {round.questions.map((question, index) => (
+          <div
+            key={question.id}
+            className={cn(
+              "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2",
+              activeQuestionId === `${round.id}-${question.id}` && "bg-accent"
+            )}
+            onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
+          >
+            <span className="text-muted-foreground">{index + 1}.</span>
+            <span className="truncate">{getContentPreview(question.content)}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">{round.questions.length} / {round.questionCount}</Badge>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pl-6 space-y-1">
-          <SortableContext items={questionIds} strategy={verticalListSortingStrategy}>
-            {round.questions.map((question, index) => (
-              <SortableItem key={`${round.id}-${question.id}`} id={`${round.id}-${question.id}`}>
-                <div
-                  className={cn(
-                    "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2 w-full",
-                    activeQuestionId === `${round.id}-${question.id}` && "bg-accent"
-                  )}
-                  onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
-                >
-                  <span className="text-muted-foreground">{index + 1}.</span>
-                  <span className="truncate">{getContentPreview(question.content)}</span>
-                </div>
-              </SortableItem>
-            ))}
-          </SortableContext>
-        </CollapsibleContent>
-      </Collapsible>
-    </SortableItem>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -890,106 +851,6 @@ export default function PackageEditor() {
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!active || !over || active.id === over.id) return;
-
-    const activeId = active.id.toString();
-    const overId = over.id.toString();
-
-    // Если перетаскиваем раунд
-    if (activeId.startsWith('round-')) {
-      const oldIndex = packageData!.rounds.findIndex(r => `round-${r.id}` === activeId);
-      const newIndex = packageData!.rounds.findIndex(r => `round-${r.id}` === overId);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newRounds = arrayMove(packageData!.rounds, oldIndex, newIndex);
-        setPackageData(prev => prev ? { ...prev, rounds: newRounds } : null);
-
-        try {
-          await fetch(`/api/packages/${params.id}/rounds/reorder`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              roundIds: newRounds.map((r, index) => ({ id: r.id, orderIndex: index })),
-            }),
-          });
-        } catch (error) {
-          toast({
-            title: 'Ошибка',
-            description: 'Не удалось обновить порядок раундов',
-            variant: 'destructive',
-          });
-        }
-      }
-    } else {
-      // Если перетаскиваем вопрос
-      const [activeRoundId, activeQuestionId] = activeId.split('-').map(Number);
-      const [overRoundId, overQuestionId] = overId.split('-').map(Number);
-
-      const sourceRound = packageData!.rounds.find(r => r.id === activeRoundId);
-      const targetRound = packageData!.rounds.find(r => r.id === overRoundId);
-
-      if (sourceRound && targetRound) {
-        const oldIndex = sourceRound.questions.findIndex(q => q.id === activeQuestionId);
-        const newIndex = targetRound.questions.findIndex(q => q.id === overQuestionId);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newRounds = [...packageData!.rounds];
-          const sourceRoundIndex = newRounds.findIndex(r => r.id === activeRoundId);
-          const targetRoundIndex = newRounds.findIndex(r => r.id === overRoundId);
-
-          if (activeRoundId === overRoundId) {
-            // Перемещение внутри одного раунда
-            newRounds[sourceRoundIndex].questions = arrayMove(
-              sourceRound.questions,
-              oldIndex,
-              newIndex
-            );
-          } else {
-            // Перемещение между раундами
-            const [movedQuestion] = newRounds[sourceRoundIndex].questions.splice(oldIndex, 1);
-            newRounds[targetRoundIndex].questions.splice(newIndex, 0, movedQuestion);
-          }
-
-          setPackageData(prev => prev ? { ...prev, rounds: newRounds } : null);
-
-          try {
-            await fetch(`/api/packages/${params.id}/questions/reorder`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                questionId: activeQuestionId,
-                sourceRoundId: activeRoundId,
-                targetRoundId: overRoundId,
-                newIndex,
-              }),
-            });
-          } catch (error) {
-            toast({
-              title: 'Ошибка',
-              description: 'Не удалось обновить порядок вопросов',
-              variant: 'destructive',
-            });
-          }
-        }
-      }
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1040,28 +901,16 @@ export default function PackageEditor() {
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
           <div className="h-full border-r flex flex-col container">
             <ScrollArea className="flex-1">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={packageData?.rounds.map(r => `round-${r.id}`) || []}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-4 py-4">
-                    {packageData?.rounds.map((round) => (
-                      <NavigationItem
-                        key={`round-${round.id}`}
-                        round={round}
-                        activeQuestionId={activeQuestionId}
-                        onQuestionClick={handleQuestionClick}
-                        roundId={`round-${round.id}`}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+              <div className="space-y-4 py-4">
+                {packageData.rounds.map((round) => (
+                  <NavigationItem
+                    key={round.id}
+                    round={round}
+                    activeQuestionId={activeQuestionId}
+                    onQuestionClick={handleQuestionClick}
+                  />
+                ))}
+              </div>
             </ScrollArea>
             <div className="py-4 border-t">
               <Button className="w-full" onClick={handleAddRound}>
@@ -1082,29 +931,26 @@ export default function PackageEditor() {
                     onSave={handleUpdateRound}
                   />
                   <div className="space-y-4">
-                    <SortableContext items={round.questions.map(q => `${round.id}-${q.id}`)} strategy={verticalListSortingStrategy}>
-                      {round.questions.map((question, index) => (
-                        <SortableItem key={`${round.id}-${question.id}`} id={`${round.id}-${question.id}`}>
-                          <div
-                            ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
-                            className={cn(
-                              "rounded-lg border bg-card p-4",
-                              activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
-                            )}
-                          >
-                            <QuestionItem
-                              question={question}
-                              index={index}
-                              roundId={round.id}
-                              roundQuestionCount={round.questionCount}
-                              handleAutoSave={handleAutoSave}
-                              form={form}
-                              packageData={packageData}
-                            />
-                          </div>
-                        </SortableItem>
-                      ))}
-                    </SortableContext>
+                    {round.questions.map((question, index) => (
+                      <div
+                        key={`${round.id}-${question.id}`}
+                        ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
+                        className={cn(
+                          "rounded-lg border bg-card p-4",
+                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                        )}
+                      >
+                        <QuestionItem
+                          question={question}
+                          index={index}
+                          roundId={round.id}
+                          roundQuestionCount={round.questionCount}
+                          handleAutoSave={handleAutoSave}
+                          form={form}
+                          packageData={packageData}
+                        />
+                      </div>
+                    ))}
                     {isCreatingQuestion && currentRoundId === round.id && (
                       <div className="rounded-lg border bg-card p-4">
                         <Form {...createQuestionForm}>
