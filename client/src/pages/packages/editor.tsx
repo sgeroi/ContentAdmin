@@ -44,26 +44,46 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import debounce from "lodash/debounce";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// ... [rest of the imports and types remain the same]
+type PackageQuestion = Question & {
+  author: { username: string; };
+};
+
+type Round = {
+  id: number;
+  name: string;
+  description: string;
+  questionCount: number;
+  questions: PackageQuestion[];
+  orderIndex: number;
+};
+
+type PackageWithRounds = Package & {
+  rounds: Round[];
+};
+
+type QuestionFormData = {
+  content: any;
+  answer: string;
+};
+
+type QuestionSearchFilters = {
+  query: string;
+};
+
+interface QuestionItemProps {
+  question: PackageQuestion;
+  index: number;
+  roundId: number;
+  roundQuestionCount: number;
+  handleAutoSave: (questionId: number, data: any) => void;
+  handleRemoveQuestion: (roundId: number, questionId: number) => void;
+  handleMoveQuestion: (fromRoundId: number, toRoundId: number, questionId: number) => void;
+  form: any;
+  packageData: PackageWithRounds;
+}
 
 function NavigationItem({ 
   round, 
@@ -111,6 +131,107 @@ function NavigationItem({
   );
 }
 
+function QuestionItem({
+  question,
+  index,
+  roundId,
+  roundQuestionCount,
+  handleAutoSave,
+  handleRemoveQuestion,
+  handleMoveQuestion,
+  form,
+  packageData,
+}: QuestionItemProps) {
+  return (
+    <div className="relative rounded-lg border bg-card p-4">
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">
+            Вопрос {index + 1}
+          </h3>
+          {index >= roundQuestionCount && (
+            <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <Form {...form}>
+            <form className="space-y-3">
+              <FormItem>
+                <FormLabel>Содержание вопроса</FormLabel>
+                <WysiwygEditor
+                  content={question.content}
+                  onChange={(content) => handleAutoSave(question.id, { content })}
+                  className="min-h-[150px]"
+                />
+                <FormMessage />
+              </FormItem>
+              <FormField
+                control={form.control}
+                name="answer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ответ</FormLabel>
+                    <FormControl>
+                      <Input
+                        defaultValue={question.answer || ""}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          handleAutoSave(question.id, { answer: e.target.value });
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+        </div>
+      </div>
+
+      <div className="absolute top-3 right-[-40px] flex flex-col gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleRemoveQuestion(roundId, question.id)}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoveVertical className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Переместить вопрос</DialogTitle>
+              <DialogDescription>
+                Выберите раунд, в который хотите переместить вопрос
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {packageData.rounds
+                .filter(r => r.id !== roundId)
+                .map((targetRound) => (
+                  <Button
+                    key={targetRound.id}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleMoveQuestion(roundId, targetRound.id, question.id)}
+                  >
+                    Раунд {targetRound.orderIndex + 1}: {targetRound.name}
+                  </Button>
+                ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+}
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -118,10 +239,9 @@ export default function PackageEditor() {
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [showNewQuestionForm, setShowNewQuestionForm] = useState<{roundId: number, index: number} | null>(null);
+  const [editingRound, setEditingRound] = useState<{ id: number, name: string, description: string } | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const [editingRound, setEditingRound] = useState<{ id: number, name: string, description: string } | null>(null);
 
   const form = useForm<QuestionFormData>({
     defaultValues: {
@@ -172,19 +292,33 @@ export default function PackageEditor() {
     fetchData();
   }, [params.id]);
 
-  const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
+  const handleUpdateRound = async (id: number, data: { name: string, description: string }) => {
     try {
-      const queryParams = new URLSearchParams();
-      if (filters.query) queryParams.append("q", filters.query);
+      const response = await fetch(`/api/rounds/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
 
-      const response = await fetch(`/api/questions?${queryParams}`, {
+      if (!response.ok) {
+        throw new Error('Failed to update round');
+      }
+
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: 'include'
       });
-      if (!response.ok) {
-        throw new Error('Failed to fetch questions');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setPackageData(updatedData);
+        setEditingRound(null);
+        toast({
+          title: "Успех",
+          description: "Раунд обновлен",
+        });
       }
-      const result = await response.json();
-      setAvailableQuestions(result.questions);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -194,9 +328,55 @@ export default function PackageEditor() {
     }
   };
 
-  const handleSearch = useCallback((data: QuestionSearchFilters) => {
-    fetchQuestions(data);
-  }, []);
+  const handleAddRound = async () => {
+    try {
+      const response = await fetch(`/api/packages/${params.id}/rounds`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: 'Новый раунд',
+          description: 'Описание раунда',
+          questionCount: 5,
+          orderIndex: packageData?.rounds.length || 0,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add round');
+      }
+
+      // Немедленно добавляем новый раунд
+      const newRound = await response.json();
+      setPackageData(prevData => {
+        if (!prevData) return null;
+        return {
+          ...prevData,
+          rounds: [...prevData.rounds, newRound]
+        };
+      });
+
+      // Сразу открываем диалог редактирования
+      setEditingRound({
+        id: newRound.id,
+        name: newRound.name,
+        description: newRound.description
+      });
+
+      toast({
+        title: "Успех",
+        description: "Раунд добавлен",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleAutoSave = useCallback(
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
@@ -325,142 +505,24 @@ export default function PackageEditor() {
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    if (!event.over || !packageData) return;
+  const handleSearch = useCallback((data: QuestionSearchFilters) => {
+    fetchQuestions(data);
+  }, []);
 
-    const { active, over } = event;
-
-    if (active.id !== over.id) {
-      const [activeRoundId, activeIndex] = active.id.toString().split('-');
-      const [overRoundId, overIndex] = over.id.toString().split('-');
-
-      const round = packageData.rounds.find(r => r.id === parseInt(activeRoundId));
-      if (!round || !round.questions) return;
-
-      if (activeRoundId === overRoundId) {
-        const oldIndex = parseInt(activeIndex);
-        const newIndex = parseInt(overIndex);
-
-        const updatedQuestions = [...round.questions];
-        const [movedItem] = updatedQuestions.splice(oldIndex, 1);
-        updatedQuestions.splice(newIndex, 0, movedItem);
-
-        try {
-          const response = await fetch(`/api/rounds/${activeRoundId}/questions/reorder`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              questionIds: updatedQuestions.map(q => q.id),
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to reorder questions');
-          }
-
-          const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-            credentials: 'include'
-          });
-          if (updatedResponse.ok) {
-            const updatedData = await updatedResponse.json();
-            setPackageData(updatedData);
-          }
-
-          toast({
-            title: "Успех",
-            description: "Порядок вопросов обновлен",
-          });
-        } catch (error: any) {
-          toast({
-            title: "Ошибка",
-            description: error.message,
-            variant: "destructive",
-          });
-        }
-      } else {
-        const question = round.questions[parseInt(activeIndex)];
-        handleMoveQuestion(parseInt(activeRoundId), parseInt(overRoundId), question.id);
-      }
-    }
-  };
-
-  const handleAddRound = async () => {
+  const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
     try {
-      const response = await fetch(`/api/packages/${params.id}/rounds`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: 'Новый раунд',
-          description: 'Описание раунда',
-          questionCount: 5,
-          orderIndex: packageData?.rounds.length || 0,
-        }),
-      });
+      const queryParams = new URLSearchParams();
+      if (filters.query) queryParams.append("q", filters.query);
 
-      if (!response.ok) {
-        throw new Error('Failed to add round');
-      }
-
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+      const response = await fetch(`/api/questions?${queryParams}`, {
         credentials: 'include'
       });
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
-        toast({
-          title: "Успех",
-          description: "Раунд добавлен",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateRound = async (id: number, data: { name: string, description: string }) => {
-    try {
-      const response = await fetch(`/api/rounds/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      });
-
       if (!response.ok) {
-        throw new Error('Failed to update round');
+        throw new Error('Failed to fetch questions');
       }
-
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: 'include'
-      });
-      if (updatedResponse.ok) {
-        const updatedData = await updatedResponse.json();
-        setPackageData(updatedData);
-        setEditingRound(null);
-        toast({
-          title: "Успех",
-          description: "Раунд обновлен",
-        });
-      }
+      const result = await response.json();
+      setAvailableQuestions(result.questions);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -541,7 +603,7 @@ export default function PackageEditor() {
         <ResizableHandle />
         <ResizablePanel defaultSize={75}>
           <ScrollArea className="h-full">
-            <div className="container py-6 space-y-8 pl-8">
+            <div className="container py-6 space-y-8 pl-12 pr-16">
               {packageData.rounds.map((round) => (
                 <div key={round.id} id={`round-${round.id}`} className="space-y-4">
                   <div className="sticky top-0 bg-background z-10 py-2 -mx-6 px-6 border-b">
@@ -552,40 +614,28 @@ export default function PackageEditor() {
                   </div>
 
                   <div className="space-y-4">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={round.questions?.map((q, index) => `${round.id}-${index}`) || []}
-                        strategy={verticalListSortingStrategy}
+                    {round.questions?.map((question, index) => (
+                      <div
+                        key={`${round.id}-${question.id}`}
+                        ref={el => questionRefs.current[`${round.id}-${question.id}`] = el}
+                        className={cn(
+                          "rounded-lg border bg-card",
+                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                        )}
                       >
-                        {round.questions?.map((question, index) => (
-                          <div
-                            key={`${round.id}-${question.id}`}
-                            ref={el => questionRefs.current[`${round.id}-${question.id}`] = el}
-                            className={cn(
-                              "rounded-lg border bg-card",
-                              activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
-                            )}
-                          >
-                            <QuestionItem
-                              id={`${round.id}-${index}`}
-                              question={question}
-                              index={index}
-                              roundId={round.id}
-                              roundQuestionCount={round.questionCount}
-                              handleAutoSave={handleAutoSave}
-                              handleRemoveQuestion={handleRemoveQuestion}
-                              handleMoveQuestion={handleMoveQuestion}
-                              form={form}
-                              packageData={packageData}
-                            />
-                          </div>
-                        ))}
-                      </SortableContext>
-                    </DndContext>
+                        <QuestionItem
+                          question={question}
+                          index={index}
+                          roundId={round.id}
+                          roundQuestionCount={round.questionCount}
+                          handleAutoSave={handleAutoSave}
+                          handleRemoveQuestion={handleRemoveQuestion}
+                          handleMoveQuestion={handleMoveQuestion}
+                          form={form}
+                          packageData={packageData}
+                        />
+                      </div>
+                    ))}
 
                     <Button
                       variant="outline"
@@ -612,60 +662,40 @@ export default function PackageEditor() {
             </DialogDescription>
           </DialogHeader>
           {editingRound && (
-            <form 
-              className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleUpdateRound(editingRound.id, {
-                  name: editingRound.name,
-                  description: editingRound.description,
-                });
-              }}
-            >
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="roundName">Название</Label>
                 <Input
                   id="roundName"
-                  type="text"
                   value={editingRound.name}
                   onChange={(e) => setEditingRound({ ...editingRound, name: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="roundDescription">Описание</Label>
                 <Textarea
                   id="roundDescription"
-                  rows={3}
                   value={editingRound.description}
                   onChange={(e) => setEditingRound({ ...editingRound, description: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditingRound(null)}>
                   Отмена
                 </Button>
-                <Button type="submit">
+                <Button onClick={() => handleUpdateRound(editingRound.id, {
+                  name: editingRound.name,
+                  description: editingRound.description,
+                })}>
                   Сохранить
                 </Button>
               </div>
-            </form>
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => setIsSearchDialogOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Добавить вопрос
-          </Button>
-        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Добавить вопрос</DialogTitle>
@@ -748,131 +778,4 @@ function getContentPreview(content: any): string {
     console.error('Error parsing content:', error);
     return 'Ошибка контента';
   }
-}
-
-function QuestionItem({
-  question,
-  index,
-  roundId,
-  roundQuestionCount,
-  handleAutoSave,
-  handleRemoveQuestion,
-  handleMoveQuestion,
-  form,
-  id,
-  packageData,
-}: QuestionItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    transition
-  } : undefined;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "relative rounded-lg border bg-card",
-        isDragging && "opacity-50",
-      )}
-    >
-      <div className="absolute left-[-30px] top-3 cursor-move" {...attributes} {...listeners}>
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-      </div>
-
-      <div className="p-3 space-y-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium">
-            Вопрос {index + 1}
-          </h3>
-          {index >= roundQuestionCount && (
-            <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <Form {...form}>
-            <form className="space-y-3">
-              <FormItem>
-                <FormLabel>Содержание вопроса</FormLabel>
-                <WysiwygEditor
-                  content={question.content}
-                  onChange={(content) => handleAutoSave(question.id, { content })}
-                  className="min-h-[150px]"
-                />
-                <FormMessage />
-              </FormItem>
-              <FormField
-                control={form.control}
-                name="answer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ответ</FormLabel>
-                    <FormControl>
-                      <Input
-                        defaultValue={question.answer || ""}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          handleAutoSave(question.id, { answer: e.target.value });
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </div>
-      </div>
-
-      <div className="absolute top-3 right-[-40px] flex flex-col gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleRemoveQuestion(roundId, question.id)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoveVertical className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Переместить вопрос</DialogTitle>
-              <DialogDescription>
-                Выберите раунд, в который хотите переместить вопрос
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              {packageData.rounds
-                .filter(r => r.id !== roundId)
-                .map((targetRound) => (
-                  <Button
-                    key={targetRound.id}
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => handleMoveQuestion(roundId, targetRound.id, question.id)}
-                  >
-                    Раунд {targetRound.orderIndex + 1}: {targetRound.name}
-                  </Button>
-                ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
-  );
 }
