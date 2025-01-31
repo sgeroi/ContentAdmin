@@ -202,14 +202,50 @@ export function registerRoutes(app: Express): Server {
   // Package management routes
   app.get("/api/packages", requireAuth, async (req, res) => {
     try {
+      console.log('Fetching packages');
       const result = await db.query.packages.findMany({
         with: {
           template: true,
-          rounds: true,
+          rounds: {
+            with: {
+              roundQuestions: {
+                with: {
+                  question: {
+                    with: {
+                      author: true,
+                      questionTags: {
+                        with: {
+                          tag: true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: asc(rounds.orderIndex)
+          }
         },
-        orderBy: desc(packages.createdAt),
+        author: {
+          columns: {
+            id: true,
+            username: true
+          }
+        },
+        orderBy: desc(packages.createdAt)
       });
-      res.json(result);
+
+      // Transform the data to match the expected format
+      const transformedResult = result.map(pkg => ({
+        ...pkg,
+        rounds: pkg.rounds.map(round => ({
+          ...round,
+          questions: round.roundQuestions?.map(rq => rq.question) || []
+        }))
+      }));
+
+      console.log('Packages fetched:', transformedResult);
+      res.json(transformedResult);
     } catch (error: any) {
       console.error('Error fetching packages:', error);
       res.status(500).json({ error: error.message });

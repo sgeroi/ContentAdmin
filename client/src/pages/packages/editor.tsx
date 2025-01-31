@@ -42,6 +42,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
+interface QuestionFormData {
+  content: any;
+  answer: string;
+}
+
+interface QuestionSearchFilters {
+  query: string;
+}
+
 type PackageQuestion = Question & {
   author: { username: string; };
 };
