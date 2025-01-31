@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, X, Database, Plus, ChevronRight, Search, Edit2 } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -38,7 +38,6 @@ import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
 
 type PackageQuestion = Question & {
   author: { username: string; };
@@ -80,12 +79,10 @@ function NavigationItem({
   round,
   activeQuestionId,
   onQuestionClick,
-  onEdit,
 }: {
   round: Round;
   activeQuestionId: string | null;
   onQuestionClick: (id: string) => void;
-  onEdit: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -94,13 +91,10 @@ function NavigationItem({
       <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
         <div className="flex items-center gap-2">
           <ChevronRight className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")} />
-          <span>Раунд {round.orderIndex + 1}: {round.name}</span>
+          <span>Раунд {round.orderIndex + 1}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{round.questions.length} / {round.questionCount}</Badge>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent className="pl-6 space-y-1">
@@ -126,10 +120,59 @@ function AutoSaveStatus({ saving }: { saving: boolean }) {
   return (
     <div className="fixed top-4 right-4 flex items-center gap-2 text-sm text-muted-foreground">
       <div className={cn(
-        "h-2 w-2 rounded-full",
+        "h-2 w-2 rounded-full transition-colors",
         saving ? "bg-yellow-500" : "bg-green-500"
       )} />
       {saving ? "Сохранение..." : "Все изменения сохранены"}
+    </div>
+  );
+}
+
+function RoundHeader({
+  round,
+  onSave,
+}: {
+  round: Round;
+  onSave: (id: number, data: { name: string; description: string }) => void;
+}) {
+  const [editMode, setEditMode] = useState(false);
+  const [name, setName] = useState(round.name);
+  const [description, setDescription] = useState(round.description);
+
+  const handleSave = useCallback(() => {
+    if (name !== round.name || description !== round.description) {
+      onSave(round.id, { name, description });
+    }
+  }, [name, description, round, onSave]);
+
+  // Сохраняем при изменении
+  useEffect(() => {
+    handleSave();
+  }, [name, description, handleSave]);
+
+  return (
+    <div className="sticky top-0 bg-background z-10 py-2 -mx-6 px-6 border-b">
+      {editMode ? (
+        <div className="space-y-2">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Название раунда"
+          />
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Описание раунда"
+          />
+        </div>
+      ) : (
+        <div className="space-y-1" onClick={() => setEditMode(true)}>
+          <h2 className="text-lg font-semibold">
+            Раунд {round.orderIndex + 1}: {name}
+          </h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -142,7 +185,6 @@ export default function PackageEditor() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [editingRound, setEditingRound] = useState<{ id: number; name: string; description: string } | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -196,7 +238,7 @@ export default function PackageEditor() {
     fetchData();
   }, [params.id]);
 
-  const handleUpdateRound = async (id: number, data: { name: string; description: string }) => {
+  const handleUpdateRound = useCallback(async (id: number, data: { name: string; description: string }) => {
     try {
       const response = await fetch(`/api/rounds/${id}`, {
         method: "PATCH",
@@ -215,14 +257,10 @@ export default function PackageEditor() {
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
+
       if (updatedResponse.ok) {
         const updatedData = await updatedResponse.json();
         setPackageData(updatedData);
-        setEditingRound(null);
-        toast({
-          title: "Успех",
-          description: "Раунд обновлен",
-        });
       }
     } catch (error: any) {
       toast({
@@ -231,32 +269,33 @@ export default function PackageEditor() {
         variant: "destructive",
       });
     }
-  };
+  }, [params.id, toast]);
 
   const handleAddRound = async () => {
     try {
       const orderIndex = packageData?.rounds.length || 0;
+
+      const roundData = {
+        name: "Новый раунд",
+        description: "Описание раунда",
+        questionCount: 5,
+        orderIndex,
+      };
+
       const response = await fetch(`/api/packages/${params.id}/rounds`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          name: "Новый раунд",
-          description: "Описание раунда",
-          questionCount: 5,
-          orderIndex,
-        }),
+        body: JSON.stringify(roundData),
       });
 
       if (!response.ok) {
         throw new Error("Failed to add round");
       }
 
-      const newRound = await response.json();
-
-      // Обновляем данные после успешного создания
+      // Обновляем список раундов
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
       });
@@ -267,16 +306,6 @@ export default function PackageEditor() {
 
       const updatedPackage = await updatedResponse.json();
       setPackageData(updatedPackage);
-
-      // Открываем диалог редактирования нового раунда
-      const lastRound = updatedPackage.rounds[updatedPackage.rounds.length - 1];
-      if (lastRound) {
-        setEditingRound({
-          id: lastRound.id,
-          name: lastRound.name,
-          description: lastRound.description,
-        });
-      }
 
       toast({
         title: "Успех",
@@ -307,6 +336,15 @@ export default function PackageEditor() {
         if (!response.ok) {
           throw new Error("Failed to save question");
         }
+
+        // Обновляем данные после успешного сохранения
+        const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+          credentials: "include",
+        });
+        if (updatedResponse.ok) {
+          const updatedData = await updatedResponse.json();
+          setPackageData(updatedData);
+        }
       } catch (error: any) {
         toast({
           title: "Ошибка автосохранения",
@@ -317,7 +355,7 @@ export default function PackageEditor() {
         setIsSaving(false);
       }
     }, 1000),
-    []
+    [params.id, toast]
   );
 
   const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
@@ -436,7 +474,7 @@ export default function PackageEditor() {
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="h-full border-r flex flex-col px-4">
+          <div className="h-full border-r flex flex-col container">
             <ScrollArea className="flex-1">
               <div className="space-y-4 py-4">
                 {packageData.rounds.map((round) => (
@@ -445,11 +483,6 @@ export default function PackageEditor() {
                     round={round}
                     activeQuestionId={activeQuestionId}
                     onQuestionClick={handleQuestionClick}
-                    onEdit={() => setEditingRound({
-                      id: round.id,
-                      name: round.name,
-                      description: round.description,
-                    })}
                   />
                 ))}
               </div>
@@ -468,20 +501,14 @@ export default function PackageEditor() {
             <div className="container py-6 space-y-8 pl-12 pr-16">
               {packageData.rounds.map((round) => (
                 <div key={round.id} id={`round-${round.id}`} className="space-y-4">
-                  <div className="sticky top-0 bg-background z-10 py-2 -mx-6 px-6 border-b">
-                    <h2 className="text-lg font-semibold">
-                      Раунд {round.orderIndex + 1}: {round.name}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">{round.description}</p>
-                  </div>
-
+                  <RoundHeader round={round} onSave={handleUpdateRound} />
                   <div className="space-y-4">
-                    {round.questions.map((question, index) => (
+                    {round.questions?.map((question, index) => (
                       <div
                         key={`${round.id}-${question.id}`}
                         ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
                         className={cn(
-                          "rounded-lg border bg-card",
+                          "rounded-lg border bg-card p-4",
                           activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
                         )}
                       >
@@ -515,76 +542,6 @@ export default function PackageEditor() {
           </ScrollArea>
         </ResizablePanel>
       </ResizablePanelGroup>
-
-      <Dialog open={editingRound !== null} onOpenChange={(open) => !open && setEditingRound(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактировать раунд</DialogTitle>
-            <DialogDescription>
-              Измените название и описание раунда
-            </DialogDescription>
-          </DialogHeader>
-          {editingRound && (
-            <Form {...form}>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleUpdateRound(editingRound.id, {
-                    name: editingRound.name,
-                    description: editingRound.description,
-                  });
-                }}
-                className="space-y-4"
-              >
-                <FormField
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Название</FormLabel>
-                      <FormControl>
-                        <Input
-                          value={editingRound.name}
-                          onChange={(e) =>
-                            setEditingRound((prev) =>
-                              prev ? { ...prev, name: e.target.value } : null
-                            )
-                          }
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Описание</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          value={editingRound.description}
-                          onChange={(e) =>
-                            setEditingRound((prev) =>
-                              prev ? { ...prev, description: e.target.value } : null
-                            )
-                          }
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setEditingRound(null)}>
-                    Отмена
-                  </Button>
-                  <Button type="submit">
-                    Сохранить
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
         <DialogContent>
@@ -654,51 +611,49 @@ function QuestionItem({
   packageData,
 }: QuestionItemProps) {
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium">
-            Вопрос {index + 1}
-          </h3>
-          {index >= roundQuestionCount && (
-            <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
-          )}
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-medium">
+          Вопрос {index + 1}
+        </h3>
+        {index >= roundQuestionCount && (
+          <Badge variant="secondary" className="text-xs">Дополнительный</Badge>
+        )}
+      </div>
 
-        <div className="space-y-3">
-          <Form {...form}>
-            <form className="space-y-3">
-              <FormItem>
-                <FormLabel>Содержание вопроса</FormLabel>
-                <WysiwygEditor
-                  content={question.content}
-                  onChange={(content) => handleAutoSave(question.id, { content })}
-                  className="min-h-[150px]"
-                />
-                <FormMessage />
-              </FormItem>
-              <FormField
-                control={form.control}
-                name="answer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ответ</FormLabel>
-                    <FormControl>
-                      <Input
-                        defaultValue={question.answer || ""}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          handleAutoSave(question.id, { answer: e.target.value });
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+      <div className="space-y-3">
+        <Form {...form}>
+          <form className="space-y-3">
+            <FormItem>
+              <FormLabel>Содержание вопроса</FormLabel>
+              <WysiwygEditor
+                content={question.content}
+                onChange={(content) => handleAutoSave(question.id, { content })}
+                className="min-h-[150px]"
               />
-            </form>
-          </Form>
-        </div>
+              <FormMessage />
+            </FormItem>
+            <FormField
+              control={form.control}
+              name="answer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ответ</FormLabel>
+                  <FormControl>
+                    <Input
+                      defaultValue={question.answer || ""}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handleAutoSave(question.id, { answer: e.target.value });
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
       </div>
     </div>
   );
