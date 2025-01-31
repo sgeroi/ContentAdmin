@@ -834,85 +834,89 @@ export default function PackageEditor() {
 
       <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
         <ResizablePanel defaultSize={25} minSize={15}>
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={[
-                    ...packageData.rounds.map(r => r.id),
-                    ...packageData.rounds.flatMap(round =>
-                      (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
-                    )
-                  ]}
-                  strategy={verticalListSortingStrategy}
+          <div className="sticky top-0 h-screen overflow-auto">
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-4">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  {packageData.rounds.map((round) => (
-                    <div key={round.id} className="space-y-1">
-                      <TreeItem
-                        id={round.id.toString()}
-                        depth={0}
-                        isFolder
-                        isExpanded={expandedRounds.has(round.id)}
-                        label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
-                        onToggle={() => toggleRound(round.id)}
-                        onClick={() => scrollToRound(round.id)}
-                      />
-                      {expandedRounds.has(round.id) && (
-                        <>
-                          {[...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
-                            const question = round.questions?.[index];
-                            const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
-                            const questionPreview = question ? getContentPreview(question.content) : undefined;
-                            return (
-                              <TreeItem
-                                key={`${round.id}-${index}`}
-                                id={`${round.id}-${index}`}
-                                depth={1}
-                                label={String(index + 1)}
-                                questionPreview={questionPreview}
-                                badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
-                                isActive={isActive}
-                                onClick={() => {
-                                  setActiveQuestion({ roundId: round.id, index });
-                                  scrollToQuestion(round.id, index);
-                                }}
-                              />
-                            );
-                          })}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start pl-8 text-muted-foreground"
-                            onClick={() => {
-                              const nextIndex = round.questions?.length || 0;
-                              setActiveQuestion({ roundId: round.id, index: nextIndex });
-                              scrollToQuestion(round.id, nextIndex);
-                            }}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Добавить вопрос
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-muted-foreground mt-4"
-                    onClick={() => setIsCreateRoundDialogOpen(true)}
+                  <SortableContext
+                    items={[
+                      ...packageData.rounds.map(r => r.id),
+                      ...packageData.rounds.flatMap(round =>
+                        (round.questions ?? []).map((_, index) => `${round.id}-${index}`)
+                      )
+                    ]}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Добавить раунд
-                  </Button>
-                </SortableContext>
-              </DndContext>
-            </div>
-          </ScrollArea>
+                    {packageData.rounds.map((round) => (
+                      <div key={round.id} className="space-y-1">
+                        <TreeItem
+                          id={round.id.toString()}
+                          depth={0}
+                          isFolder
+                          isExpanded={expandedRounds.has(round.id)}
+                          label={`Раунд ${round.orderIndex + 1}: ${round.name}`}
+                          onToggle={() => toggleRound(round.id)}
+                          onClick={() => scrollToRound(round.id)}
+                        />
+                        {expandedRounds.has(round.id) && (
+                          <>
+                            {[...Array(Math.max(round.questionCount || 0, (round.questions?.length || 0) + 1))].map((_, index) => {
+                              const question = round.questions?.[index];
+                              const isActive = activeQuestion?.roundId === round.id && activeQuestion?.index === index;
+                              const questionPreview = question ? getContentPreview(question.content) : undefined;
+                              return (
+                                <TreeItem
+                                  key={`${round.id}-${index}`}
+                                  id={`${round.id}-${index}`}
+                                  depth={1}
+                                  label={String(index + 1)}
+                                  questionPreview={questionPreview}
+                                  badge={index >= (round.questionCount || 0) ? "Доп" : undefined}
+                                  isActive={isActive}
+                                  onClick={() => {
+                                    setActiveQuestion({ roundId: round.id, index });
+                                    requestAnimationFrame(() => {
+                                      scrollToQuestion(round.id, index);
+                                    });
+                                  }}
+                                />
+                              );
+                            })}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start pl-8 text-muted-foreground"
+                              onClick={() => {
+                                const nextIndex = round.questions?.length || 0;
+                                setActiveQuestion({ roundId: round.id, index: nextIndex });
+                                scrollToQuestion(round.id, nextIndex);
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Добавить вопрос
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-muted-foreground mt-4"
+                      onClick={() => setIsCreateRoundDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Добавить раунд
+                    </Button>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </ScrollArea>
+          </div>
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={75}>
@@ -1011,8 +1015,9 @@ export default function PackageEditor() {
                                                 <Input
                                                   placeholder="Поиск по тексту..."
                                                   {...field}
-                 />
+                                                />
                                               </FormControl>
+                                              <FormMessage />
                                             </FormItem>
                                           )}
                                         />
@@ -1021,38 +1026,38 @@ export default function PackageEditor() {
                                           Поиск
                                         </Button>
                                       </div>
-                                    </form>
-                                  </Form>
-                                  <ScrollArea className="h-[400px]">
-                                    <div className="space-y-3">
-                                      {availableQuestions.map((q) => (
-                                        <div
-                                          key={q.id}
-                                          className="p-3 border rounded-lg cursor-pointer hover:bg-accent"
-                                          onClick={() => {
-                                            handleAddQuestion(round.id, q.id, index);
-                                            setIsSearchDialogOpen(false);
-                                          }}
-                                        >
-                                          <div className="text-sm">
-                                            {getContentPreview(q.content)}
-                                          </div>
-                                          <div className="text-sm text-muted-foreground mt-2">
-                                            Автор: {q.author?.username || "Неизвестен"} •
-                                            Создан: {new Date(q.createdAt).toLocaleDateString()}
-                                          </div>
+                                      <div className="py-4">
+                                        <div className="space-y-2">
+                                          {availableQuestions.map((q) => (
+                                            <div
+                                              key={q.id}
+                                              className="p-3 border rounded-lg cursor-pointer hover:bg-accent"
+                                              onClick={() => {
+                                                handleAddQuestion(round.id, q.id, index);
+                                                setIsSearchDialogOpen(false);
+                                              }}
+                                            >
+                                              <div className="text-sm">
+                                                {getContentPreview(q.content)}
+                                              </div>
+                                              <div className="text-sm text-muted-foreground mt-2">
+                                                Автор: {q.author?.username || "Неизвестен"} •
+                                                Создан: {new Date(q.createdAt).toLocaleDateString()}
+                                              </div>
+                                            </div>
+                                          ))}
                                         </div>
-                                      ))}
-                                    </div>
-                                  </ScrollArea>
-                                </DialogContent>
-                              </Dialog>
+                                      </div>
+                                    </Form>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1060,6 +1065,7 @@ export default function PackageEditor() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      {/* Диалог редактирования раунда */}
       <Dialog open={isEditRoundDialogOpen} onOpenChange={setIsEditRoundDialogOpen}>
         <DialogContent>
           <DialogHeader>
