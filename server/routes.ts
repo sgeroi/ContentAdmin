@@ -403,6 +403,75 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+  // Добавляем endpoint для изменения порядка раундов
+  app.put("/api/packages/:packageId/rounds/reorder", requireAuth, async (req, res) => {
+    try {
+      const { roundIds } = req.body;
+      const packageId = parseInt(req.params.packageId);
+
+      // Обновляем orderIndex для каждого раунда
+      for (const { id, orderIndex } of roundIds) {
+        await db
+          .update(rounds)
+          .set({ orderIndex })
+          .where(eq(rounds.id, id));
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error reordering rounds:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Добавляем endpoint для изменения порядка вопросов
+  app.put("/api/packages/:packageId/questions/reorder", requireAuth, async (req, res) => {
+    try {
+      const { questionId, sourceRoundId, targetRoundId, newIndex } = req.body;
+
+      // Если вопрос перемещается в другой раунд
+      if (sourceRoundId !== targetRoundId) {
+        // Удаляем вопрос из исходного раунда
+        await db
+          .delete(roundQuestions)
+          .where(
+            and(
+              eq(roundQuestions.roundId, sourceRoundId),
+              eq(roundQuestions.questionId, questionId)
+            )
+          );
+
+        // Добавляем вопрос в целевой раунд
+        await db
+          .insert(roundQuestions)
+          .values({
+            roundId: targetRoundId,
+            questionId,
+            orderIndex: newIndex,
+          });
+      }
+
+      // Обновляем orderIndex для всех вопросов в целевом раунде
+      const targetRoundQuestions = await db
+        .select()
+        .from(roundQuestions)
+        .where(eq(roundQuestions.roundId, targetRoundId))
+        .orderBy(asc(roundQuestions.orderIndex));
+
+      for (let i = 0; i < targetRoundQuestions.length; i++) {
+        await db
+          .update(roundQuestions)
+          .set({ orderIndex: i })
+          .where(eq(roundQuestions.id, targetRoundQuestions[i].id));
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error reordering questions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Upload image endpoint
   app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
     if (!req.file) {
