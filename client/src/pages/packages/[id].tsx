@@ -6,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, FileText, CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 
 type PackageQuestion = {
@@ -128,7 +127,7 @@ export default function PackageView() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <Link href="/packages">
@@ -177,9 +176,9 @@ export default function PackageView() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {packageData.rounds.map((round, roundIndex) => (
-          <Card key={round.id}>
+          <Card key={round.id} className="border-t-4 border-t-primary">
             <CardHeader>
               <CardTitle>
                 Раунд {roundIndex + 1}: {round.name}
@@ -189,48 +188,46 @@ export default function PackageView() {
               )}
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px] rounded-md border">
-                <div className="space-y-4 p-4">
-                  {round.questions.map((question, questionIndex) => (
-                    <div
-                      key={question.id}
-                      className="rounded-lg border p-4 space-y-2"
-                    >
-                      <div className="space-y-4">
-                        <div>
-                          <div className="font-medium text-lg">
-                            Вопрос {questionIndex + 1}
-                          </div>
-                          <div className="mt-2 whitespace-pre-wrap">
-                            <ContentRenderer content={question.content} />
-                          </div>
+              <div className="space-y-6">
+                {round.questions.map((question, questionIndex) => (
+                  <div
+                    key={question.id}
+                    className="rounded-lg border p-6 space-y-4 hover:bg-muted/50"
+                  >
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-lg font-semibold border-b pb-2">
+                          Вопрос {questionIndex + 1}
                         </div>
-                        <div>
-                          <div className="font-medium">Ответ:</div>
-                          <div className="text-muted-foreground">
-                            {question.answer}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge variant="outline">{question.topic}</Badge>
-                          <Badge className={difficultyColors[question.difficulty]}>
-                            Уровень {question.difficulty}
-                          </Badge>
-                          {question.isGenerated && (
-                            <Badge variant="secondary">AI</Badge>
-                          )}
-                          {question.factChecked && (
-                            <Badge variant="secondary">Проверено</Badge>
-                          )}
-                          <Badge variant="outline">
-                            Автор: {question.author.username}
-                          </Badge>
+                        <div className="mt-4 prose max-w-none">
+                          <ContentRenderer content={question.content} />
                         </div>
                       </div>
+                      <div>
+                        <div className="font-medium text-muted-foreground">Ответ:</div>
+                        <div className="mt-1">
+                          {question.answer}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Badge variant="outline">{question.topic}</Badge>
+                        <Badge className={difficultyColors[question.difficulty]}>
+                          Уровень {question.difficulty}
+                        </Badge>
+                        {question.isGenerated && (
+                          <Badge variant="secondary">AI</Badge>
+                        )}
+                        {question.factChecked && (
+                          <Badge variant="secondary">Проверено</Badge>
+                        )}
+                        <Badge variant="outline">
+                          Автор: {question.author.username}
+                        </Badge>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         ))}
