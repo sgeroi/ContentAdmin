@@ -280,25 +280,19 @@ export function registerRoutes(app: Express): Server {
     try {
       console.log('Updating package:', req.params.id, 'with data:', req.body);
 
-      const updateData = {
-        title: req.body.title,
-        description: req.body.description || "",
-        playDate: req.body.playDate ? new Date(req.body.playDate) : null,
-        authorId: req.body.authorId ? Number(req.body.authorId) : null,
-        templateId: req.body.templateId || null,
-        updatedAt: new Date(),
-      };
-
-      console.log('Update data prepared:', updateData);
-
       // Update the package
       const [pkg] = await db
         .update(packages)
-        .set(updateData)
+        .set({
+          title: req.body.title,
+          description: req.body.description || "",
+          playDate: req.body.playDate || null,
+          authorId: req.body.authorId || null,
+          templateId: req.body.templateId || null,
+          updatedAt: new Date(),
+        })
         .where(eq(packages.id, parseInt(req.params.id)))
         .returning();
-
-      console.log('Package updated:', pkg);
 
       // If manual rounds were provided, update them
       if (req.body.rounds && Array.isArray(req.body.rounds)) {
@@ -324,7 +318,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(packages.id, pkg.id),
         with: {
           template: true,
-          author: true,
+          author: true, // Include author data
           rounds: {
             with: {
               roundQuestions: {
@@ -752,7 +746,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-    app.put("/api/questions/:id", requireAuth, async (req, res) => {
+  app.put("/api/questions/:id", requireAuth, async (req, res) => {
     try {
       const [question] = await db
         .update(questions)
@@ -768,7 +762,7 @@ export function registerRoutes(app: Express): Server {
         data: question,
       });
     } catch (error: any) {
-       console.error('Error updating question:', error);
+      console.error('Error updating question:', error);
       res.status(500).json({
         error: error.message,
         details: error.toString()
@@ -856,7 +850,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-    app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
         .delete(rounds)
