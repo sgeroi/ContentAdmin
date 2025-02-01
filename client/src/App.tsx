@@ -18,6 +18,7 @@ import Users from "@/pages/users";
 import Rounds from "@/pages/rounds";
 import Templates from "@/pages/templates";
 import PackageView from "@/pages/packages/[id]";
+import Calendar from "@/pages/calendar";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -49,6 +50,7 @@ function Router() {
         <Route path="/packages" component={Packages} />
         <Route path="/packages/:id" component={PackageView} />
         <Route path="/packages/:id/edit" component={PackageEditor} />
+        <Route path="/calendar" component={Calendar} />
         <Route path="/tags" component={Tags} />
         <Route path="/rounds" component={Rounds} />
         <Route path="/templates" component={Templates} />

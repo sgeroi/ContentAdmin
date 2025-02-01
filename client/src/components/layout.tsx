@@ -9,6 +9,7 @@ import {
   Tag,
   Layers,
   CircuitBoard,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/use-user";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Раунды", href: "/rounds", icon: CircuitBoard },
   { name: "Шаблоны", href: "/templates", icon: Layers },
   { name: "Пакеты", href: "/packages", icon: Package },
+  { name: "Календарь", href: "/calendar", icon: Calendar },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
