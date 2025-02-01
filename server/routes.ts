@@ -205,7 +205,20 @@ export function registerRoutes(app: Express): Server {
       const result = await db.query.packages.findMany({
         with: {
           template: true,
-          rounds: true,
+          author: true,
+          rounds: {
+            with: {
+              roundQuestions: {
+                with: {
+                  question: {
+                    with: {
+                      author: true,
+                    }
+                  }
+                }
+              }
+            }
+          },
         },
         orderBy: desc(packages.createdAt),
       });

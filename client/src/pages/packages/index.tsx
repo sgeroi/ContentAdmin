@@ -29,12 +29,32 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, FileText, Eye } from "lucide-react";
+import { Plus, Trash2, FileText, Eye, CalendarIcon } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import type { Package } from "@db/schema";
+import { format } from "date-fns";
+
+const getPackageStatus = (pkg: Package) => {
+  if (!pkg.rounds?.length) return { label: "Новый", color: "bg-blue-500" };
+
+  const hasQuestions = pkg.rounds.some(r => r.questions?.length > 0);
+  if (!hasQuestions) return { label: "Новый", color: "bg-blue-500" };
+
+  const allQuestionsFactChecked = pkg.rounds.every(r => 
+    r.questions?.every(q => q.factChecked)
+  );
+  if (allQuestionsFactChecked) return { label: "Готов", color: "bg-green-500" };
+
+  const hasFactCheckedQuestions = pkg.rounds.some(r => 
+    r.questions?.some(q => q.factChecked)
+  );
+  if (hasFactCheckedQuestions) return { label: "Факт-чек", color: "bg-yellow-500" };
+
+  return { label: "Редактура", color: "bg-orange-500" };
+};
 
 type Round = {
   id?: number;
@@ -136,7 +156,6 @@ export default function Packages() {
   const handleEditClick = (id: number) => {
     setLocation(`/packages/${id}/edit`);
   };
-
 
   return (
     <div className="space-y-6">
@@ -310,53 +329,77 @@ export default function Packages() {
             <TableRow>
               <TableHead>Название</TableHead>
               <TableHead>Описание</TableHead>
+              <TableHead>Дата игры</TableHead>
+              <TableHead>Автор</TableHead>
+              <TableHead>Статус</TableHead>
               <TableHead>Шаблон</TableHead>
               <TableHead>Создан</TableHead>
               <TableHead className="w-[200px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {packages.map((pkg) => (
-              <TableRow key={pkg.id}>
-                <TableCell className="font-medium">{pkg.title}</TableCell>
-                <TableCell>{pkg.description}</TableCell>
-                <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
-                <TableCell>{new Date(pkg.createdAt).toLocaleDateString()}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewClick(pkg.id)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Просмотр
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(pkg.id);
-                      }}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Редактировать
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deletePackage(pkg.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {packages.map((pkg) => {
+              const status = getPackageStatus(pkg);
+              return (
+                <TableRow key={pkg.id}>
+                  <TableCell className="font-medium">{pkg.title}</TableCell>
+                  <TableCell>{pkg.description}</TableCell>
+                  <TableCell>
+                    {pkg.playDate ? (
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        {format(new Date(pkg.playDate), "dd.MM.yyyy")}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {pkg.author?.username || "-"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={status.color}>
+                      {status.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
+                  <TableCell>{format(new Date(pkg.createdAt), "dd.MM.yyyy")}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewClick(pkg.id)}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Просмотр
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(pkg.id);
+                        }}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Редактировать
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deletePackage(pkg.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
