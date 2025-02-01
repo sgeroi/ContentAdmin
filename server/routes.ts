@@ -318,7 +318,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(packages.id, pkg.id),
         with: {
           template: true,
-          author: true, // Include author data
+          author: true,
           rounds: {
             with: {
               roundQuestions: {

@@ -413,7 +413,7 @@ function PackageHeader({
       await onSave({
         title,
         description,
-        playDate: playDate ? playDate.toISOString() : undefined,
+        playDate: playDate?.toISOString(),
         authorId,
       });
       setEditMode(false);
@@ -1006,7 +1006,7 @@ export default function PackageEditor() {
 
   const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
     try {
-      const response = await fetch('/api/questions/generate', {
+      const response= await fetch('/api/questions/generate', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

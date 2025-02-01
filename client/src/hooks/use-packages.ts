@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Package, InsertPackage, Question } from "@db/schema";
+import type { Package, InsertPackage } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 
 type CreatePackageData = Omit<InsertPackage, "authorId">;
