@@ -479,13 +479,13 @@ export default function Packages() {
 
       {/* Filters */}
       <div className="flex gap-4 items-center">
-        <div className="flex-1">
+        <div className="flex-1 relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Поиск по названию, описанию или автору..."
             value={filters.search}
             onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
-            className="max-w-sm"
-            leftIcon={<Search className="h-4 w-4" />}
+            className="pl-9"
           />
         </div>
         <Select
@@ -496,7 +496,7 @@ export default function Packages() {
             <SelectValue placeholder="Статус" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Все статусы</SelectItem>
+            <SelectItem value="all">Все статусы</SelectItem>
             <SelectItem value="Новый">Новый</SelectItem>
             <SelectItem value="Редактура">Редактура</SelectItem>
             <SelectItem value="Факт-чек">Факт-чек</SelectItem>
