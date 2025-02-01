@@ -1006,49 +1006,47 @@ export default function PackageEditor() {
   };
 
   const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
+    if (!currentRoundId) {
+      toast({
+        title: "Ошибка",
+        description: "Выберите раунд для добавления вопросов",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      const response= await fetch('/api/questions/generate', {
+      const response = await fetch("/api/questions/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({ 
+          prompt: data.prompt,
+          count: data.count
+        }),
       });
 
-      console.log('Generate questions response status:', response.status);
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error(`Invalid server response: ${responseText}`);
-      }
-
       if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to generate questions: ${response.statusText}`);
+        throw new Error(await response.text());
       }
 
-      // Add all generated questions to the current round
-      if (currentRoundId) {
+      const generatedQuestions = await response.json();
+
+      // Add each generated question to the current round
+      for (const question of generatedQuestions) {
         const round = packageData?.rounds.find((r) => r.id === currentRoundId);
         if (round) {
-          let position = round.questions?.length || 0;
-          for (const question of responseData.data) {
-            await handleAddQuestion(currentRoundId, question.id, position++);
-          }
+          await handleAddQuestion(currentRoundId, question.id, round.questions?.length || 0);
         }
       }
 
       setIsGenerateQuestionsDialogOpen(false);
       toast({
         title: "Успех",
-        description: `Сгенерировано ${responseData.data.length} вопросов`,
+        description: `Сгенерировано ${generatedQuestions.length} новых вопросов`
       });
     } catch (error: any) {
       console.error('Error generating questions:', error);
@@ -1269,7 +1267,7 @@ export default function PackageEditor() {
                                 </FormItem>
                               )}
                             />
-                            <FormField
+                             <FormField
                               control={createQuestionForm.control}
                               name="difficulty"
                               render={({ field }) => (
