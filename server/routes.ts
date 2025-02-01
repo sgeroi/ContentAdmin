@@ -284,7 +284,7 @@ export function registerRoutes(app: Express): Server {
         title: req.body.title,
         description: req.body.description || "",
         playDate: req.body.playDate ? new Date(req.body.playDate) : null,
-        authorId: req.body.authorId || null,
+        authorId: req.body.authorId ? Number(req.body.authorId) : null,
         templateId: req.body.templateId || null,
         updatedAt: new Date(),
       };
@@ -297,6 +297,8 @@ export function registerRoutes(app: Express): Server {
         .set(updateData)
         .where(eq(packages.id, parseInt(req.params.id)))
         .returning();
+
+      console.log('Package updated:', pkg);
 
       // If manual rounds were provided, update them
       if (req.body.rounds && Array.isArray(req.body.rounds)) {
@@ -750,7 +752,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/questions/:id", requireAuth, async (req, res) => {
+    app.put("/api/questions/:id", requireAuth, async (req, res) => {
     try {
       const [question] = await db
         .update(questions)
@@ -766,7 +768,7 @@ export function registerRoutes(app: Express): Server {
         data: question,
       });
     } catch (error: any) {
-      console.error('Error updating question:', error);
+       console.error('Error updating question:', error);
       res.status(500).json({
         error: error.message,
         details: error.toString()
@@ -853,7 +855,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-
     app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
