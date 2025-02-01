@@ -18,7 +18,10 @@ export function usePackages() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(pkg),
+        body: JSON.stringify({
+          ...pkg,
+          playDate: pkg.playDate ? new Date(pkg.playDate).toISOString() : null,
+        }),
       });
 
       if (!response.ok) {
@@ -52,7 +55,10 @@ export function usePackages() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(pkg),
+        body: JSON.stringify({
+          ...pkg,
+          playDate: pkg.playDate ? new Date(pkg.playDate).toISOString() : null,
+        }),
       });
 
       if (!response.ok) {

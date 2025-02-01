@@ -29,13 +29,14 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, FileText, Eye, CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { Plus, Trash2, FileText, Eye, CalendarIcon, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import type { Package } from "@db/schema";
 import { format } from "date-fns";
+import { useUser } from "@/hooks/use-user";
 
 const getPackageStatus = (pkg: Package) => {
   if (!pkg.rounds?.length) return { label: "Новый", color: "bg-blue-500" };
@@ -71,10 +72,18 @@ type CreatePackageData = {
   rounds: Round[];
 };
 
+type PackageFilters = {
+  search: string;
+  status: string;
+  sortBy: 'date' | 'title' | 'status';
+  sortOrder: 'asc' | 'desc';
+}
+
 export default function Packages() {
   const { packages, createPackage, updatePackage, deletePackage } = usePackages();
   const { templates } = useTemplates();
   const { toast } = useToast();
+  const { user } = useUser();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -82,6 +91,12 @@ export default function Packages() {
   const [manualRounds, setManualRounds] = useState<Round[]>([]);
   const [createMode, setCreateMode] = useState<"template" | "manual">("template");
   const [, setLocation] = useLocation();
+  const [filters, setFilters] = useState<PackageFilters>({
+    search: '',
+    status: '',
+    sortBy: 'date',
+    sortOrder: 'desc'
+  });
 
   const resetForm = () => {
     setTitle("");
@@ -90,6 +105,49 @@ export default function Packages() {
     setManualRounds([]);
     setCreateMode("template");
   };
+
+  const filteredAndSortedPackages = useMemo(() => {
+    let result = [...packages];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      result = result.filter(pkg => 
+        pkg.title.toLowerCase().includes(searchLower) ||
+        pkg.description?.toLowerCase().includes(searchLower) ||
+        pkg.author?.username.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status) {
+      result = result.filter(pkg => getPackageStatus(pkg).label === filters.status);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let compareValue = 0;
+      switch (filters.sortBy) {
+        case 'date':
+          compareValue = new Date(b.playDate || b.createdAt).getTime() - 
+                        new Date(a.playDate || a.createdAt).getTime();
+          break;
+        case 'title':
+          compareValue = a.title.localeCompare(b.title);
+          break;
+        case 'status':
+          compareValue = getPackageStatus(a).label.localeCompare(getPackageStatus(b).label);
+          break;
+      }
+      return filters.sortOrder === 'desc' ? compareValue : -compareValue;
+    });
+
+    return result;
+  }, [packages, filters]);
+
+  const myPackages = useMemo(() => {
+    return packages.filter(pkg => pkg.authorId === user?.id);
+  }, [packages, user]);
 
   const handleSave = async () => {
     if (!title) {
@@ -149,13 +207,109 @@ export default function Packages() {
     setManualRounds(manualRounds.filter((_, i) => i !== index));
   };
 
-  const handleViewClick = (id: number) => {
-    setLocation(`/packages/${id}`);
-  };
-
   const handleEditClick = (id: number) => {
     setLocation(`/packages/${id}/edit`);
   };
+
+  const PackageTable = ({ data }: { data: Package[] }) => (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Название</TableHead>
+            <TableHead>Описание</TableHead>
+            <TableHead>
+              <div 
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setFilters(f => ({ 
+                  ...f, 
+                  sortBy: 'date',
+                  sortOrder: f.sortBy === 'date' ? (f.sortOrder === 'asc' ? 'desc' : 'asc') : 'desc'
+                }))}
+              >
+                Дата игры
+                {filters.sortBy === 'date' && (
+                  <span className="text-xs">
+                    {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </div>
+            </TableHead>
+            <TableHead>Автор</TableHead>
+            <TableHead>
+              <div 
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setFilters(f => ({ 
+                  ...f, 
+                  sortBy: 'status',
+                  sortOrder: f.sortBy === 'status' ? (f.sortOrder === 'asc' ? 'desc' : 'asc') : 'desc'
+                }))}
+              >
+                Статус
+                {filters.sortBy === 'status' && (
+                  <span className="text-xs">
+                    {filters.sortOrder === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </div>
+            </TableHead>
+            <TableHead>Шаблон</TableHead>
+            <TableHead>Создан</TableHead>
+            <TableHead className="w-[100px]">Действия</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((pkg) => {
+            const status = getPackageStatus(pkg);
+            return (
+              <TableRow 
+                key={pkg.id} 
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => handleEditClick(pkg.id)}
+              >
+                <TableCell className="font-medium">{pkg.title}</TableCell>
+                <TableCell>{pkg.description}</TableCell>
+                <TableCell>
+                  {pkg.playDate ? (
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      {format(new Date(pkg.playDate), "dd.MM.yyyy")}
+                    </div>
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+                <TableCell>
+                  {pkg.author?.username || "-"}
+                </TableCell>
+                <TableCell>
+                  <Badge className={status.color}>
+                    {status.label}
+                  </Badge>
+                </TableCell>
+                <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
+                <TableCell>{format(new Date(pkg.createdAt), "dd.MM.yyyy")}</TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deletePackage(pkg.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -323,85 +477,46 @@ export default function Packages() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Название</TableHead>
-              <TableHead>Описание</TableHead>
-              <TableHead>Дата игры</TableHead>
-              <TableHead>Автор</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>Шаблон</TableHead>
-              <TableHead>Создан</TableHead>
-              <TableHead className="w-[200px]">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {packages.map((pkg) => {
-              const status = getPackageStatus(pkg);
-              return (
-                <TableRow key={pkg.id}>
-                  <TableCell className="font-medium">{pkg.title}</TableCell>
-                  <TableCell>{pkg.description}</TableCell>
-                  <TableCell>
-                    {pkg.playDate ? (
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        {format(new Date(pkg.playDate), "dd.MM.yyyy")}
-                      </div>
-                    ) : (
-                      "-"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {pkg.author?.username || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={status.color}>
-                      {status.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
-                  <TableCell>{format(new Date(pkg.createdAt), "dd.MM.yyyy")}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewClick(pkg.id)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Просмотр
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditClick(pkg.id);
-                        }}
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Редактировать
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deletePackage(pkg.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+      {/* Filters */}
+      <div className="flex gap-4 items-center">
+        <div className="flex-1">
+          <Input
+            placeholder="Поиск по названию, описанию или автору..."
+            value={filters.search}
+            onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+            className="max-w-sm"
+            leftIcon={<Search className="h-4 w-4" />}
+          />
+        </div>
+        <Select
+          value={filters.status}
+          onValueChange={(value) => setFilters(f => ({ ...f, status: value }))}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Статус" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Все статусы</SelectItem>
+            <SelectItem value="Новый">Новый</SelectItem>
+            <SelectItem value="Редактура">Редактура</SelectItem>
+            <SelectItem value="Факт-чек">Факт-чек</SelectItem>
+            <SelectItem value="Готов">Готов</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* My Packages */}
+      {myPackages.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Мои пакеты</h2>
+          <PackageTable data={myPackages} />
+        </div>
+      )}
+
+      {/* All Packages */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Все пакеты</h2>
+        <PackageTable data={filteredAndSortedPackages} />
       </div>
     </div>
   );
