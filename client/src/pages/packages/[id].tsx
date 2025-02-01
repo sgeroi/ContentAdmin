@@ -42,29 +42,47 @@ const difficultyColors: Record<number, string> = {
   5: "bg-red-500",
 };
 
-function getContentPreview(content: any): string {
+function ContentRenderer({ content }: { content: any }) {
   try {
-    if (content?.content) {
-      let preview = '';
-      const extractText = (nodes: any[]): string => {
-        let text = '';
-        for (const node of nodes) {
-          if (node.text) {
-            text += node.text + ' ';
-          }
-          if (node.content) {
-            text += extractText(node.content);
-          }
-        }
-        return text;
-      };
-      preview = extractText(content.content);
-      return preview;
+    if (!content?.content) {
+      return <div>Нет содержания</div>;
     }
-    return 'Нет содержания';
+
+    const renderNode = (node: any) => {
+      if (node.type === 'image') {
+        return (
+          <img 
+            key={node.attrs?.src} 
+            src={node.attrs?.src} 
+            alt={node.attrs?.alt || ''} 
+            className="max-w-full my-4 rounded-lg"
+          />
+        );
+      }
+
+      if (node.text) {
+        return node.text;
+      }
+
+      if (node.content) {
+        return node.content.map((child: any, index: number) => (
+          <span key={index}>{renderNode(child)}</span>
+        ));
+      }
+
+      return null;
+    };
+
+    return (
+      <div>
+        {content.content.map((node: any, index: number) => (
+          <div key={index}>{renderNode(node)}</div>
+        ))}
+      </div>
+    );
   } catch (error) {
-    console.error('Error parsing content:', error);
-    return 'Ошибка контента';
+    console.error('Error rendering content:', error);
+    return <div>Ошибка отображения контента</div>;
   }
 }
 
@@ -184,7 +202,7 @@ export default function PackageView() {
                             Вопрос {questionIndex + 1}
                           </div>
                           <div className="mt-2 whitespace-pre-wrap">
-                            {getContentPreview(question.content)}
+                            <ContentRenderer content={question.content} />
                           </div>
                         </div>
                         <div>
