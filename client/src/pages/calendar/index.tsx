@@ -90,54 +90,52 @@ export default function CalendarPage() {
           />
         </div>
 
-        {selectedDate && (
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                {format(selectedDate, "d MMMM yyyy", { locale: ru })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {getPackagesForDate(selectedDate).map((pkg: any) => {
-                  const status = getPackageStatus(pkg);
-                  return (
-                    <div
-                      key={pkg.id}
-                      className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleViewPackage(pkg.id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-medium">{pkg.title}</h3>
-                          {pkg.description && (
-                            <p className="text-muted-foreground text-sm mt-1">
-                              {pkg.description}
-                            </p>
-                          )}
-                          <div className="flex gap-2 mt-2">
-                            <Badge variant="outline">
-                              Автор: {pkg.author?.username || "Не указан"}
-                            </Badge>
-                            <Badge className={status.color}>
-                              {status.label}
-                            </Badge>
-                          </div>
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              {format(selectedDate || new Date(), "d MMMM yyyy", { locale: ru })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {getPackagesForDate(selectedDate || new Date()).map((pkg: any) => {
+                const status = getPackageStatus(pkg);
+                return (
+                  <div
+                    key={pkg.id}
+                    className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                    onClick={() => handleViewPackage(pkg.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-medium">{pkg.title}</h3>
+                        {pkg.description && (
+                          <p className="text-muted-foreground text-sm mt-1">
+                            {pkg.description}
+                          </p>
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <Badge variant="outline">
+                            Автор: {pkg.author?.username || "Не указан"}
+                          </Badge>
+                          <Badge className={status.color}>
+                            {status.label}
+                          </Badge>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-                {getPackagesForDate(selectedDate).length === 0 && (
-                  <p className="text-muted-foreground">
-                    Нет запланированных пакетов на этот день
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  </div>
+                );
+              })}
+              {getPackagesForDate(selectedDate || new Date()).length === 0 && (
+                <p className="text-muted-foreground">
+                  Нет запланированных пакетов на этот день
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
