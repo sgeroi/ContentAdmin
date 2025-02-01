@@ -280,13 +280,12 @@ export function registerRoutes(app: Express): Server {
     try {
       console.log('Updating package:', req.params.id, 'with data:', req.body);
 
-      // Update the package
       const [pkg] = await db
         .update(packages)
         .set({
           title: req.body.title,
           description: req.body.description || "",
-          playDate: req.body.playDate || null,
+          playDate: req.body.playDate ? new Date(req.body.playDate) : null,
           authorId: req.body.authorId || null,
           templateId: req.body.templateId || null,
           updatedAt: new Date(),

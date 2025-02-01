@@ -413,7 +413,7 @@ function PackageHeader({
       await onSave({
         title,
         description,
-        playDate: playDate?.toISOString(),
+        playDate: playDate ? new Date(playDate).toISOString() : null,
         authorId,
       });
       setEditMode(false);
@@ -422,6 +422,7 @@ function PackageHeader({
         description: "Пакет обновлен",
       });
     } catch (error: any) {
+      console.error('Error saving package:', error);
       toast({
         title: "Ошибка",
         description: error.message,
