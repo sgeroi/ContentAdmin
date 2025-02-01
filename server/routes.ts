@@ -855,6 +855,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+
     app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
