@@ -3,10 +3,11 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Edit, FileText } from "lucide-react";
+import { ChevronLeft, Edit, FileText, CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
 
 type PackageQuestion = {
   id: number;
@@ -16,12 +17,15 @@ type PackageQuestion = {
   author: { username: string };
   isGenerated: boolean;
   factChecked: boolean;
+  answer: string;
 };
 
 type PackageWithQuestions = {
   id: number;
   title: string;
   description: string;
+  playDate: string | null;
+  author: { username: string } | null;
   rounds: Array<{
     id: number;
     name: string;
@@ -46,7 +50,7 @@ function getContentPreview(content: any): string {
         let text = '';
         for (const node of nodes) {
           if (node.text) {
-            text += node.text;
+            text += node.text + ' ';
           }
           if (node.content) {
             text += extractText(node.content);
@@ -55,7 +59,7 @@ function getContentPreview(content: any): string {
         return text;
       };
       preview = extractText(content.content);
-      return preview.length > 100 ? preview.slice(0, 100) + '...' : preview;
+      return preview;
     }
     return 'Нет содержания';
   } catch (error) {
@@ -106,7 +110,7 @@ export default function PackageView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <Link href="/packages">
@@ -119,12 +123,25 @@ export default function PackageView() {
           {packageData.description && (
             <p className="text-muted-foreground">{packageData.description}</p>
           )}
+          <div className="flex gap-2 mt-2">
+            {packageData.playDate && (
+              <Badge variant="secondary">
+                <CalendarIcon className="h-4 w-4 mr-1" />
+                {format(new Date(packageData.playDate), "PP")}
+              </Badge>
+            )}
+            {packageData.author && (
+              <Badge variant="outline">
+                Автор: {packageData.author.username}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <Link href={`/packages/${params.id}/edit`}>
             <Button variant="default">
               <Edit className="mr-2 h-4 w-4" />
-              Редактировать вопросы
+              Редактировать
             </Button>
           </Link>
           <Button
@@ -156,39 +173,41 @@ export default function PackageView() {
             <CardContent>
               <ScrollArea className="h-[400px] rounded-md border">
                 <div className="space-y-4 p-4">
-                  {round.questions.map((question) => (
+                  {round.questions.map((question, questionIndex) => (
                     <div
                       key={question.id}
                       className="rounded-lg border p-4 space-y-2"
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="space-y-1">
-                            <div className="font-medium">
-                              {getContentPreview(question.content)}
-                            </div>
-                            <div className="flex gap-2">
-                              <Badge variant="outline">{question.topic}</Badge>
-                              <Badge className={difficultyColors[question.difficulty]}>
-                                Уровень {question.difficulty}
-                              </Badge>
-                              {question.isGenerated && (
-                                <Badge variant="secondary">AI</Badge>
-                              )}
-                              {question.factChecked && (
-                                <Badge variant="secondary">Проверено</Badge>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Автор: {question.author.username}
-                            </div>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="font-medium text-lg">
+                            Вопрос {questionIndex + 1}
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap">
+                            {getContentPreview(question.content)}
                           </div>
                         </div>
-                        <Link href={`/questions/${question.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        <div>
+                          <div className="font-medium">Ответ:</div>
+                          <div className="text-muted-foreground">
+                            {question.answer}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge variant="outline">{question.topic}</Badge>
+                          <Badge className={difficultyColors[question.difficulty]}>
+                            Уровень {question.difficulty}
+                          </Badge>
+                          {question.isGenerated && (
+                            <Badge variant="secondary">AI</Badge>
+                          )}
+                          {question.factChecked && (
+                            <Badge variant="secondary">Проверено</Badge>
+                          )}
+                          <Badge variant="outline">
+                            Автор: {question.author.username}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   ))}

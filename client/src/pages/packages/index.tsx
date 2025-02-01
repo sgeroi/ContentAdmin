@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, FileText } from "lucide-react";
+import { Plus, Trash2, FileText, Eye } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -129,9 +129,14 @@ export default function Packages() {
     setManualRounds(manualRounds.filter((_, i) => i !== index));
   };
 
-  const handleRowClick = (id: number) => {
+  const handleViewClick = (id: number) => {
+    setLocation(`/packages/${id}`);
+  };
+
+  const handleEditClick = (id: number) => {
     setLocation(`/packages/${id}/edit`);
   };
+
 
   return (
     <div className="space-y-6">
@@ -307,16 +312,12 @@ export default function Packages() {
               <TableHead>Описание</TableHead>
               <TableHead>Шаблон</TableHead>
               <TableHead>Создан</TableHead>
-              <TableHead className="w-[120px]">Действия</TableHead>
+              <TableHead className="w-[200px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {packages.map((pkg) => (
-              <TableRow
-                key={pkg.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => handleRowClick(pkg.id)}
-              >
+              <TableRow key={pkg.id}>
                 <TableCell className="font-medium">{pkg.title}</TableCell>
                 <TableCell>{pkg.description}</TableCell>
                 <TableCell>{pkg.template?.name || "Пользовательский пакет"}</TableCell>
@@ -326,16 +327,21 @@ export default function Packages() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleViewClick(pkg.id)}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Просмотр
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        toast({
-                          title: "Скоро",
-                          description: "Функция скачивания PDF будет доступна в ближайшее время",
-                        });
+                        handleEditClick(pkg.id);
                       }}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      PDF
+                      Редактировать
                     </Button>
                     <Button
                       variant="ghost"
@@ -346,7 +352,6 @@ export default function Packages() {
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Удалить
                     </Button>
                   </div>
                 </TableCell>
