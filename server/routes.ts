@@ -500,6 +500,15 @@ export function registerRoutes(app: Express): Server {
             with: {
               tag: true
             }
+          },
+          roundQuestions: {
+            with: {
+              round: {
+                with: {
+                  package: true
+                }
+              }
+            }
           }
         },
         orderBy: desc(questions.createdAt),

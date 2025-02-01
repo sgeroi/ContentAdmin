@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuestions } from "@/hooks/use-questions";
 import { Link, useLocation } from "wouter";
-import { Edit, Trash2, Plus, CheckCircle2, Wand2, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit, Trash2, Plus, CheckCircle2, Wand2, Sparkles, ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -107,6 +107,7 @@ export default function Questions() {
             <TableRow>
               <TableHead>Содержание</TableHead>
               <TableHead>Тема</TableHead>
+              <TableHead>Пакет</TableHead>
               <TableHead>Сложность</TableHead>
               <TableHead>Автор</TableHead>
               <TableHead>Статус</TableHead>
@@ -144,6 +145,16 @@ export default function Questions() {
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary">{question.topic}</Badge>
+                </TableCell>
+                <TableCell>
+                  {question.roundQuestions?.map(rq => (
+                    <div key={rq.roundId} className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {rq.round?.package?.title}
+                      </span>
+                    </div>
+                  ))}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -211,7 +222,7 @@ export default function Questions() {
             {questions.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6} 
+                  colSpan={7}
                   className="text-center text-muted-foreground h-24"
                 >
                   {isLoading ? "Загрузка..." : "Вопросы не найдены"}
