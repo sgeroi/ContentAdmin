@@ -413,7 +413,7 @@ function PackageHeader({
       await onSave({
         title,
         description,
-        playDate: playDate ? playDate.toISOString() : undefined,
+        playDate: playDate ? new Date(playDate).toISOString() : null,
         authorId,
       });
       setEditMode(false);

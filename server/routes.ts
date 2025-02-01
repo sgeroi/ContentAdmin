@@ -280,17 +280,21 @@ export function registerRoutes(app: Express): Server {
     try {
       console.log('Updating package:', req.params.id, 'with data:', req.body);
 
+      const updateData = {
+        title: req.body.title,
+        description: req.body.description || "",
+        playDate: req.body.playDate ? new Date(req.body.playDate) : null,
+        authorId: req.body.authorId || null,
+        templateId: req.body.templateId || null,
+        updatedAt: new Date(),
+      };
+
+      console.log('Update data prepared:', updateData);
+
       // Update the package
       const [pkg] = await db
         .update(packages)
-        .set({
-          title: req.body.title,
-          description: req.body.description || "",
-          playDate: req.body.playDate || null,
-          authorId: req.body.authorId || null,
-          templateId: req.body.templateId || null,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(packages.id, parseInt(req.params.id)))
         .returning();
 
@@ -318,7 +322,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(packages.id, pkg.id),
         with: {
           template: true,
-          author: true, // Include author data
+          author: true,
           rounds: {
             with: {
               roundQuestions: {
@@ -850,7 +854,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+    app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
         .delete(rounds)
