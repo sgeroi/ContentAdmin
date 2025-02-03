@@ -11,7 +11,6 @@ import fs from 'fs';
 import express from 'express';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import OpenAI from "openai";
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -58,10 +57,6 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB
   }
-});
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export function registerRoutes(app: Express): Server {
@@ -426,98 +421,16 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-  
-    app.post("/api/verify/spelling", requireAuth, async (req, res) => {
-    try {
-      const { content } = req.body;
-      // Extract text content from HTML
-      const textContent = content.replace(/<[^>]*>/g, ' ').trim();
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: `You are a spelling and grammar checker. Analyze the following text for spelling, punctuation, and grammar errors. 
-            You must respond only with a JSON object in this exact format, no other text:
-            {
-              "correctedText": "text with all corrections applied",
-              "comments": [
-                {
-                  "text": "incorrect text",
-                  "correction": "correct text",
-                  "explanation": "why it was corrected"
-                }
-              ]
-            }`
-          },
-          {
-            role: "user",
-            content: textContent
-          }
-        ]
-      });
 
-      const result = JSON.parse(completion.choices[0].message.content);
-      res.json(result);
-    } catch (error: any) {
-      console.error('Spelling check error:', error);
-      res.status(500).json({ error: error.message });
+
+  // Upload image endpoint
+  app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
     }
-  });
-
-  app.post("/api/verify/facts", requireAuth, async (req, res) => {
-    try {
-      const { content } = req.body;
-      // Extract text content from HTML
-      const textContent = content.replace(/<[^>]*>/g, ' ').trim();
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: `You are a fact checker. Analyze the following text for factual accuracy.
-            You must respond only with a JSON object in this exact format, no other text:
-            {
-              "correctedText": "text with all corrections applied",
-              "comments": [
-                {
-                  "text": "incorrect claim",
-                  "correction": "correct claim",
-                  "explanation": "why it needed correction"
-                }
-              ]
-            }`
-          },
-          {
-            role: "user",
-            content: textContent
-          }
-        ]
-      });
-
-      const result = JSON.parse(completion.choices[0].message.content);
-      res.json(result);
-    } catch (error: any) {
-      console.error('Fact check error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Upload image endpoint with proper CORS and error handling
-  app.post("/api/uploads", requireAuth, upload.single('image'), (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'Файл не загружен' });
-      }
-      // Return the URL path to the uploaded file
-      const url = `/uploads/${req.file.filename}`;
-      res.json({ url });
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: error.message });
-    }
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url });
   });
 
   // Tags API
@@ -841,7 +754,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-    app.put("/api/questions/:id", requireAuth, async (req, res) => {
+  app.put("/api/questions/:id", requireAuth, async (req, res) => {
     try {
       const [question] = await db
         .update(questions)
@@ -864,6 +777,7 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
 
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
@@ -943,8 +857,8 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-  
-    app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+
+  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
         .delete(rounds)

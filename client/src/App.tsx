@@ -20,7 +20,6 @@ import Templates from "@/pages/templates";
 import PackageView from "@/pages/packages/[id]";
 import Calendar from "@/pages/calendar";
 import VerifyContent from "@/pages/verify";
-import VerifyResult from "@/pages/verify/result";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -57,7 +56,6 @@ function Router() {
         <Route path="/rounds" component={Rounds} />
         <Route path="/templates" component={Templates} />
         <Route path="/verify" component={VerifyContent} />
-        <Route path="/verify/result" component={VerifyResult} />
         {user.role === "admin" && (
           <Route path="/users" component={Users} />
         )}

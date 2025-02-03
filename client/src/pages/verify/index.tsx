@@ -1,66 +1,17 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ContentEditor } from "@/components/content-editor";
+import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload } from "lucide-react";
-import { useLocation } from "wouter";
-
-interface VerifyResult {
-  correctedText: string;
-  comments: Array<{
-    text: string;
-    correction: string;
-    explanation: string;
-  }>;
-}
+import { Loader2 } from "lucide-react";
 
 export default function VerifyContent() {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState<any>({});
   const [isChecking, setIsChecking] = useState(false);
+  const [results, setResults] = useState<string | null>(null);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.match('text.*')) {
-      toast({
-        title: "Ошибка",
-        description: "Пожалуйста, загрузите текстовый файл",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      setContent(text);
-      toast({
-        title: "Файл загружен",
-        description: "Текст из файла успешно загружен в редактор",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось прочитать файл: " + error.message,
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSpellingCheck = async () => {
-    if (!content.trim()) {
-      toast({
-        title: "Ошибка",
-        description: "Пожалуйста, введите текст или загрузите файл",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsChecking(true);
     try {
       const response = await fetch("/api/verify/spelling", {
@@ -69,16 +20,15 @@ export default function VerifyContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ content }),
-        credentials: 'include'
       });
 
       if (!response.ok) {
         throw new Error(await response.text());
       }
 
-      const result = await response.json() as VerifyResult;
-      setLocation('/verify/result', result);
-
+      const result = await response.json();
+      setResults(result.suggestions);
+      
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -91,15 +41,6 @@ export default function VerifyContent() {
   };
 
   const handleFactCheck = async () => {
-    if (!content.trim()) {
-      toast({
-        title: "Ошибка",
-        description: "Пожалуйста, введите текст или загрузите файл",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsChecking(true);
     try {
       const response = await fetch("/api/verify/facts", {
@@ -108,16 +49,15 @@ export default function VerifyContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ content }),
-        credentials: 'include'
       });
 
       if (!response.ok) {
         throw new Error(await response.text());
       }
 
-      const result = await response.json() as VerifyResult;
-      setLocation('/verify/result', result);
-
+      const result = await response.json();
+      setResults(result.analysis);
+      
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -142,31 +82,15 @@ export default function VerifyContent() {
         <CardHeader>
           <CardTitle>Текст для проверки</CardTitle>
           <CardDescription>
-            Вставьте текст вопросов для проверки или загрузите текстовый файл.
+            Вставьте текст вопросов для проверки. Поддерживается вставка изображений из буфера обмена.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <input
-              type="file"
-              accept=".txt,.doc,.docx"
-              onChange={handleFileChange}
-              ref={fileInputRef}
-              className="hidden"
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Загрузить файл
-            </Button>
-          </div>
-
-          <ContentEditor
-            value={content}
+          <WysiwygEditor
+            content={content}
             onChange={setContent}
             className="min-h-[400px]"
+            uploadEndpoint="/api/uploads"
           />
 
           <div className="flex gap-4">
@@ -186,6 +110,19 @@ export default function VerifyContent() {
               Проверить факты
             </Button>
           </div>
+
+          {results && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Результаты проверки</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="whitespace-pre-wrap font-mono text-sm">
+                  {results}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
     </div>
