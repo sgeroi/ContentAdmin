@@ -11,6 +11,7 @@ import fs from 'fs';
 import express from 'express';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import OpenAI from "openai";
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -57,6 +58,10 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB
   }
+});
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export function registerRoutes(app: Express): Server {
@@ -425,28 +430,40 @@ export function registerRoutes(app: Express): Server {
     app.post("/api/verify/spelling", requireAuth, async (req, res) => {
     try {
       const { content } = req.body;
-      // Extract text content from rich text editor
-      let textContent = '';
-      if (content?.content) {
-        const extractText = (nodes: any[]): string => {
-          let text = '';
-          for (const node of nodes) {
-            if (node.text) {
-              text += node.text + ' ';
-            }
-            if (node.content) {
-              text += extractText(node.content);
-            }
-          }
-          return text;
-        };
-        textContent = extractText(content.content);
-      }
+      // Extract text content from HTML
+      const textContent = content.replace(/<[^>]*>/g, ' ').trim();
 
-      const validation = await validateQuestion('', textContent, '');
-      res.json({
-        suggestions: validation.suggestions || validation.message || 'Текст проверен, ошибок не найдено'
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a spelling and grammar checker. Analyze the following text for spelling, punctuation, and grammar errors. 
+            Return a JSON object with:
+            1. correctedText: the text with all corrections applied, maintaining original HTML
+            2. comments: an array of objects with { text: original problematic text, correction: corrected version, explanation: why it was corrected }
+            Example response format:
+            {
+              "correctedText": "<p>Corrected text here</p>",
+              "comments": [
+                {
+                  "text": "incorrect text",
+                  "correction": "correct text",
+                  "explanation": "This was corrected because..."
+                }
+              ]
+            }`
+          },
+          {
+            role: "user",
+            content: textContent
+          }
+        ],
+        response_format: { type: "json_object" }
       });
+
+      const result = JSON.parse(completion.choices[0].message.content);
+      res.json(result);
     } catch (error: any) {
       console.error('Spelling check error:', error);
       res.status(500).json({ error: error.message });
@@ -456,28 +473,40 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/verify/facts", requireAuth, async (req, res) => {
     try {
       const { content } = req.body;
-      // Extract text content from rich text editor
-      let textContent = '';
-      if (content?.content) {
-        const extractText = (nodes: any[]): string => {
-          let text = '';
-          for (const node of nodes) {
-            if (node.text) {
-              text += node.text + ' ';
-            }
-            if (node.content) {
-              text += extractText(node.content);
-            }
-          }
-          return text;
-        };
-        textContent = extractText(content.content);
-      }
+      // Extract text content from HTML
+      const textContent = content.replace(/<[^>]*>/g, ' ').trim();
 
-      const validation = await factCheckQuestion('', textContent, '');
-      res.json({
-        analysis: validation.analysis || validation.message || 'Факты проверены, неточностей не найдено'
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a fact checker. Analyze the following text for factual accuracy. 
+            Return a JSON object with:
+            1. correctedText: the text with all corrections applied, maintaining original HTML
+            2. comments: an array of objects with { text: original claim, correction: corrected version, explanation: why it needed correction }
+            Example response format:
+            {
+              "correctedText": "<p>Factually correct text here</p>",
+              "comments": [
+                {
+                  "text": "incorrect claim",
+                  "correction": "correct claim",
+                  "explanation": "This was corrected because..."
+                }
+              ]
+            }`
+          },
+          {
+            role: "user",
+            content: textContent
+          }
+        ],
+        response_format: { type: "json_object" }
       });
+
+      const result = JSON.parse(completion.choices[0].message.content);
+      res.json(result);
     } catch (error: any) {
       console.error('Fact check error:', error);
       res.status(500).json({ error: error.message });

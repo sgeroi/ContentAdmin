@@ -1,15 +1,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { WysiwygEditor } from "@/components/wysiwyg-editor";
+import { ContentEditor } from "@/components/content-editor";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
+
+interface VerifyResult {
+  correctedText: string;
+  comments: Array<{
+    text: string;
+    correction: string;
+    explanation: string;
+  }>;
+}
 
 export default function VerifyContent() {
-  const [content, setContent] = useState<any>({});
+  const [content, setContent] = useState('');
   const [isChecking, setIsChecking] = useState(false);
-  const [results, setResults] = useState<string | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSpellingCheck = async () => {
     setIsChecking(true);
@@ -20,14 +30,15 @@ export default function VerifyContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ content }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         throw new Error(await response.text());
       }
 
-      const result = await response.json();
-      setResults(result.suggestions);
+      const result = await response.json() as VerifyResult;
+      setLocation('/verify/result', result as any);
 
     } catch (error: any) {
       toast({
@@ -49,14 +60,15 @@ export default function VerifyContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ content }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         throw new Error(await response.text());
       }
 
-      const result = await response.json();
-      setResults(result.analysis);
+      const result = await response.json() as VerifyResult;
+      setLocation('/verify/result', result as any);
 
     } catch (error: any) {
       toast({
@@ -86,11 +98,10 @@ export default function VerifyContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <WysiwygEditor
-            content={content}
+          <ContentEditor
+            value={content}
             onChange={setContent}
             className="min-h-[400px]"
-            uploadUrl="/api/uploads"
           />
 
           <div className="flex gap-4">
@@ -110,19 +121,6 @@ export default function VerifyContent() {
               Проверить факты
             </Button>
           </div>
-
-          {results && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Результаты проверки</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="whitespace-pre-wrap font-mono text-sm">
-                  {results}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </CardContent>
       </Card>
     </div>
