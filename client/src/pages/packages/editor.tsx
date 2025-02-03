@@ -618,6 +618,7 @@ function DraggableQuestionItem({
   );
 }
 
+// Обновляем компонент PackageEditor, добавляя инициализацию questionRefs
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -632,6 +633,9 @@ export default function PackageEditor() {
   const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [activeId, setActiveId] = useState<string | null>(null);
+    // Добавляем анимацию для drag and drop
+  const [isDragging, setIsDragging] = useState(false);
   const form = useForm<QuestionFormData>({
     defaultValues: {
       content: {},
@@ -650,7 +654,6 @@ export default function PackageEditor() {
       difficulty: 1,
     },
   });
-  const [activeId, setActiveId] = useState<string | null>(null);
     const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -858,9 +861,11 @@ export default function PackageEditor() {
     const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
+    setIsDragging(true);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    setIsDragging(false);
     const { active, over } = event;
     if (!over) return;
 
@@ -1327,6 +1332,15 @@ export default function PackageEditor() {
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      // Добавляем модификаторы для анимации
+      modifiers={[
+        (args) => ({
+          ...args,
+          scaleX: isDragging ? 1.05 : 1,
+          scaleY: isDragging ? 1.05 : 1,
+          transition: 'all 0.2s ease',
+        }),
+      ]}
     >
       <div className="h-screen flex flex-col">
         <div className="border-b">
@@ -1558,7 +1572,7 @@ export default function PackageEditor() {
 
         <DragOverlay>
           {activeId ? (
-            <div className="rounded-lg border bg-card p-4 shadow-lg w-full max-w-2xl">
+            <div className="rounded-lg border bg-card p-4 shadow-lg w-full max-w-2xl transform scale-105 transition-transform duration-200">
               <div className="text-sm font-medium">Перетаскивание вопроса...</div>
             </div>
           ) : null}
