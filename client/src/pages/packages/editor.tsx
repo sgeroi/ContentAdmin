@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2, CalendarIcon } from "lucide-react";
+import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2, CalendarIcon, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -396,7 +396,7 @@ function PackageHeader({
   const [title, setTitle] = useState(packageData.title);
   const [description, setDescription] = useState(packageData.description || "");
   const [playDate, setPlayDate] = useState<Date | undefined>(packageData.playDate ? new Date(packageData.playDate) : undefined);
-  const [authorId, setAuthorId] = useState<number>(packageData.authorId);
+  const [authorId, setAuthorId] = useState<number>(packageData.authorId || 0);
   const { users } = useUsers();
   const { toast } = useToast();
 
@@ -404,7 +404,7 @@ function PackageHeader({
     setTitle(packageData.title);
     setDescription(packageData.description || "");
     setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-    setAuthorId(packageData.authorId);
+    setAuthorId(packageData.authorId || 0);
   }, [packageData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -414,7 +414,7 @@ function PackageHeader({
         title,
         description,
         playDate: playDate ? new Date(playDate).toISOString() : null,
-        authorId,
+        authorId: authorId || null,
       });
       setEditMode(false);
       toast({
@@ -430,6 +430,8 @@ function PackageHeader({
       });
     }
   };
+
+  const validUsers = users?.filter(user => user && user.id) || [];
 
   if (editMode) {
     return (
@@ -478,14 +480,14 @@ function PackageHeader({
         <div className="space-y-2">
           <Label>Автор</Label>
           <Select 
-            value={authorId.toString()} 
-            onValueChange={(value) => setAuthorId(parseInt(value))}
+            value={authorId ? authorId.toString() : ""} 
+            onValueChange={(value) => setAuthorId(parseInt(value) || 0)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Выберите автора" />
             </SelectTrigger>
             <SelectContent>
-              {users?.filter(user => user.id).map((user) => (
+              {validUsers.map((user) => (
                 <SelectItem key={user.id} value={user.id.toString()}>
                   {user.username}
                 </SelectItem>
@@ -502,7 +504,7 @@ function PackageHeader({
               setTitle(packageData.title);
               setDescription(packageData.description || "");
               setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-              setAuthorId(packageData.authorId);
+              setAuthorId(packageData.authorId || 0);
             }}
           >
             Отмена
@@ -584,6 +586,7 @@ export default function PackageEditor() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         const packageResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
         });
@@ -591,6 +594,7 @@ export default function PackageEditor() {
           throw new Error("Failed to fetch package data");
         }
         const packageResult = await packageResponse.json();
+        console.log('Fetched package data:', packageResult);
         setPackageData(packageResult);
 
         await fetchQuestions();
@@ -606,7 +610,9 @@ export default function PackageEditor() {
       }
     };
 
-    fetchData();
+    if (params.id) {
+      fetchData();
+    }
   }, [params.id]);
 
   const handleUpdateRound = useCallback(async (id: number, data: { name: string; description: string }) => {
@@ -999,7 +1005,7 @@ export default function PackageEditor() {
     } catch (error: any) {
       console.error('Error creating question:', error);
       toast({
-        title: "Ошибка",
+                title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
@@ -1164,227 +1170,274 @@ export default function PackageEditor() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="border-b">
-        <div className="container py-4">
-          <div className="space-y-4">
-            <Link href="/packages">
-              <Button variant="ghost" className="pl-0">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Назад к пакетам
-              </Button>
-            </Link>
-            {packageData && (
-              <PackageHeader
-                packageData={packageData}
-                onSave={handleUpdatePackage}
-              />
-            )}
-          </div>
+    <div className="container mx-auto py-6 space-y-6">
+      <Link href="/packages">
+        <Button variant="ghost" className="mb-4">
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Назад к пакетам
+        </Button>
+      </Link>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center min-h-[200px]">
+          <Loader2 className="h-8 w-8 animate-spin text-border" />
         </div>
-      </div>
-
-      <AutoSaveStatus saving={isSaving} />
-
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="h-full border-r flex flex-col container">
-            <ScrollArea className="flex-1">
-              <div className="space-y-4 py-4">
-                {packageData.rounds.map((round) => (
-                  <NavigationItem
-                    key={round.id}
-                    round={round}
-                    activeQuestionId={activeQuestionId}
-                    onQuestionClick={handleQuestionClick}
-                  />
-                ))}
+      ) : packageData ? (
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
+            {/* Navigation Panel */}
+            <div className="h-full border rounded-lg p-4 space-y-4">
+              <div className="space-y-2">
+                <h2 className="font-semibold">Навигация</h2>
+                <div className="space-y-1">
+                  {packageData.rounds.map((round) => (
+                    <NavigationItem
+                      key={round.id}
+                      round={round}
+                      activeQuestionId={activeQuestionId}
+                      onQuestionClick={handleQuestionClick}
+                    />
+                  ))}
+                </div>
               </div>
-            </ScrollArea>
-            <div className="py-4 border-t">
-              <Button className="w-full" onClick={handleAddRound}>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={handleAddRound}
+              >
+                <Plus className="mr-2 h-4 w-4" />
                 Добавить раунд
               </Button>
             </div>
-          </div>
-        </ResizablePanel>
-        <ResizableHandle />
-        <ResizablePanel defaultSize={75}>
-          <ScrollArea className="h-full">
-            <div className="container py-6 space-y-8 pl-12 pr-16">
-              {packageData.rounds.map((round) => (
-                <div key={round.id} className="space-y-4">
-                  <RoundHeader
-                    round={round}
-                    onSave={handleUpdateRound}
-                  />
-                  <div className="space-y-4">
-                    {round.questions.map((question, index) => (
-                      <div
-                        key={`${round.id}-${question.id}`}
-                        ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
-                        className={cn(
-                          "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
-                        )}
-                      >
-                        <QuestionItem
-                          question={question}
-                          index={index}
-                          roundId={round.id}
-                          roundQuestionCount={round.questionCount}
-                          handleAutoSave={handleAutoSave}
-                          handleDelete={handleDeleteQuestion}
-                          form={form}
-                          packageData={packageData}
-                        />
-                      </div>
-                    ))}
-                    {isCreatingQuestion && currentRoundId === round.id && (
-                      <div className="rounded-lg border bg-card p-4">
-                        <Form {...createQuestionForm}>
-                          <form onSubmit={createQuestionForm.handleSubmit(handleCreateQuestion)} className="space-y-4">
-                            <FormField
-                              control={createQuestionForm.control}
-                              name="content"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Текст вопроса</FormLabel>
-                                  <FormControl>
-                                    <WysiwygEditor
-                                      content={field.value}
-                                      onChange={field.onChange}
-                                      className="min-h-[200px]"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={createQuestionForm.control}
-                              name="answer"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Ответ</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                             <FormField
-                              control={createQuestionForm.control}
-                              name="difficulty"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Сложность</FormLabel>
-                                  <FormControl>
-                                    <Input type="number" min={1} max={5} {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsCreatingQuestion(false)}
-                              >
-                                Отмена
-                              </Button>
-                              <Button type="submit">Создать</Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        setCurrentRoundId(round.id);
-                        setIsAddQuestionDialogOpen(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Добавить вопрос
-                    </Button>
+          </ResizablePanel>
+
+          <ResizableHandle />
+
+          <ResizablePanel defaultSize={75}>
+            {/* Content Panel */}
+            <div className="h-full border rounded-lg p-6">
+              <div className="space-y-6">
+                <PackageHeader
+                  packageData={packageData}
+                  onSave={handleUpdatePackage}
+                />
+
+                {packageData.rounds.map((round) => (
+                  <div
+                    key={round.id}
+                    className="space-y-6 border-t pt-6 first:border-t-0 first:pt-0"
+                  >
+                    <RoundHeader
+                      round={round}
+                      onSave={handleUpdateRound}
+                    />
+
+                    <div className="space-y-8">
+                      {round.questions.map((question, index) => (
+                        <div
+                          key={`${round.id}-${question.id}`}
+                          ref={(el) =>
+                            (questionRefs.current[
+                              `${round.id}-${question.id}`
+                            ] = el)
+                          }
+                          className={cn(
+                            "p-6 border rounded-lg",
+                            activeQuestionId ===
+                              `${round.id}-${question.id}` &&
+                              "ring-2 ring-primary"
+                          )}
+                        >
+                          <QuestionItem
+                            question={question}
+                            index={index}
+                            roundId={round.id}
+                            roundQuestionCount={round.questionCount}
+                            handleAutoSave={handleAutoSave}
+                            handleDelete={handleDeleteQuestion}
+                            form={form}
+                            packageData={packageData}
+                          />
+                        </div>
+                      ))}
+
+                      {round.questions.length < round.questionCount && (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            setCurrentRoundId(round.id);
+                            setIsAddQuestionDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Добавить вопрос
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </ScrollArea>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div>Пакет не найден</div>
+      )}
 
       <AddQuestionDialog
         open={isAddQuestionDialogOpen}
         onOpenChange={setIsAddQuestionDialogOpen}
         onSelect={handleAddQuestionSelect}
       />
-      <GenerateQuestionsDialog
+
+      <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Поиск вопросов</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Form {...searchForm}>
+              <form
+                onSubmit={searchForm.handleSubmit(handleSearch)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={searchForm.control}
+                  name="query"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Поиск по содержанию"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit">Поиск</Button>
+              </form>
+            </Form>
+
+            <ScrollArea className="h-[400px] border rounded-md">
+              <div className="p-4 space-y-4">
+                {availableQuestions.map((question) => (
+                  <div
+                    key={question.id}
+                    className="p-4 border rounded-lg space-y-2"
+                  >
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: JSON.stringify(question.content),
+                      }}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => {
+                          if (currentRoundId) {
+                            const round = packageData?.rounds.find(
+                              (r) => r.id === currentRoundId
+                            );
+                            if (round) {
+                              handleAddQuestion(
+                                currentRoundId,
+                                question.id,
+                                round.questions?.length || 0
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        Добавить
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={isGenerateQuestionsDialogOpen}
         onOpenChange={setIsGenerateQuestionsDialogOpen}
-        onSubmit={handleGenerateQuestions}
-      />
-      <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Добавить вопрос</DialogTitle>
+            <DialogTitle>Сгенерировать вопросы</DialogTitle>
             <DialogDescription>
-              Найдите существующий вопрос для добавления в раунд
+              Опишите тему и укажите количество вопросов для генерации
             </DialogDescription>
           </DialogHeader>
-          <Form {...searchForm}>
-            <form onSubmit={searchForm.handleSubmit(handleSearch)} className="space-y-4">
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(handleGenerateQuestions)}
+              className="space-y-4"
+            >
               <FormField
-                control={searchForm.control}
-                name="query"
+                control={form.control}
+                name="prompt"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Тема или описание</FormLabel>
                     <FormControl>
-                      <div className="flex gap-2">
-                        <Input placeholder="Поиск по тексту..." {...field} />
-                        <Button type="submit">
-                          <Search className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Textarea
+                        {...field}
+                        placeholder="Например: Вопросы про историю России 19 века, сложность средняя"
+                      />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Количество вопросов</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsGenerateQuestionsDialogOpen(false)}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" disabled={isProcessing}>
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Генерация...
+                    </>
+                  ) : (
+                    "Генерировать"
+                  )}
+                </Button>
+              </div>
             </form>
           </Form>
-          <ScrollArea className="h-[400px] mt-4">
-            <div className="space-y-2">
-              {availableQuestions.map((question) => (
-                <div
-                  key={question.id}
-                  className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
-                  onClick={() => {
-                    if (currentRoundId) {
-                      const round = packageData.rounds.find((r) => r.id === currentRoundId);
-                      if (round) {
-                        handleAddQuestion(currentRoundId, question.id, round.questions.length);
-                      }
-                    }
-                  }}
-                >
-                  <div>{getContentPreview(question.content)}</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Автор: {question.author.username} •
-                    Создан: {new Date(question.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      <AutoSaveStatus saving={isSaving} />
     </div>
   );
 }
