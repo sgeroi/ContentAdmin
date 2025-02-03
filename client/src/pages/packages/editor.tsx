@@ -50,6 +50,9 @@ import {
 } from "@/components/ui/select"
 import { useUsers } from "@/hooks/use-users"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useQuestions } from "@/hooks/use-questions";
+import { Loader2 } from "lucide-react";
 
 
 type PackageQuestion = Question & {
@@ -118,8 +121,8 @@ function NavigationItem({
               ref={provided.innerRef} 
               {...provided.droppableProps}
               className={cn(
-                "min-h-[8px] transition-colors",
-                snapshot.isDraggingOver && "bg-accent/50 rounded-md"
+                "min-h-[8px] transition-colors rounded-md",
+                snapshot.isDraggingOver && "bg-accent/50"
               )}
             >
               {round.questions.map((question, index) => (
@@ -135,19 +138,19 @@ function NavigationItem({
                       className={cn(
                         "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2 transition-colors",
                         activeQuestionId === `${round.id}-${question.id}` && "bg-accent",
-                        snapshot.isDragging && "bg-accent opacity-50"
+                        snapshot.isDragging && "bg-accent/80 shadow-lg"
                       )}
                       onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
                     >
                       <span 
                         {...provided.dragHandleProps}
-                        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing select-none"
+                        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing select-none px-1 -ml-1"
                         onClick={e => e.stopPropagation()}
                       >
                         ⠿
                       </span>
                       <span className="text-muted-foreground">{index + 1}.</span>
-                      <span className="truncate">{getContentPreview(question.content)}</span>
+                      <span className="truncate flex-1">{getContentPreview(question.content)}</span>
                     </div>
                   )}
                 </Draggable>
@@ -1163,40 +1166,30 @@ export default function PackageEditor() {
   };
 
     const handleDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId } = result;
+    if (!result.destination || !packageData) return;
 
-    // If dropped outside or no change
-    if (!destination || 
-        (source.droppableId === destination.droppableId && 
-         source.index === destination.index)) {
-      return;
-    }
+    const sourceRoundId = parseInt(result.source.droppableId.replace('round-', ''));
+    const destinationRoundId = parseInt(result.destination.droppableId.replace('round-', ''));
+    const questionId = parseInt(result.draggableId.replace('question-', ''));
 
-    // Extract round IDs from droppableIds
-    const sourceRoundId = parseInt(source.droppableId.replace('round-', ''));
-    const destinationRoundId = parseInt(destination.droppableId.replace('round-', ''));
-    const questionId = parseInt(draggableId.replace('question-', ''));
-
-    // Create a deep copy of the package data
+    // Создаем глубокую копию данных пакета для оптимистичного обновления
     const newPackageData = JSON.parse(JSON.stringify(packageData));
 
-    // Find source and destination rounds
     const sourceRound = newPackageData.rounds.find(r => r.id === sourceRoundId);
     const destinationRound = newPackageData.rounds.find(r => r.id === destinationRoundId);
 
-    if (!sourceRound || !destinationRound) return;
-
-    // Remove from source
-    const [movedQuestion] = sourceRound.questions.splice(source.index, 1);
-
-    // Add to destination
-    destinationRound.questions.splice(destination.index, 0, movedQuestion);
-
-    // Update state optimistically
-    setPackageData(newPackageData);
+    if (!sourceRound || !destinationRound) {
+      console.error('Source or destination round not found');
+      return;
+    }
 
     try {
-      // Call API to update question order
+      // Оптимистичное обновление UI
+      const [movedQuestion] = sourceRound.questions.splice(result.source.index, 1);
+      destinationRound.questions.splice(result.destination.index, 0, movedQuestion);
+      setPackageData(newPackageData);
+
+      // Отправляем запрос на сервер
       const response = await fetch(`/api/rounds/${destinationRoundId}/questions/reorder`, {
         method: 'POST',
         headers: {
@@ -1205,26 +1198,27 @@ export default function PackageEditor() {
         credentials: 'include',
         body: JSON.stringify({
           questionId,
-          newIndex: destination.index,
+          newIndex: result.destination.index,
           sourceRoundId: sourceRoundId !== destinationRoundId ? sourceRoundId : undefined,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error('Failed to update question order');
       }
 
-      // Refresh package data
-      const refreshResponse = await fetch(`/api/packages/${params.id}`, {
+      // Обновляем данные с сервера
+      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: 'include',
       });
 
-      if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh package data');
+      if (!updatedResponse.ok) {
+        throw new Error('Failed to fetch updated package data');
       }
 
-      const refreshedData = await refreshResponse.json();
-      setPackageData(refreshedData);
+      const updatedData = await updatedResponse.json();
+      setPackageData(updatedData);
+
     } catch (error: any) {
       console.error('Error reordering questions:', error);
       toast({
