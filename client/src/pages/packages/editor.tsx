@@ -396,7 +396,7 @@ function PackageHeader({
   const [title, setTitle] = useState(packageData.title);
   const [description, setDescription] = useState(packageData.description || "");
   const [playDate, setPlayDate] = useState<Date | undefined>(packageData.playDate ? new Date(packageData.playDate) : undefined);
-  const [authorId, setAuthorId] = useState<number>(packageData.authorId || 0);
+  const [authorId, setAuthorId] = useState<number | null>(null);
   const { users } = useUsers();
   const { toast } = useToast();
 
@@ -404,7 +404,7 @@ function PackageHeader({
     setTitle(packageData.title);
     setDescription(packageData.description || "");
     setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-    setAuthorId(packageData.authorId || 0);
+    setAuthorId(packageData.authorId || null);
   }, [packageData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -431,7 +431,8 @@ function PackageHeader({
     }
   };
 
-  const validUsers = users?.filter(user => user && user.id) || [];
+  // Filter out any invalid user entries
+  const validUsers = users?.filter(user => user && typeof user.id === 'number' && user.username) || [];
 
   if (editMode) {
     return (
@@ -480,8 +481,8 @@ function PackageHeader({
         <div className="space-y-2">
           <Label>Автор</Label>
           <Select 
-            value={authorId ? authorId.toString() : ""} 
-            onValueChange={(value) => setAuthorId(parseInt(value) || 0)}
+            value={authorId?.toString() || ""} 
+            onValueChange={(value) => setAuthorId(value ? parseInt(value) : null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Выберите автора" />
@@ -504,7 +505,7 @@ function PackageHeader({
               setTitle(packageData.title);
               setDescription(packageData.description || "");
               setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-              setAuthorId(packageData.authorId || 0);
+              setAuthorId(packageData.authorId || null);
             }}
           >
             Отмена
