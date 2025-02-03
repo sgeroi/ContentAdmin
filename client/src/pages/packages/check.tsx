@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export default function PackageCheck() {
   const [, setLocation] = useLocation();
@@ -15,6 +17,7 @@ export default function PackageCheck() {
   const [content, setContent] = useState<any>({});
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [editorRef, setEditorRef] = useState<HTMLDivElement | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,7 +57,8 @@ export default function PackageCheck() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to check spelling");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to check spelling");
       }
 
       const result = await response.json();
@@ -92,7 +96,8 @@ export default function PackageCheck() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fact check");
+         const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fact check");
       }
 
       const result = await response.json();
@@ -109,15 +114,40 @@ export default function PackageCheck() {
     }
   };
 
-  const handleSave = () => {
-    // Создаем файл для скачивания
-    const element = document.createElement("a");
-    const file = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
-    element.href = URL.createObjectURL(file);
-    element.download = "package-content.json";
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+  const handleSavePDF = async () => {
+    if (!editorRef) return;
+
+    try {
+      setIsProcessing(true);
+      const canvas = await html2canvas(editorRef, {
+        scale: 2,
+        useCORS: true,
+        logging: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('package-content.pdf');
+
+      toast({
+        title: "Успех",
+        description: "PDF успешно сохранен",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить PDF: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -149,11 +179,13 @@ export default function PackageCheck() {
           </div>
           <div className="space-y-2">
             <Label>Или введите текст</Label>
-            <WysiwygEditor
-              content={content}
-              onChange={setContent}
-              className="min-h-[400px]"
-            />
+            <div ref={setEditorRef}>
+              <WysiwygEditor
+                content={content}
+                onChange={setContent}
+                className="min-h-[400px]"
+              />
+            </div>
           </div>
         </div>
 
@@ -175,13 +207,13 @@ export default function PackageCheck() {
             Фактчек
           </Button>
           <Button
-            onClick={handleSave}
-            disabled={Object.keys(content).length === 0}
+            onClick={handleSavePDF}
+            disabled={isProcessing || Object.keys(content).length === 0}
             variant="outline"
             className="flex-1"
           >
             <Download className="mr-2 h-4 w-4" />
-            Сохранить текст
+            Сохранить PDF
           </Button>
         </div>
       </Card>
