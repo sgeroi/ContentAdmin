@@ -396,15 +396,12 @@ function PackageHeader({
   const [title, setTitle] = useState(packageData.title);
   const [description, setDescription] = useState(packageData.description || "");
   const [playDate, setPlayDate] = useState<Date | undefined>(packageData.playDate ? new Date(packageData.playDate) : undefined);
-  const [authorId, setAuthorId] = useState<number | null>(null);
-  const { users } = useUsers();
   const { toast } = useToast();
 
   useEffect(() => {
     setTitle(packageData.title);
     setDescription(packageData.description || "");
     setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-    setAuthorId(packageData.authorId || null);
   }, [packageData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -414,7 +411,6 @@ function PackageHeader({
         title,
         description,
         playDate: playDate ? new Date(playDate).toISOString() : null,
-        authorId: authorId || null,
       });
       setEditMode(false);
       toast({
@@ -430,9 +426,6 @@ function PackageHeader({
       });
     }
   };
-
-  // Filter out any invalid user entries
-  const validUsers = users?.filter(user => user && typeof user.id === 'number' && user.username) || [];
 
   if (editMode) {
     return (
@@ -478,24 +471,6 @@ function PackageHeader({
             </PopoverContent>
           </Popover>
         </div>
-        <div className="space-y-2">
-          <Label>Автор</Label>
-          <Select 
-            value={authorId?.toString() || ""} 
-            onValueChange={(value) => setAuthorId(value ? parseInt(value) : null)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Выберите автора" />
-            </SelectTrigger>
-            <SelectContent>
-              {validUsers.map((user) => (
-                <SelectItem key={user.id} value={user.id.toString()}>
-                  {user.username}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         <div className="flex justify-end gap-2">
           <Button
             type="button"
@@ -505,7 +480,6 @@ function PackageHeader({
               setTitle(packageData.title);
               setDescription(packageData.description || "");
               setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
-              setAuthorId(packageData.authorId || null);
             }}
           >
             Отмена
@@ -1037,7 +1011,7 @@ export default function PackageEditor() {
         }),
       });
 
-      if (!response.ok) {
+      if (!response.ok){
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to generate questions");
       }
