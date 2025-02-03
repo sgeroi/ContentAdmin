@@ -28,7 +28,7 @@ export default function VerifyContent() {
 
       const result = await response.json();
       setResults(result.suggestions);
-      
+
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -57,7 +57,7 @@ export default function VerifyContent() {
 
       const result = await response.json();
       setResults(result.analysis);
-      
+
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -90,7 +90,7 @@ export default function VerifyContent() {
             content={content}
             onChange={setContent}
             className="min-h-[400px]"
-            uploadEndpoint="/api/uploads"
+            uploadUrl="/api/uploads"
           />
 
           <div className="flex gap-4">

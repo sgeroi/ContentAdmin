@@ -421,16 +421,82 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
+  
+    app.post("/api/verify/spelling", requireAuth, async (req, res) => {
+    try {
+      const { content } = req.body;
+      // Extract text content from rich text editor
+      let textContent = '';
+      if (content?.content) {
+        const extractText = (nodes: any[]): string => {
+          let text = '';
+          for (const node of nodes) {
+            if (node.text) {
+              text += node.text + ' ';
+            }
+            if (node.content) {
+              text += extractText(node.content);
+            }
+          }
+          return text;
+        };
+        textContent = extractText(content.content);
+      }
 
-
-
-  // Upload image endpoint
-  app.post("/api/upload", requireAuth, upload.single('image'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Файл не загружен' });
+      const validation = await validateQuestion('', textContent, '');
+      res.json({
+        suggestions: validation.suggestions || validation.message || 'Текст проверен, ошибок не найдено'
+      });
+    } catch (error: any) {
+      console.error('Spelling check error:', error);
+      res.status(500).json({ error: error.message });
     }
-    const url = `/uploads/${req.file.filename}`;
-    res.json({ url });
+  });
+
+  app.post("/api/verify/facts", requireAuth, async (req, res) => {
+    try {
+      const { content } = req.body;
+      // Extract text content from rich text editor
+      let textContent = '';
+      if (content?.content) {
+        const extractText = (nodes: any[]): string => {
+          let text = '';
+          for (const node of nodes) {
+            if (node.text) {
+              text += node.text + ' ';
+            }
+            if (node.content) {
+              text += extractText(node.content);
+            }
+          }
+          return text;
+        };
+        textContent = extractText(content.content);
+      }
+
+      const validation = await factCheckQuestion('', textContent, '');
+      res.json({
+        analysis: validation.analysis || validation.message || 'Факты проверены, неточностей не найдено'
+      });
+    } catch (error: any) {
+      console.error('Fact check error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Upload image endpoint with proper CORS and error handling
+  app.post("/api/uploads", requireAuth, upload.single('image'), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Файл не загружен' });
+      }
+      // Return the URL path to the uploaded file
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Tags API
@@ -754,7 +820,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.put("/api/questions/:id", requireAuth, async (req, res) => {
+    app.put("/api/questions/:id", requireAuth, async (req, res) => {
     try {
       const [question] = await db
         .update(questions)
@@ -777,7 +843,6 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
-
 
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
@@ -858,7 +923,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
+    app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
         .delete(rounds)
