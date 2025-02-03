@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, FileText, Eye, CalendarIcon, Search, FileCheck2 } from "lucide-react";
+import { Plus, Trash2, FileText, Eye, CalendarIcon, Search } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,21 +37,20 @@ import { useLocation } from "wouter";
 import type { Package } from "@db/schema";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/use-user";
-import { Link } from "wouter";
 
 const getPackageStatus = (pkg: Package) => {
   if (!pkg.rounds?.length) return { label: "Новый", color: "bg-blue-500" };
 
-  const hasQuestions = pkg.rounds.some(r => (r.questions || []).length > 0);
+  const hasQuestions = pkg.rounds.some(r => r.questions?.length > 0);
   if (!hasQuestions) return { label: "Новый", color: "bg-blue-500" };
 
   const allQuestionsFactChecked = pkg.rounds.every(r => 
-    (r.questions || []).every(q => q.factChecked)
+    r.questions?.every(q => q.factChecked)
   );
   if (allQuestionsFactChecked) return { label: "Готов", color: "bg-green-500" };
 
   const hasFactCheckedQuestions = pkg.rounds.some(r => 
-    (r.questions || []).some(q => q.factChecked)
+    r.questions?.some(q => q.factChecked)
   );
   if (hasFactCheckedQuestions) return { label: "Факт-чек", color: "bg-yellow-500" };
 
@@ -321,166 +320,161 @@ export default function Packages() {
             Создание и управление пакетами вопросов
           </p>
         </div>
-        <div className="flex gap-2">
-          <Dialog 
-            open={isDialogOpen} 
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Новый пакет
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Создать новый пакет</DialogTitle>
-                <DialogDescription>
-                  Создайте новый пакет, выбрав шаблон или создав раунды вручную
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Название</Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Введите название пакета"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Описание</Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Введите описание пакета"
-                    />
-                  </div>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Новый пакет
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Создать новый пакет</DialogTitle>
+              <DialogDescription>
+                Создайте новый пакет, выбрав шаблон или создав раунды вручную
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Название</Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Введите название пакета"
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Описание</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Введите описание пакета"
+                  />
+                </div>
+              </div>
 
-                <Tabs value={createMode} onValueChange={(value) => setCreateMode(value as "template" | "manual")}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="template">Использовать шаблон</TabsTrigger>
-                    <TabsTrigger value="manual">Создать вручную</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="template" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Выберите шаблон</Label>
-                      <Select
-                        value={selectedTemplateId}
-                        onValueChange={setSelectedTemplateId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите шаблон" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {templates.map((template) => (
-                            <SelectItem key={template.id} value={template.id.toString()}>
-                              {template.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {selectedTemplateId && (
-                        <div className="pt-4">
-                          <Label>Раунды шаблона</Label>
-                          {templates
-                            .find((t) => t.id.toString() === selectedTemplateId)
-                            ?.roundSettings?.map((round) => (
-                              <div key={round.id} className="mt-2 p-2 border rounded-lg">
-                                <div className="font-medium">{round.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {round.description}
-                                </div>
-                                <Badge variant="secondary">
-                                  {round.questionCount} вопросов
-                                </Badge>
+              <Tabs value={createMode} onValueChange={(value) => setCreateMode(value as "template" | "manual")}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="template">Использовать шаблон</TabsTrigger>
+                  <TabsTrigger value="manual">Создать вручную</TabsTrigger>
+                </TabsList>
+                <TabsContent value="template" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Выберите шаблон</Label>
+                    <Select
+                      value={selectedTemplateId}
+                      onValueChange={setSelectedTemplateId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите шаблон" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id.toString()}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedTemplateId && (
+                      <div className="pt-4">
+                        <Label>Раунды шаблона</Label>
+                        {templates
+                          .find((t) => t.id.toString() === selectedTemplateId)
+                          ?.roundSettings?.map((round) => (
+                            <div key={round.id} className="mt-2 p-2 border rounded-lg">
+                              <div className="font-medium">{round.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {round.description}
                               </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="manual" className="space-y-4">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label>Раунды</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={addRound}
-                          size="sm"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Добавить раунд
-                        </Button>
-                      </div>
-                      <ScrollArea className="h-[300px] rounded-md border p-4">
-                        <div className="space-y-4">
-                          {manualRounds.map((round, index) => (
-                            <div key={index} className="space-y-2 p-4 border rounded-lg">
-                              <div className="flex justify-between">
-                                <Label>Раунд {index + 1}</Label>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeRound(index)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <Input
-                                placeholder="Название раунда"
-                                value={round.name}
-                                onChange={(e) =>
-                                  updateRound(index, "name", e.target.value)
-                                }
-                              />
-                              <Textarea
-                                placeholder="Описание раунда"
-                                value={round.description}
-                                onChange={(e) =>
-                                  updateRound(index, "description", e.target.value)
-                                }
-                              />
-                              <div className="flex items-center gap-2">
-                                <Label>Количество вопросов</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={round.questionCount}
-                                  onChange={(e) =>
-                                    updateRound(
-                                      index,
-                                      "questionCount",
-                                      parseInt(e.target.value) || 1
-                                    )
-                                  }
-                                  className="w-24"
-                                />
-                              </div>
+                              <Badge variant="secondary">
+                                {round.questionCount} вопросов
+                              </Badge>
                             </div>
                           ))}
-                        </div>
-                      </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="manual" className="space-y-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label>Раунды</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addRound}
+                        size="sm"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Добавить раунд
+                      </Button>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                    <ScrollArea className="h-[300px] rounded-md border p-4">
+                      <div className="space-y-4">
+                        {manualRounds.map((round, index) => (
+                          <div key={index} className="space-y-2 p-4 border rounded-lg">
+                            <div className="flex justify-between">
+                              <Label>Раунд {index + 1}</Label>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeRound(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Input
+                              placeholder="Название раунда"
+                              value={round.name}
+                              onChange={(e) =>
+                                updateRound(index, "name", e.target.value)
+                              }
+                            />
+                            <Textarea
+                              placeholder="Описание раунда"
+                              value={round.description}
+                              onChange={(e) =>
+                                updateRound(index, "description", e.target.value)
+                              }
+                            />
+                            <div className="flex items-center gap-2">
+                              <Label>Количество вопросов</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={round.questionCount}
+                                onChange={(e) =>
+                                  updateRound(
+                                    index,
+                                    "questionCount",
+                                    parseInt(e.target.value) || 1
+                                  )
+                                }
+                                className="w-24"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </TabsContent>
+              </Tabs>
 
-                <Button onClick={handleSave} className="w-full">
-                  Создать пакет
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <Button onClick={handleSave} className="w-full">
+                Создать пакет
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Filters */}
@@ -502,7 +496,7 @@ export default function Packages() {
             <SelectValue placeholder="Статус" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Все статусы</SelectItem>
+            <SelectItem value="all">Все статусы</SelectItem>
             <SelectItem value="Новый">Новый</SelectItem>
             <SelectItem value="Редактура">Редактура</SelectItem>
             <SelectItem value="Факт-чек">Факт-чек</SelectItem>

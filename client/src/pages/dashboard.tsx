@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useQuestions } from "@/hooks/use-questions";
 import { usePackages } from "@/hooks/use-packages";
 import { useUser } from "@/hooks/use-user";
-import { Package, HelpCircle, Users, Layers, Wand2, FileCheck2 } from "lucide-react";
+import { Package, HelpCircle, Users, Layers, Wand2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -56,29 +56,6 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Работа с пакетами</CardTitle>
-            <CardDescription>
-              Создавайте и проверяйте пакеты вопросов
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Link href="/packages/check">
-              <Button className="w-full" variant="secondary">
-                <FileCheck2 className="mr-2 h-4 w-4" />
-                Проверить пакет
-              </Button>
-            </Link>
-            <Link href="/packages/new">
-              <Button className="w-full" variant="outline">
-                <Package className="mr-2 h-4 w-4" />
-                Создать новый пакет
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Генерация вопросов</CardTitle>
             <CardDescription>
               Создавайте новые вопросы автоматически с помощью ИИ
@@ -95,6 +72,26 @@ export default function Dashboard() {
               <Button className="w-full" variant="outline">
                 <HelpCircle className="mr-2 h-4 w-4" />
                 Создать вручную
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Шаблоны</CardTitle>
+              <CardDescription>
+                Готовые шаблоны для создания пакетов вопросов
+              </CardDescription>
+            </div>
+            <Layers className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <Link href="/templates">
+              <Button variant="secondary" className="w-full">
+                <Layers className="mr-2 h-4 w-4" />
+                Управление шаблонами
               </Button>
             </Link>
           </CardContent>
