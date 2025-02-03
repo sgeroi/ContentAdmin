@@ -132,7 +132,6 @@ function NavigationItem({
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      {...provided.dragHandleProps}
                       className={cn(
                         "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2 transition-colors",
                         activeQuestionId === `${round.id}-${question.id}` && "bg-accent",
@@ -140,6 +139,13 @@ function NavigationItem({
                       )}
                       onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
                     >
+                      <span 
+                        {...provided.dragHandleProps}
+                        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing select-none"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        ⠿
+                      </span>
                       <span className="text-muted-foreground">{index + 1}.</span>
                       <span className="truncate">{getContentPreview(question.content)}</span>
                     </div>
