@@ -11,6 +11,7 @@ import Questions from "@/pages/questions";
 import QuestionEditor from "@/pages/questions/editor";
 import Packages from "@/pages/packages";
 import PackageEditor from "@/pages/packages/editor";
+import PackageCheck from "@/pages/packages/check";
 import Tags from "@/pages/tags";
 import Layout from "@/components/layout";
 import GenerateQuestions from "@/pages/questions/generate";
@@ -48,6 +49,7 @@ function Router() {
           {(params) => <QuestionEditor id={params.id} />}
         </Route>
         <Route path="/packages" component={Packages} />
+        <Route path="/packages/check" component={PackageCheck} />
         <Route path="/packages/:id" component={PackageView} />
         <Route path="/packages/:id/edit" component={PackageEditor} />
         <Route path="/calendar" component={Calendar} />

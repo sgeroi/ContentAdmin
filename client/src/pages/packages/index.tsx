@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { usePackages } from "@/hooks/use-packages";
 import { useTemplates } from "@/hooks/use-templates";
-import { Plus, Trash2, FileText, Eye, CalendarIcon, Search } from "lucide-react";
+import { Plus, Trash2, FileText, Eye, CalendarIcon, Search, FileCheck2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +37,7 @@ import { useLocation } from "wouter";
 import type { Package } from "@db/schema";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/use-user";
+import { Link } from "wouter";
 
 const getPackageStatus = (pkg: Package) => {
   if (!pkg.rounds?.length) return { label: "Новый", color: "bg-blue-500" };
@@ -315,22 +316,30 @@ export default function Packages() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Пакеты вопросов</h1>
-          <p className="text-muted-foreground">
-            Создание и управление пакетами вопросов
-          </p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Новый пакет
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-3xl">
+            <h1 className="text-3xl font-bold">Пакеты вопросов</h1>
+            <p className="text-muted-foreground">
+              Создание и управление пакетами вопросов
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/packages/check">
+              <Button variant="outline">
+                <FileCheck2 className="mr-2 h-4 w-4" />
+                Проверить пакет
+              </Button>
+            </Link>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Новый пакет
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+        
             <DialogHeader>
               <DialogTitle>Создать новый пакет</DialogTitle>
               <DialogDescription>
