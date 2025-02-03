@@ -910,6 +910,69 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add new endpoints for spell check and fact check after the questions API
+  app.post("/api/questions/spell-check", requireAuth, async (req, res) => {
+    try {
+      console.log('Spell check request:', req.body);
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({
+          message: "Text content is required"
+        });
+      }
+
+      // For now, return a mock response
+      // TODO: Implement actual spell checking logic
+      const corrections = [
+        {
+          original: "текст",
+          suggestion: "текст",
+          context: "Пример контекста",
+        }
+      ];
+
+      res.json({ corrections });
+    } catch (error: any) {
+      console.error('Spell check error:', error);
+      res.status(500).json({
+        message: error.message || "Failed to check spelling"
+      });
+    }
+  });
+
+  app.post("/api/questions/fact-check", requireAuth, async (req, res) => {
+    try {
+      console.log('Fact check request:', req.body);
+      const { text } = req.body;
+
+      if (!text) {
+        return res.status(400).json({
+          message: "Text content is required"
+        });
+      }
+
+      // For now, return a mock response
+      // TODO: Implement actual fact checking logic
+      const analysis = {
+        facts: [
+          {
+            statement: "Пример утверждения",
+            isCorrect: true,
+            explanation: "Объяснение"
+          }
+        ],
+        summary: "Общий анализ текста"
+      };
+
+      res.json({ analysis });
+    } catch (error: any) {
+      console.error('Fact check error:', error);
+      res.status(500).json({
+        message: error.message || "Failed to fact check"
+      });
+    }
+  });
   const httpServer = createServer(app);
   return httpServer;
 }

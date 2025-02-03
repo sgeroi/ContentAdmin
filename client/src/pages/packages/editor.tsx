@@ -485,7 +485,7 @@ function PackageHeader({
               <SelectValue placeholder="Выберите автора" />
             </SelectTrigger>
             <SelectContent>
-              {users?.map((user) => (
+              {users?.filter(user => user.id).map((user) => (
                 <SelectItem key={user.id} value={user.id.toString()}>
                   {user.username}
                 </SelectItem>
@@ -552,6 +552,7 @@ export default function PackageEditor() {
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
   const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const form = useForm<QuestionFormData>({
     defaultValues: {
@@ -1005,7 +1006,7 @@ export default function PackageEditor() {
     }
   };
 
-  const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
+    const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
     if (!currentRoundId) {
       toast({
         title: "Ошибка",
@@ -1015,30 +1016,35 @@ export default function PackageEditor() {
       return;
     }
 
+    setIsProcessing(true);
     try {
       const response = await fetch("/api/questions/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
         },
-        credentials: "include",
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: data.prompt,
-          count: data.count
+          count: data.count,
+          roundId: currentRoundId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to generate questions");
       }
 
-      const generatedQuestions = await response.json();
+      const result = await response.json();
 
-      // Add each generated question to the current round
-      for (const question of generatedQuestions) {
-        const round = packageData?.rounds.find((r) => r.id === currentRoundId);
-        if (round) {
+      if (!result.questions || !Array.isArray(result.questions)) {
+        throw new Error("Invalid response format from generation API");
+      }
+
+      // Add generated questions to the current round
+      const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+      if (round) {
+        for (const question of result.questions) {
           await handleAddQuestion(currentRoundId, question.id, round.questions?.length || 0);
         }
       }
@@ -1046,15 +1052,17 @@ export default function PackageEditor() {
       setIsGenerateQuestionsDialogOpen(false);
       toast({
         title: "Успех",
-        description: `Сгенерировано ${generatedQuestions.length} новых вопросов`
+        description: `Сгенерировано ${result.questions.length} вопросов`,
       });
     } catch (error: any) {
-      console.error('Error generating questions:', error);
+      console.error("Error generating questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
