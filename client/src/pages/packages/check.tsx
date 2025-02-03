@@ -2,36 +2,39 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Upload, Check, Brain, Download } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { WysiwygEditor } from "@/components/wysiwyg-editor";
 
 export default function PackageCheck() {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [content, setContent] = useState<string>("");
+  const [content, setContent] = useState<any>({});
   const [file, setFile] = useState<File | null>(null);
-  const [checkResults, setCheckResults] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setFile(file);
       // Читаем содержимое файла
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        setContent(text);
-      };
-      reader.readAsText(file);
+      const text = await file.text();
+      try {
+        // Пытаемся распарсить JSON если это сохраненный контент редактора
+        const jsonContent = JSON.parse(text);
+        setContent(jsonContent);
+      } catch {
+        // Если не JSON, устанавливаем как простой текст
+        setContent({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+      }
     }
   };
 
   const handleSpellCheck = async () => {
-    if (!content) {
+    if (!content || Object.keys(content).length === 0) {
       toast({
         title: "Ошибка",
         description: "Добавьте текст или загрузите файл",
@@ -55,7 +58,8 @@ export default function PackageCheck() {
       }
 
       const result = await response.json();
-      setCheckResults(result.corrections);
+      // Перенаправляем на страницу с результатами проверки
+      setLocation(`/packages/check/spelling-results?content=${encodeURIComponent(JSON.stringify(content))}&corrections=${encodeURIComponent(JSON.stringify(result.corrections))}`);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -68,7 +72,7 @@ export default function PackageCheck() {
   };
 
   const handleFactCheck = async () => {
-    if (!content) {
+    if (!content || Object.keys(content).length === 0) {
       toast({
         title: "Ошибка",
         description: "Добавьте текст или загрузите файл",
@@ -92,7 +96,8 @@ export default function PackageCheck() {
       }
 
       const result = await response.json();
-      setCheckResults(result.analysis);
+      // Перенаправляем на страницу с результатами проверки
+      setLocation(`/packages/check/fact-check-results?content=${encodeURIComponent(JSON.stringify(content))}&analysis=${encodeURIComponent(JSON.stringify(result.analysis))}`);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -107,9 +112,9 @@ export default function PackageCheck() {
   const handleSave = () => {
     // Создаем файл для скачивания
     const element = document.createElement("a");
-    const file = new Blob([checkResults], { type: 'text/plain' });
+    const file = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
     element.href = URL.createObjectURL(file);
-    element.download = "check-results.txt";
+    element.download = "package-content.json";
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -139,16 +144,15 @@ export default function PackageCheck() {
             <Input
               type="file"
               onChange={handleFileChange}
-              accept=".txt,.doc,.docx"
+              accept=".txt,.json"
             />
           </div>
           <div className="space-y-2">
-            <Label>Или вставьте текст</Label>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Вставьте текст пакета вопросов..."
+            <Label>Или введите текст</Label>
+            <WysiwygEditor
+              content={content}
+              onChange={setContent}
+              className="min-h-[400px]"
             />
           </div>
         </div>
@@ -156,7 +160,7 @@ export default function PackageCheck() {
         <div className="flex gap-4">
           <Button
             onClick={handleSpellCheck}
-            disabled={isProcessing || !content}
+            disabled={isProcessing || Object.keys(content).length === 0}
             className="flex-1"
           >
             <Check className="mr-2 h-4 w-4" />
@@ -164,7 +168,7 @@ export default function PackageCheck() {
           </Button>
           <Button
             onClick={handleFactCheck}
-            disabled={isProcessing || !content}
+            disabled={isProcessing || Object.keys(content).length === 0}
             className="flex-1"
           >
             <Brain className="mr-2 h-4 w-4" />
@@ -172,23 +176,14 @@ export default function PackageCheck() {
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!checkResults}
+            disabled={Object.keys(content).length === 0}
             variant="outline"
             className="flex-1"
           >
             <Download className="mr-2 h-4 w-4" />
-            Сохранить результат
+            Сохранить текст
           </Button>
         </div>
-
-        {checkResults && (
-          <div className="space-y-2">
-            <Label>Результаты проверки</Label>
-            <ScrollArea className="h-[400px] border rounded-md p-4">
-              <pre className="whitespace-pre-wrap">{checkResults}</pre>
-            </ScrollArea>
-          </div>
-        )}
       </Card>
     </div>
   );
