@@ -36,6 +36,20 @@ export default function PackageCheck() {
     }
   };
 
+  const extractTextContent = (content: any): string => {
+    if (!content || !content.content) return '';
+
+    return content.content.reduce((text: string, node: any) => {
+      if (node.type === 'paragraph') {
+        const paragraphText = node.content?.reduce((pText: string, textNode: any) => {
+          return pText + (textNode.text || '');
+        }, '') || '';
+        return text + paragraphText + '\n';
+      }
+      return text;
+    }, '');
+  };
+
   const handleSpellCheck = async () => {
     if (!content || Object.keys(content).length === 0) {
       toast({
@@ -48,20 +62,29 @@ export default function PackageCheck() {
 
     setIsProcessing(true);
     try {
+      const textContent = extractTextContent(content);
+
       const response = await fetch("/api/questions/spell-check", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ text: textContent }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to check spelling");
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to check spelling");
+      }
+
       // Перенаправляем на страницу с результатами проверки
       setLocation(`/packages/check/spelling-results?content=${encodeURIComponent(JSON.stringify(content))}&corrections=${encodeURIComponent(JSON.stringify(result.corrections))}`);
     } catch (error: any) {
@@ -87,20 +110,29 @@ export default function PackageCheck() {
 
     setIsProcessing(true);
     try {
+      const textContent = extractTextContent(content);
+
       const response = await fetch("/api/questions/fact-check", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ text: textContent }),
       });
 
-      if (!response.ok) {
-         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fact check");
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to fact check");
+      }
+
       // Перенаправляем на страницу с результатами проверки
       setLocation(`/packages/check/fact-check-results?content=${encodeURIComponent(JSON.stringify(content))}&analysis=${encodeURIComponent(JSON.stringify(result.analysis))}`);
     } catch (error: any) {
