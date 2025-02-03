@@ -49,6 +49,21 @@ import {
 } from "@/components/ui/select"
 import { useUsers } from "@/hooks/use-users"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 
 type PackageQuestion = Question & {
@@ -385,10 +400,10 @@ function QuestionItem({
   );
 }
 
-function PackageHeader({ 
+function PackageHeader({
   packageData,
   onSave,
-}: { 
+}: {
   packageData: PackageWithRounds;
   onSave: (data: Partial<Package>) => Promise<void>;
 }) {
@@ -477,8 +492,8 @@ function PackageHeader({
         </div>
         <div className="space-y-2">
           <Label>Автор</Label>
-          <Select 
-            value={authorId.toString()} 
+          <Select
+            value={authorId.toString()}
             onValueChange={(value) => setAuthorId(parseInt(value))}
           >
             <SelectTrigger>
@@ -539,6 +554,55 @@ function PackageHeader({
   );
 }
 
+function DraggableQuestionItem({
+  question,
+  index,
+  roundId,
+  roundQuestionCount,
+  handleAutoSave,
+  handleDelete,
+  form,
+  packageData,
+}: QuestionItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `${roundId}-${question.id}`,
+    data: {
+      type: 'question',
+      question,
+      roundId,
+      index,
+    },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <QuestionItem
+        question={question}
+        index={index}
+        roundId={roundId}
+        roundQuestionCount={roundQuestionCount}
+        handleAutoSave={handleAutoSave}
+        handleDelete={handleDelete}
+        form={form}
+        packageData={packageData}
+      />
+    </div>
+  );
+}
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -571,6 +635,21 @@ export default function PackageEditor() {
       difficulty: 1,
     },
   });
+  const [activeId, setActiveId] = useState<string | null>(null);
+    const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    })
+  );
+
 
   const handleQuestionClick = (id: string) => {
     setActiveQuestionId(id);
@@ -761,6 +840,80 @@ export default function PackageEditor() {
     }
   };
 
+    const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const [sourceRoundId, questionId] = (active.id as string).split('-');
+    const [targetRoundId, targetQuestionId] = (over.id as string).split('-');
+
+    if (sourceRoundId === targetRoundId) {
+      // Reorder within the same round
+      const round = packageData?.rounds.find(r => r.id === parseInt(sourceRoundId));
+      if (!round) return;
+
+      const oldIndex = round.questions.findIndex(q => q.id === parseInt(questionId));
+      const newIndex = round.questions.findIndex(q => q.id === parseInt(targetQuestionId));
+
+      try {
+        const response = await fetch(`/api/rounds/${sourceRoundId}/questions/reorder`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            questionId: parseInt(questionId),
+            newIndex,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to reorder questions');
+        }
+
+        // Refresh package data
+        const updatedPackage = await fetch(`/api/packages/${params.id}`, {
+          credentials: 'include',
+        }).then(res => res.json());
+
+        setPackageData(updatedPackage);
+      } catch (error: any) {
+        toast({
+          title: 'Ошибка',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // Move to different round
+      try {
+        await fetch(`/api/rounds/${sourceRoundId}/questions/${questionId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        const targetRound = packageData?.rounds.find(r => r.id === parseInt(targetRoundId));
+        if (!targetRound) return;
+
+        await handleAddQuestion(parseInt(targetRoundId), parseInt(questionId), targetRound.questions.length);
+      } catch (error: any) {
+        toast({
+          title: 'Ошибка',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+    }
+
+    setActiveId(null);
+  };
+
   const handleAutoSave = useCallback(
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
       setIsSaving(true);
@@ -854,8 +1007,7 @@ export default function PackageEditor() {
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (e) {
+        console.log('Parsed response data:', responseData);      } catch (e) {
         console.error('Failed to parse response:', e);
         throw new Error(`Invalid server response: ${responseText}`);
       }
@@ -1023,7 +1175,7 @@ export default function PackageEditor() {
           "Accept": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: data.prompt,
           count: data.count
         }),
@@ -1155,7 +1307,12 @@ export default function PackageEditor() {
     );
   }
 
-  return (
+    return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
     <div className="h-screen flex flex-col">
       <div className="border-b">
         <div className="container py-4">
@@ -1211,101 +1368,98 @@ export default function PackageEditor() {
                     round={round}
                     onSave={handleUpdateRound}
                   />
-                  <div className="space-y-4">
-                    {round.questions.map((question, index) => (
-                      <div
-                        key={`${round.id}-${question.id}`}
-                        ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
-                        className={cn(
-                          "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
-                        )}
-                      >
-                        <QuestionItem
-                          question={question}
-                          index={index}
-                          roundId={round.id}
-                          roundQuestionCount={round.questionCount}
-                          handleAutoSave={handleAutoSave}
-                          handleDelete={handleDeleteQuestion}
-                          form={form}
-                          packageData={packageData}
-                        />
-                      </div>
-                    ))}
-                    {isCreatingQuestion && currentRoundId === round.id && (
-                      <div className="rounded-lg border bg-card p-4">
-                        <Form {...createQuestionForm}>
-                          <form onSubmit={createQuestionForm.handleSubmit(handleCreateQuestion)} className="space-y-4">
-                            <FormField
-                              control={createQuestionForm.control}
-                              name="content"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Текст вопроса</FormLabel>
-                                  <FormControl>
-                                    <WysiwygEditor
-                                      content={field.value}
-                                      onChange={field.onChange}
-                                      className="min-h-[200px]"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={createQuestionForm.control}
-                              name="answer"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Ответ</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                             <FormField
-                              control={createQuestionForm.control}
-                              name="difficulty"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Сложность</FormLabel>
-                                  <FormControl>
-                                    <Input type="number" min={1} max={5} {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsCreatingQuestion(false)}
-                              >
-                                Отмена
-                              </Button>
-                              <Button type="submit">Создать</Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => {
-                        setCurrentRoundId(round.id);
-                        setIsAddQuestionDialogOpen(true);
-                      }}
+                    <CardContent className="space-y-6">
+                    <SortableContext
+                        items={round.questions.map(q => `${round.id}-${q.id}`)}
+                        strategy={verticalListSortingStrategy}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Добавить вопрос
-                    </Button>
-                  </div>
+                    {round.questions.map((question, index) => (
+                        <DraggableQuestionItem
+                        key={question.id}
+                        question={question}
+                        index={index}
+                        roundId={round.id}
+                        roundQuestionCount={round.questionCount}
+                        handleAutoSave={handleAutoSave}
+                        handleDelete={handleDeleteQuestion}
+                        form={form}
+                        packageData={packageData}
+                      />
+                    ))}
+                  </SortableContext>
+                  {isCreatingQuestion && currentRoundId === round.id && (
+                    <div className="rounded-lg border bg-card p-4">
+                      <Form {...createQuestionForm}>
+                        <form onSubmit={createQuestionForm.handleSubmit(handleCreateQuestion)} className="space-y-4">
+                          <FormField
+                            control={createQuestionForm.control}
+                            name="content"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Текст вопроса</FormLabel>
+                                <FormControl>
+                                  <WysiwygEditor
+                                    content={field.value}
+                                    onChange={field.onChange}
+                                    className="min-h-[200px]"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={createQuestionForm.control}
+                            name="answer"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Ответ</FormLabel>
+                                <FormControl>
+                                  <Input {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={createQuestionForm.control}
+                            name="difficulty"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Сложность</FormLabel>
+                                <FormControl>
+                                  <Input type="number" min={1} max={5} {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsCreatingQuestion(false)}
+                            >
+                              Отмена
+                            </Button>
+                            <Button type="submit">Создать</Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setCurrentRoundId(round.id);
+                      setIsAddQuestionDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Добавить вопрос
+                  </Button>
+                </CardContent>
                 </div>
               ))}
             </div>
@@ -1377,7 +1531,15 @@ export default function PackageEditor() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+          <DragOverlay>
+        {activeId ? (
+          <div className="bg-background border rounded-lg p-4 shadow-lg">
+            Перетаскивание вопроса...
+          </div>
+        ) : null}
+      </DragOverlay>
     </div>
+        </DndContext>
   );
 }
 
