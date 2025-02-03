@@ -357,7 +357,7 @@ function QuestionItem({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm text-muted-foreground">Вопрос {index + 1} из {roundQuestionCount}</span>
-            <Badge variant="outline">{question.author.username}</Badge>
+            <Badge variant="outline">{question.author?.username || 'Нет автора'}</Badge>
           </div>
           <WysiwygEditor
             content={question.content}
@@ -377,7 +377,7 @@ function QuestionItem({
       <div>
         <Label>Ответ</Label>
         <Input
-          value={question.answer}
+          value={question.answer || ''}
           onChange={(e) => handleAutoSave(question.id, { answer: e.target.value })}
         />
       </div>
@@ -385,10 +385,10 @@ function QuestionItem({
   );
 }
 
-function PackageHeader({ 
+function PackageHeader({
   packageData,
   onSave,
-}: { 
+}: {
   packageData: PackageWithRounds;
   onSave: (data: Partial<Package>) => Promise<void>;
 }) {
@@ -516,6 +516,64 @@ function PackageHeader({
   );
 }
 
+function CreateQuestionForm({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}) {
+  const form = useForm({
+    defaultValues: {
+      content: {},
+      answer: "",
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="content"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Текст вопроса</FormLabel>
+              <FormControl>
+                <WysiwygEditor
+                  content={field.value}
+                  onChange={field.onChange}
+                  className="min-h-[200px]"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="answer"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Ответ</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Отмена
+          </Button>
+          <Button type="submit">Создать</Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
+
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -527,9 +585,8 @@ export default function PackageEditor() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
-  const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const form = useForm<QuestionFormData>({
     defaultValues: {
@@ -542,13 +599,7 @@ export default function PackageEditor() {
       query: "",
     },
   });
-  const createQuestionForm = useForm<{ content: any; answer: string; difficulty: number }>({
-    defaultValues: {
-      content: {},
-      answer: "",
-      difficulty: 1,
-    },
-  });
+
 
   const handleQuestionClick = (id: string) => {
     setActiveQuestionId(id);
@@ -890,7 +941,7 @@ export default function PackageEditor() {
     fetchQuestions(data);
   }, []);
 
-  const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
+    const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
     try {
       const queryParams = new URLSearchParams();
       if (filters.query) queryParams.append("q", filters.query);
@@ -922,69 +973,68 @@ export default function PackageEditor() {
         setIsSearchDialogOpen(true);
         break;
       case "generate":
-        setIsGenerateQuestionsDialogOpen(true);
+          setIsGenerateQuestionsDialogOpen(true);
         break;
     }
   };
 
   const handleCreateQuestion = async (data: { content: any; answer: string; difficulty: number }) => {
-    try {
-      const response = await fetch('/api/questions', {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          title: "Вопрос",
-          ...data,
-        }),
-      });
-
-      console.log('Create question response status:', response.status);
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      let responseData;
       try {
-        responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error(`Invalid server response: ${responseText}`);
-      }
+          const response = await fetch('/api/questions', {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+              },
+              credentials: "include",
+              body: JSON.stringify({
+                  title: "Вопрос",
+                  ...data,
+              }),
+          });
 
-      if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to create question: ${response.statusText}`);
-      }
+          console.log('Create question response status:', response.status);
+          const responseText = await response.text();
+          console.log('Raw response:', responseText);
 
-      // Add the new question to the current round
-      if (currentRoundId) {
-        const round = packageData?.rounds.find((r) => r.id === currentRoundId);
-        if (round) {
-          const questionId = responseData.id || responseData.data?.id;
-          if (!questionId) {
-            throw new Error('No question ID in response');
+          let responseData;
+          try {
+              responseData = JSON.parse(responseText);
+              console.log('Parsed response data:', responseData);
+          } catch (e) {
+              console.error('Failed to parse response:', e);
+              throw new Error(`Invalid server response: ${responseText}`);
           }
-          await handleAddQuestion(currentRoundId, questionId, round.questions?.length || 0);
-        }
-      }
 
-      setIsCreatingQuestion(false);
-      createQuestionForm.reset();
-      toast({
-        title: "Успех",
-        description: "Вопрос создан",
-      });
-    } catch (error: any) {
-      console.error('Error creating question:', error);
-      toast({
+          if (!response.ok) {
+              throw new Error(responseData?.error || `Failed to create question: ${response.statusText}`);
+          }
+
+          // Add the new question to the current round
+          if (currentRoundId) {
+              const round = packageData?.rounds.find((r) => r.id === currentRoundId);
+              if (round) {
+                const questionId = responseData.id || responseData.data?.id;
+                if (!questionId) {
+                  throw new Error('No question ID in response');
+                }
+                await handleAddQuestion(currentRoundId, questionId, round.questions?.length || 0);
+              }
+          }
+
+          setIsCreatingQuestion(false);
+           toast({
+              title: "Успех",
+              description: "Вопрос создан",
+          });
+      } catch (error: any) {
+          console.error('Error creating question:', error);
+            toast({
                 title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+              description: error.message,
+              variant: "destructive",
+          });
+      }
   };
 
     const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
@@ -1240,10 +1290,10 @@ export default function PackageEditor() {
                         <Button
                           variant="outline"
                           className="w-full"
-                          onClick={() => {
-                            setCurrentRoundId(round.id);
-                            setIsAddQuestionDialogOpen(true);
-                          }}
+                           onClick={() => {
+                              setCurrentRoundId(round.id);
+                              setIsAddQuestionDialogOpen(true);
+                            }}
                         >
                           <Plus className="mr-2 h-4 w-4" />
                           Добавить вопрос
@@ -1309,7 +1359,7 @@ export default function PackageEditor() {
                     />
                     <div className="flex justify-end">
                       <Button
-                        onClick={() => {
+                       onClick={() => {
                           if (currentRoundId) {
                             const round = packageData?.rounds.find(
                               (r) => r.id === currentRoundId
@@ -1346,7 +1396,7 @@ export default function PackageEditor() {
               Опишите тему и укажите количество вопросов для генерации
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
+           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(handleGenerateQuestions)}
               className="space-y-4"
@@ -1367,27 +1417,27 @@ export default function PackageEditor() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="count"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Количество вопросов</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={10}
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(parseInt(e.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="count"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Количество вопросов</FormLabel>
+                          <FormControl>
+                              <Input
+                                  type="number"
+                                  min={1}
+                                  max={10}
+                                  {...field}
+                                  onChange={(e) =>
+                                      field.onChange(parseInt(e.target.value))
+                                  }
+                              />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+                />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -1397,20 +1447,36 @@ export default function PackageEditor() {
                   Отмена
                 </Button>
                 <Button type="submit" disabled={isProcessing}>
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Генерация...
-                    </>
-                  ) : (
-                    "Генерировать"
-                  )}
-                </Button>
+                   {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Генерация...
+                      </>
+                    ) : (
+                        "Генерировать"
+                    )}
+                  </Button>
               </div>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+         {isCreatingQuestion && (
+            <Dialog open={isCreatingQuestion} onOpenChange={setIsCreatingQuestion}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Создание вопроса</DialogTitle>
+                        <DialogDescription>
+                           Заполните форму для создания вопроса
+                        </DialogDescription>
+                    </DialogHeader>
+                    <CreateQuestionForm
+                        onSubmit={handleCreateQuestion}
+                        onCancel={() => setIsCreatingQuestion(false)}
+                    />
+                </DialogContent>
+            </Dialog>
+        )}
 
       <AutoSaveStatus saving={isSaving} />
     </div>
