@@ -439,17 +439,14 @@ export function registerRoutes(app: Express): Server {
           {
             role: "system",
             content: `You are a spelling and grammar checker. Analyze the following text for spelling, punctuation, and grammar errors. 
-            Return a JSON object with:
-            1. correctedText: the text with all corrections applied, maintaining original HTML
-            2. comments: an array of objects with { text: original problematic text, correction: corrected version, explanation: why it was corrected }
-            Example response format:
+            You must respond only with a JSON object in this exact format, no other text:
             {
-              "correctedText": "<p>Corrected text here</p>",
+              "correctedText": "text with all corrections applied",
               "comments": [
                 {
                   "text": "incorrect text",
                   "correction": "correct text",
-                  "explanation": "This was corrected because..."
+                  "explanation": "why it was corrected"
                 }
               ]
             }`
@@ -458,8 +455,7 @@ export function registerRoutes(app: Express): Server {
             role: "user",
             content: textContent
           }
-        ],
-        response_format: { type: "json_object" }
+        ]
       });
 
       const result = JSON.parse(completion.choices[0].message.content);
@@ -481,18 +477,15 @@ export function registerRoutes(app: Express): Server {
         messages: [
           {
             role: "system",
-            content: `You are a fact checker. Analyze the following text for factual accuracy. 
-            Return a JSON object with:
-            1. correctedText: the text with all corrections applied, maintaining original HTML
-            2. comments: an array of objects with { text: original claim, correction: corrected version, explanation: why it needed correction }
-            Example response format:
+            content: `You are a fact checker. Analyze the following text for factual accuracy.
+            You must respond only with a JSON object in this exact format, no other text:
             {
-              "correctedText": "<p>Factually correct text here</p>",
+              "correctedText": "text with all corrections applied",
               "comments": [
                 {
                   "text": "incorrect claim",
                   "correction": "correct claim",
-                  "explanation": "This was corrected because..."
+                  "explanation": "why it needed correction"
                 }
               ]
             }`
@@ -501,8 +494,7 @@ export function registerRoutes(app: Express): Server {
             role: "user",
             content: textContent
           }
-        ],
-        response_format: { type: "json_object" }
+        ]
       });
 
       const result = JSON.parse(completion.choices[0].message.content);
@@ -951,7 +943,7 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: error.message });
     }
   });
-
+  
     app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
     try {
       await db
