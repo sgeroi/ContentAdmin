@@ -909,7 +909,78 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
-
+  app.post("/api/rounds/:roundId/questions/reorder", requireAuth, async (req, res) => {
+    try {
+      const roundId = parseInt(req.params.roundId);
+      const { questionId, newIndex, sourceRoundId } = req.body;
+  
+      // First, remove the question from the source round
+      if (sourceRoundId) {
+        await db
+          .delete(roundQuestions)
+          .where(
+            and(
+              eq(roundQuestions.roundId, sourceRoundId),
+              eq(roundQuestions.questionId, questionId)
+            )
+          );
+      }
+  
+      // Get existing questions in the destination round
+      const existingQuestions = await db
+        .select()
+        .from(roundQuestions)
+        .where(eq(roundQuestions.roundId, roundId))
+        .orderBy(asc(roundQuestions.orderIndex));
+  
+      // Calculate new order indices
+      const updatedQuestions = [...existingQuestions];
+      if (sourceRoundId && sourceRoundId !== roundId) {
+        // If moving between rounds, insert at the new index
+        updatedQuestions.splice(newIndex, 0, {
+          roundId,
+          questionId,
+          orderIndex: newIndex,
+          id: 0 // This will be assigned by the database
+        });
+      } else {
+        // If reordering within the same round, find and move the question
+        const oldIndex = updatedQuestions.findIndex(q => q.questionId === questionId);
+        const [movedQuestion] = updatedQuestions.splice(oldIndex, 1);
+        updatedQuestions.splice(newIndex, 0, movedQuestion);
+      }
+  
+      // Update order indices for all questions
+      for (let i = 0; i < updatedQuestions.length; i++) {
+        updatedQuestions[i].orderIndex = i;
+      }
+  
+      // Begin transaction
+      await db.transaction(async (tx) => {
+        // Delete existing questions if reordering within the same round
+        if (!sourceRoundId || sourceRoundId === roundId) {
+          await tx
+            .delete(roundQuestions)
+            .where(eq(roundQuestions.roundId, roundId));
+        }
+  
+        // Insert questions with new order
+        await tx
+          .insert(roundQuestions)
+          .values(updatedQuestions.map(q => ({
+            roundId,
+            questionId: q.questionId,
+            orderIndex: q.orderIndex
+          })));
+      });
+  
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error reordering questions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }
