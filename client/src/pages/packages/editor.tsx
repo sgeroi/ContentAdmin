@@ -113,8 +113,15 @@ function NavigationItem({
       </CollapsibleTrigger>
       <CollapsibleContent className="pl-6 space-y-1">
         <Droppable droppableId={`round-${round.id}`}>
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps}>
+          {(provided, snapshot) => (
+            <div 
+              ref={provided.innerRef} 
+              {...provided.droppableProps}
+              className={cn(
+                "min-h-[8px] transition-colors",
+                snapshot.isDraggingOver && "bg-accent/50 rounded-md"
+              )}
+            >
               {round.questions.map((question, index) => (
                 <Draggable 
                   key={question.id} 
@@ -127,9 +134,9 @@ function NavigationItem({
                       {...provided.draggableProps}
                       {...provided.dragHandleProps}
                       className={cn(
-                        "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2",
+                        "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2 transition-colors",
                         activeQuestionId === `${round.id}-${question.id}` && "bg-accent",
-                        snapshot.isDragging && "opacity-50"
+                        snapshot.isDragging && "bg-accent opacity-50"
                       )}
                       onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
                     >
@@ -1150,25 +1157,34 @@ export default function PackageEditor() {
   };
 
     const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination || !packageData) return;
+    const { source, destination, draggableId } = result;
 
-    const sourceRoundId = parseInt(result.source.droppableId.replace('round-', ''));
-    const destinationRoundId = parseInt(result.destination.droppableId.replace('round-', ''));
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
+    // If dropped outside or no change
+    if (!destination || 
+        (source.droppableId === destination.droppableId && 
+         source.index === destination.index)) {
+      return;
+    }
 
-    // Create a copy of the package data to update optimistically
-    const newPackageData = { ...packageData };
+    // Extract round IDs from droppableIds
+    const sourceRoundId = parseInt(source.droppableId.replace('round-', ''));
+    const destinationRoundId = parseInt(destination.droppableId.replace('round-', ''));
+    const questionId = parseInt(draggableId.replace('question-', ''));
+
+    // Create a deep copy of the package data
+    const newPackageData = JSON.parse(JSON.stringify(packageData));
+
+    // Find source and destination rounds
     const sourceRound = newPackageData.rounds.find(r => r.id === sourceRoundId);
     const destinationRound = newPackageData.rounds.find(r => r.id === destinationRoundId);
 
     if (!sourceRound || !destinationRound) return;
 
-    // Remove question from source round
-    const [movedQuestion] = sourceRound.questions.splice(sourceIndex, 1);
+    // Remove from source
+    const [movedQuestion] = sourceRound.questions.splice(source.index, 1);
 
-    // Add question to destination round
-    destinationRound.questions.splice(destinationIndex, 0, movedQuestion);
+    // Add to destination
+    destinationRound.questions.splice(destination.index, 0, movedQuestion);
 
     // Update state optimistically
     setPackageData(newPackageData);
@@ -1182,30 +1198,29 @@ export default function PackageEditor() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          questionId: parseInt(result.draggableId.replace('question-', '')),
-          newIndex: destinationIndex,
-          sourceRoundId: sourceRoundId,
+          questionId,
+          newIndex: destination.index,
+          sourceRoundId: sourceRoundId !== destinationRoundId ? sourceRoundId : undefined,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update question order');
+        throw new Error(await response.text());
       }
 
-      // Refresh package data to ensure we have the latest state
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+      // Refresh package data
+      const refreshResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: 'include',
       });
 
-      if (!updatedResponse.ok) {
-        throw new Error('Failed to fetch updated package data');
+      if (!refreshResponse.ok) {
+        throw new Error('Failed to refresh package data');
       }
 
-      const updatedData = await updatedResponse.json();
-      setPackageData(updatedData);
-
+      const refreshedData = await refreshResponse.json();
+      setPackageData(refreshedData);
     } catch (error: any) {
-      console.error('Error updating question order:', error);
+      console.error('Error reordering questions:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -1469,26 +1484,12 @@ export default function PackageEditor() {
 
 function getContentPreview(content: any): string {
   try {
-    if (content?.content) {
-      let preview = "";
-      const extractText = (nodes: any[]): string => {
-        let text = "";
-        for (const node of nodes) {
-          if (node.text) {
-            text += node.text;
-          }
-          if (node.content) {
-            text += extractText(node.content);
-          }
-        }
-        return text;
-      };
-      preview = extractText(content.content);
-      return preview.length > 50 ? preview.slice(0, 50) + "..." : preview;
-    }
-    return "Нет содержания";
-  } catch (error) {
-    console.error("Error parsing content:", error);
-    return "Ошибка контента";
+    if (!content?.content) return 'Нет содержимого';
+    return content.content
+      .map((node: any) => node.content?.map((n: any) => n.text).join('') || '')
+      .join(' ')
+      .slice(0, 100);
+  } catch {
+    return 'Ошибка отображения';
   }
 }
