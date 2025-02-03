@@ -92,7 +92,7 @@ type QuestionSearchFilters = {
   query: string;
 };
 
-interface QuestionItemProps {
+type QuestionItemProps = {
   question: PackageQuestion;
   index: number;
   roundId: number;
@@ -101,7 +101,8 @@ interface QuestionItemProps {
   handleDelete: (roundId: number, questionId: number) => Promise<void>;
   form: any;
   packageData: PackageWithRounds;
-}
+  questionRefs?: React.MutableRefObject<{ [key: string]: HTMLDivElement | null }>;
+};
 
 function NavigationItem({
   round,
@@ -564,6 +565,7 @@ function DraggableQuestionItem({
   form,
   packageData,
   isActive,
+  questionRefs,
 }: QuestionItemProps & { isActive?: boolean }) {
   const {
     attributes,
@@ -591,7 +593,7 @@ function DraggableQuestionItem({
     <div 
       ref={(el) => {
         setNodeRef(el);
-        if (questionRefs.current) {
+        if (questionRefs?.current) {
           questionRefs.current[`${roundId}-${question.id}`] = el;
         }
       }}
@@ -1388,6 +1390,7 @@ export default function PackageEditor() {
                                 form={form}
                                 packageData={packageData}
                                 isActive={activeQuestionId === `${round.id}-${question.id}`}
+                                questionRefs={questionRefs}
                               />
                             ))}
                           </SortableContext>
