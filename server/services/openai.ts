@@ -50,7 +50,6 @@ function extractImagesFromContent(content: any): string[] {
   return images;
 }
 
-// Extract text content from the JSON structure
 function extractTextFromContent(content: any): string {
   try {
     if (!content?.content) return '';
@@ -59,7 +58,7 @@ function extractTextFromContent(content: any): string {
     const traverse = (nodes: any[]) => {
       for (const node of nodes) {
         if (node.type === 'text') {
-          text += node.text;
+          text += node.text + ' ';
         }
         if (node.content) {
           traverse(node.content);
@@ -67,24 +66,44 @@ function extractTextFromContent(content: any): string {
       }
     };
     traverse(content.content);
-    return text;
+    return text.trim();
   } catch (error) {
     console.error('Error extracting text from content:', error);
     return '';
   }
 }
 
-// Create content structure from text
-function createContentFromText(text: string): any {
+function updateContentWithCorrections(originalContent: any, correctedText: string): any {
+  if (!originalContent?.content) return originalContent;
+
+  let currentPosition = 0;
+  const correctedWords = correctedText.split(/\s+/);
+  let wordIndex = 0;
+
+  const traverse = (nodes: any[]): any[] => {
+    return nodes.map(node => {
+      if (node.type === 'text' && wordIndex < correctedWords.length) {
+        const words = node.text.split(/(\s+)/);
+        const corrected = words.map(word => {
+          if (word.trim()) {
+            const correctedWord = correctedWords[wordIndex++] || word;
+            return correctedWord;
+          }
+          return word;
+        }).join('');
+
+        return { ...node, text: corrected };
+      }
+      if (node.content) {
+        return { ...node, content: traverse(node.content) };
+      }
+      return node;
+    });
+  };
+
   return {
-    type: "doc",
-    content: [{
-      type: "paragraph",
-      content: [{
-        type: "text",
-        text: text
-      }]
-    }]
+    ...originalContent,
+    content: traverse(originalContent.content)
   };
 }
 
@@ -116,6 +135,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
     });
 
     const result = JSON.parse(response.choices[0]?.message?.content || '');
+    const correctedContent = updateContentWithCorrections(content, result.correctedText);
 
     return {
       isValid: true,
@@ -126,7 +146,7 @@ export async function validateQuestion(title: string, content: any, topic: strin
       suggestions: result.corrections || [],
       citations: [],
       correctedTitle: title,
-      correctedContent: createContentFromText(result.correctedText)
+      correctedContent
     };
   } catch (error: any) {
     console.error('Error validating question:', error);
