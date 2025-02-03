@@ -322,12 +322,6 @@ export default function Packages() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href="/packages/check">
-            <Button variant="outline">
-              <FileCheck2 className="mr-2 h-4 w-4" />
-              Проверить пакет
-            </Button>
-          </Link>
           <Dialog 
             open={isDialogOpen} 
             onOpenChange={(open) => {
