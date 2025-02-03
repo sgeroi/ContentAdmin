@@ -40,11 +40,10 @@ export default function PackageCheck() {
     if (!content || !content.content) return '';
 
     return content.content.reduce((text: string, node: any) => {
-      if (node.type === 'paragraph') {
-        const paragraphText = node.content?.reduce((pText: string, textNode: any) => {
-          return pText + (textNode.text || '');
-        }, '') || '';
-        return text + paragraphText + '\n';
+      if (node.type === 'text') {
+        return text + (node.text || '');
+      } else if (node.content) {
+        return text + extractTextContent({ content: node.content });
       }
       return text;
     }, '');
@@ -63,6 +62,7 @@ export default function PackageCheck() {
     setIsProcessing(true);
     try {
       const textContent = extractTextContent(content);
+      console.log('Sending text content:', textContent); // Debug log
 
       const response = await fetch("/api/questions/spell-check", {
         method: "POST",
@@ -73,21 +73,27 @@ export default function PackageCheck() {
       });
 
       const responseText = await response.text();
+      console.log('Raw API response:', responseText); // Debug log
+
       let result;
       try {
         result = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse response:', responseText);
-        throw new Error('Invalid response from server');
+        throw new Error(`Invalid response format: ${responseText.substring(0, 100)}...`);
       }
 
       if (!response.ok) {
-        throw new Error(result.message || "Failed to check spelling");
+        throw new Error(result.message || `Server error: ${response.status}`);
       }
 
-      // Перенаправляем на страницу с результатами проверки
+      if (!result.corrections) {
+        throw new Error('Missing corrections in response');
+      }
+
       setLocation(`/packages/check/spelling-results?content=${encodeURIComponent(JSON.stringify(content))}&corrections=${encodeURIComponent(JSON.stringify(result.corrections))}`);
     } catch (error: any) {
+      console.error('Spell check error:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -111,6 +117,7 @@ export default function PackageCheck() {
     setIsProcessing(true);
     try {
       const textContent = extractTextContent(content);
+      console.log('Sending text content:', textContent); // Debug log
 
       const response = await fetch("/api/questions/fact-check", {
         method: "POST",
@@ -121,21 +128,27 @@ export default function PackageCheck() {
       });
 
       const responseText = await response.text();
+      console.log('Raw API response:', responseText); // Debug log
+
       let result;
       try {
         result = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse response:', responseText);
-        throw new Error('Invalid response from server');
+        throw new Error(`Invalid response format: ${responseText.substring(0, 100)}...`);
       }
 
       if (!response.ok) {
-        throw new Error(result.message || "Failed to fact check");
+        throw new Error(result.message || `Server error: ${response.status}`);
       }
 
-      // Перенаправляем на страницу с результатами проверки
+      if (!result.analysis) {
+        throw new Error('Missing analysis in response');
+      }
+
       setLocation(`/packages/check/fact-check-results?content=${encodeURIComponent(JSON.stringify(content))}&analysis=${encodeURIComponent(JSON.stringify(result.analysis))}`);
     } catch (error: any) {
+      console.error('Fact check error:', error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -184,19 +197,17 @@ export default function PackageCheck() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link href="/packages">
-            <Button variant="ghost" className="mb-4">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Назад к пакетам
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Проверка пакета вопросов</h1>
-          <p className="text-muted-foreground">
-            Загрузите файл или вставьте текст для проверки
-          </p>
-        </div>
+      <div>
+        <Link href="/packages">
+          <Button variant="ghost" className="mb-4">
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Назад к пакетам
+          </Button>
+        </Link>
+        <h1 className="text-3xl font-bold">Проверка пакета вопросов</h1>
+        <p className="text-muted-foreground">
+          Загрузите файл или вставьте текст для проверки
+        </p>
       </div>
 
       <Card className="p-6 space-y-4">
