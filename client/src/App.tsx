@@ -19,6 +19,7 @@ import Rounds from "@/pages/rounds";
 import Templates from "@/pages/templates";
 import PackageView from "@/pages/packages/[id]";
 import Calendar from "@/pages/calendar";
+import VerifyContent from "@/pages/verify";
 
 function Router() {
   const { user, isLoading } = useUser();
@@ -54,6 +55,7 @@ function Router() {
         <Route path="/tags" component={Tags} />
         <Route path="/rounds" component={Rounds} />
         <Route path="/templates" component={Templates} />
+        <Route path="/verify" component={VerifyContent} />
         {user.role === "admin" && (
           <Route path="/users" component={Users} />
         )}

@@ -10,6 +10,7 @@ import {
   Layers,
   CircuitBoard,
   Calendar,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/hooks/use-user";
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Шаблоны", href: "/templates", icon: Layers },
   { name: "Пакеты", href: "/packages", icon: Package },
   { name: "Календарь", href: "/calendar", icon: Calendar },
+  { name: "Проверка", href: "/verify", icon: CheckCircle2 },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

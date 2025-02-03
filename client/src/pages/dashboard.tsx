@@ -61,7 +61,7 @@ export default function Dashboard() {
               Создавайте новые вопросы автоматически с помощью ИИ
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-col gap-4">
             <Link href="/questions/generate">
               <Button className="w-full">
                 <Wand2 className="mr-2 h-4 w-4" />
