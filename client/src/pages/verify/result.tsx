@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import { useLocation, Link } from "wouter";
+import { useEffect } from "react";
 
 interface VerifyResultState {
   correctedText: string;
@@ -13,8 +14,15 @@ interface VerifyResultState {
 }
 
 export default function VerifyResult() {
-  const [, params] = useLocation();
-  const { correctedText, comments } = params as unknown as VerifyResultState;
+  const [location, params] = useLocation();
+  const { correctedText = '', comments = [] } = (params || {}) as VerifyResultState;
+
+  useEffect(() => {
+    // If no data is present, redirect back to verify page
+    if (!correctedText && !comments.length) {
+      window.location.href = '/verify';
+    }
+  }, [correctedText, comments]);
 
   return (
     <div className="space-y-6">
@@ -32,7 +40,7 @@ export default function VerifyResult() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Исправленный текст</CardTitle>
@@ -63,6 +71,9 @@ export default function VerifyResult() {
                   </p>
                 </div>
               ))}
+              {!comments.length && (
+                <p className="text-muted-foreground">Нет комментариев</p>
+              )}
             </div>
           </CardContent>
         </Card>
