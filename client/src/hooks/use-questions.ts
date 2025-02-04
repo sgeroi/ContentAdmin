@@ -47,14 +47,21 @@ export function useQuestions(page: number = 1) {
     staleTime: 1000 * 60, // Cache for 1 minute
   });
 
-  const getQuestion = async (id: number): Promise<QuestionWithPackages> => {
-    const response = await fetch(`/api/questions/${id}`, {
-      credentials: 'include'
+  const useQuestionQuery = (id?: string) => {
+    return useQuery<QuestionWithPackages>({
+      queryKey: [`/api/questions/${id}`],
+      queryFn: async () => {
+        if (!id) throw new Error("Question ID is required");
+        const response = await fetch(`/api/questions/${id}`, {
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        return response.json();
+      },
+      enabled: !!id,
     });
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    return response.json();
   };
 
   const validateMutation = useMutation({
@@ -179,7 +186,7 @@ export function useQuestions(page: number = 1) {
     currentPage: data?.page ?? page,
     limit: data?.limit ?? 10,
     isLoading,
-    getQuestion,
+    useQuestionQuery,
     validateQuestion: validateMutation.mutateAsync,
     factCheckQuestion: factCheckMutation.mutateAsync,
     createQuestion: createMutation.mutateAsync,

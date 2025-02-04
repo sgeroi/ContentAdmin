@@ -19,7 +19,7 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +36,11 @@ type FormData = {
 
 export default function QuestionEditor({ id }: { id?: string }) {
   const [, setLocation] = useLocation();
-  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, getQuestion } = useQuestions();
+  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, useQuestionQuery } = useQuestions();
+  const { data: question, isLoading: isLoadingQuestion } = useQuestionQuery(id);
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
-  const [questionPackages, setQuestionPackages] = useState<Array<{
-    id: number;
-    title: string;
-    playDate: string | null;
-  }>>([]);
   const { tags } = useTags();
 
   const form = useForm<FormData>({
@@ -56,32 +52,15 @@ export default function QuestionEditor({ id }: { id?: string }) {
     },
   });
 
-  useEffect(() => {
-    const loadQuestion = async () => {
-      if (id) {
-        try {
-          const question = await getQuestion(parseInt(id));
-          form.reset({
-            content: question.content,
-            difficulty: question.difficulty.toString(),
-            tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
-            comment: question.comment || "",
-          });
-          if (question.packages) {
-            setQuestionPackages(question.packages);
-          }
-        } catch (error: any) {
-          toast({
-            title: "Ошибка",
-            description: error.message,
-            variant: "destructive",
-          });
-        }
-      }
-    };
-
-    loadQuestion();
-  }, [id, form, getQuestion]);
+  // Only update form when question data changes
+  if (question && !form.getValues().content.content?.[0]?.content?.[0]?.text) {
+    form.reset({
+      content: question.content,
+      difficulty: question.difficulty.toString(),
+      tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
+      comment: question.comment || "",
+    });
+  }
 
   const handleCancel = () => {
     setLocation("/questions");
@@ -135,23 +114,12 @@ export default function QuestionEditor({ id }: { id?: string }) {
   };
 
   const handleFactCheck = async (data: FormData) => {
-    if (!data.content || Object.keys(data.content).length === 0) {
-      toast({
-        title: "Ошибка",
-        description: "Заполните содержание вопроса перед проверкой",
-        variant: "destructive",
-        duration: 5000,
-      });
-      return;
-    }
-
     setIsFactChecking(true);
     try {
       const result = await factCheckQuestion({
         title: "Временный заголовок",
         content: data.content,
         topic: "",
-        id: id ? parseInt(id) : undefined,
       });
 
       toast({
@@ -209,6 +177,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
     }
   };
 
+  if (isLoadingQuestion) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-border" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -228,14 +204,14 @@ export default function QuestionEditor({ id }: { id?: string }) {
         </p>
       </div>
 
-      {questionPackages.length > 0 && (
+      {question?.packages && question.packages.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Используется в пакетах</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {questionPackages.map((pkg) => (
+              {question.packages.map((pkg) => (
                 <Badge key={pkg.id} variant="secondary">
                   {pkg.title}
                   {pkg.playDate && ` (${format(new Date(pkg.playDate), "PP")})`}
