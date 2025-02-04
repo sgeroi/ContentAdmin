@@ -234,6 +234,7 @@ export async function factCheckQuestion(title: string, content: any, topic: stri
 export async function generateQuizQuestions(count: number = 10, topic?: string, prompt?: string): Promise<Array<{
   title: string;
   content: any;
+  answer: string;
   topic: string;
   difficulty: number;
 }>> {
@@ -258,7 +259,7 @@ export async function generateQuizQuestions(count: number = 10, topic?: string, 
           content: `Ты - эксперт по созданию интересных вопросов для викторины. 
           ${promptText}
           Вопросы должны быть разной сложности (от 1 до 5).
-          ВАЖНО: Ответ должен быть включен в текст вопроса, после вопроса, начиная с новой строки и со слова "Ответ:".
+          Для каждого вопроса обязательно укажи правильный ответ.
           Верни JSON в формате:
           {
             "questions": [{
@@ -286,6 +287,7 @@ export async function generateQuizQuestions(count: number = 10, topic?: string, 
                   }
                 ]
               },
+              "answer": "правильный ответ на вопрос",
               "topic": "${topic || 'тема вопроса (одна из: История, Наука, География, Литература, Искусство, Музыка, Спорт, Технологии)'}",
               "difficulty": число от 1 до 5
             }]

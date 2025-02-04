@@ -23,21 +23,32 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 type FormData = {
   content: any;
+  topic: string;
   difficulty: string;
+  answer: string;
   tags: string[];
-  comment: string;
+  comment: string; // Added comment field
 };
+
+const topics = [
+  "История",
+  "Наука",
+  "География",
+  "Литература",
+  "Искусство",
+  "Музыка",
+  "Спорт",
+  "Технологии",
+];
 
 export default function QuestionEditor({ id }: { id?: string }) {
   const [, setLocation] = useLocation();
-  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, useQuestionQuery } = useQuestions();
-  const { data: question, isLoading: isLoadingQuestion } = useQuestionQuery(id);
+  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, questions } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
@@ -45,37 +56,30 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const form = useForm<FormData>({
     defaultValues: {
-      content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
+      content: {},
+      topic: "",
       difficulty: "1",
+      answer: "",
       tags: [],
-      comment: "",
+      comment: "", // Added default value for comment
     },
   });
 
   useEffect(() => {
-    if (question) {
-      console.log('Question data loaded:', question);
-      const defaultContent = {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: "" }]
-          }
-        ]
-      };
-
-      const resetData = {
-        content: question.content || defaultContent,
-        difficulty: question.difficulty?.toString() || "1",
-        tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
-        comment: question.comment || "",
-      };
-
-      console.log('Resetting form with data:', resetData);
-      form.reset(resetData, { keepDefaultValues: false });
+    if (id) {
+      const question = questions.find(q => q.id === parseInt(id));
+      if (question) {
+        form.reset({
+          content: question.content,
+          topic: question.topic,
+          difficulty: question.difficulty.toString(),
+          answer: question.answer || "",
+          tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
+          comment: question.comment || "", // Added comment reset
+        });
+      }
     }
-  }, [question, form]);
+  }, [id, questions, form]);
 
   const handleCancel = () => {
     setLocation("/questions");
@@ -87,7 +91,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       const result = await validateQuestion({
         title: "Временный заголовок",
         content: data.content,
-        topic: "", // We still need to pass topic but it can be empty
+        topic: data.topic,
       });
 
       form.setValue("content", result.correctedContent, { shouldValidate: true });
@@ -129,12 +133,23 @@ export default function QuestionEditor({ id }: { id?: string }) {
   };
 
   const handleFactCheck = async (data: FormData) => {
+    if (!data.content || Object.keys(data.content).length === 0) {
+      toast({
+        title: "Ошибка",
+        description: "Заполните содержание вопроса перед проверкой",
+        variant: "destructive",
+        duration: 5000,
+      });
+      return;
+    }
+
     setIsFactChecking(true);
     try {
       const result = await factCheckQuestion({
         title: "Временный заголовок",
         content: data.content,
-        topic: "",
+        topic: data.topic,
+        id: id ? parseInt(id) : undefined,
       });
 
       toast({
@@ -156,12 +171,10 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const onSubmit = async (data: FormData) => {
     try {
-      console.log('Submitting form with data:', data);
       const questionData = {
         ...data,
         title: "Вопрос",
         difficulty: parseInt(data.difficulty),
-        topic: "", // We still need to pass topic but it can be empty
       };
 
       if (id) {
@@ -193,14 +206,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
     }
   };
 
-  if (isLoadingQuestion) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-border" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -220,24 +225,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
         </p>
       </div>
 
-      {question?.packages && question.packages.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Используется в пакетах</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {question.packages.map((pkg) => (
-                <Badge key={pkg.id} variant="secondary">
-                  {pkg.title}
-                  {pkg.playDate && ` (${format(new Date(pkg.playDate), "PP")})`}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -249,12 +236,41 @@ export default function QuestionEditor({ id }: { id?: string }) {
                 <FormControl>
                   <WysiwygEditor
                     content={field.value}
-                    onChange={(value) => {
-                      console.log('WysiwygEditor onChange value:', value);
-                      field.onChange(value);
-                    }}
-                    className="min-h-[400px]"
-                    uploadEndpoint="/api/uploads"
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="answer"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ответ</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Введите правильный ответ"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="comment"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Комментарий</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Введите комментарий к вопросу"
+                    {...field}
                   />
                 </FormControl>
                 <FormMessage />
@@ -263,6 +279,34 @@ export default function QuestionEditor({ id }: { id?: string }) {
           />
 
           <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="topic"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Тема</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите тему" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {topics.map((topic) => (
+                        <SelectItem key={topic} value={topic}>
+                          {topic}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="difficulty"
@@ -315,23 +359,6 @@ export default function QuestionEditor({ id }: { id?: string }) {
                     </Badge>
                   ))}
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="comment"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Комментарий</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Введите комментарий к вопросу"
-                    {...field}
-                  />
-                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

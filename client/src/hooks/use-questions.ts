@@ -21,14 +21,6 @@ interface QuestionsResponse {
   limit: number;
 }
 
-interface QuestionWithPackages extends Question {
-  packages: Array<{
-    id: number;
-    title: string;
-    playDate: string | null;
-  }>;
-}
-
 export function useQuestions(page: number = 1) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -46,23 +38,6 @@ export function useQuestions(page: number = 1) {
     },
     staleTime: 1000 * 60, // Cache for 1 minute
   });
-
-  const useQuestionQuery = (id?: string) => {
-    return useQuery<QuestionWithPackages>({
-      queryKey: [`/api/questions/${id}`],
-      queryFn: async () => {
-        if (!id) throw new Error("Question ID is required");
-        const response = await fetch(`/api/questions/${id}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-        return response.json();
-      },
-      enabled: !!id,
-    });
-  };
 
   const validateMutation = useMutation({
     mutationFn: async (data: { title: string; content: any; topic: string }) => {
@@ -186,7 +161,6 @@ export function useQuestions(page: number = 1) {
     currentPage: data?.page ?? page,
     limit: data?.limit ?? 10,
     isLoading,
-    useQuestionQuery,
     validateQuestion: validateMutation.mutateAsync,
     factCheckQuestion: factCheckMutation.mutateAsync,
     createQuestion: createMutation.mutateAsync,
