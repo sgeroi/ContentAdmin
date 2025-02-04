@@ -19,7 +19,7 @@ import { WysiwygEditor } from "@/components/wysiwyg-editor";
 import { useQuestions } from "@/hooks/use-questions";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
@@ -52,15 +52,17 @@ export default function QuestionEditor({ id }: { id?: string }) {
     },
   });
 
-  // Only update form when question data changes
-  if (question && !form.getValues().content.content?.[0]?.content?.[0]?.text) {
-    form.reset({
-      content: question.content,
-      difficulty: question.difficulty.toString(),
-      tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
-      comment: question.comment || "",
-    });
-  }
+  useEffect(() => {
+    if (question) {
+      console.log('Updating form with question data:', question);
+      form.reset({
+        content: question.content || { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
+        difficulty: question.difficulty?.toString() || "1",
+        tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
+        comment: question.comment || "",
+      });
+    }
+  }, [question, form]);
 
   const handleCancel = () => {
     setLocation("/questions");
@@ -141,6 +143,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const onSubmit = async (data: FormData) => {
     try {
+      console.log('Submitting form with data:', data);
       const questionData = {
         ...data,
         title: "Вопрос",
@@ -233,7 +236,12 @@ export default function QuestionEditor({ id }: { id?: string }) {
                 <FormControl>
                   <WysiwygEditor
                     content={field.value}
-                    onChange={field.onChange}
+                    onChange={(value) => {
+                      console.log('WysiwygEditor onChange value:', value);
+                      field.onChange(value);
+                    }}
+                    className="min-h-[400px]"
+                    uploadEndpoint="/api/uploads"
                   />
                 </FormControl>
                 <FormMessage />
