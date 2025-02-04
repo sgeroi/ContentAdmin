@@ -25,6 +25,7 @@ import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 
 type FormData = {
   content: any;
@@ -48,7 +49,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   const form = useForm<FormData>({
     defaultValues: {
-      content: {},
+      content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
       difficulty: "1",
       tags: [],
       comment: "",
@@ -80,7 +81,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
     };
 
     loadQuestion();
-  }, [id, form]);
+  }, [id, form, getQuestion]);
 
   const handleCancel = () => {
     setLocation("/questions");
