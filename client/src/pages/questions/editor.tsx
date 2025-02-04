@@ -23,63 +23,64 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTags } from "@/hooks/use-tags";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type FormData = {
   content: any;
-  topic: string;
   difficulty: string;
-  answer: string;
   tags: string[];
-  comment: string; // Added comment field
+  comment: string;
 };
-
-const topics = [
-  "История",
-  "Наука",
-  "География",
-  "Литература",
-  "Искусство",
-  "Музыка",
-  "Спорт",
-  "Технологии",
-];
 
 export default function QuestionEditor({ id }: { id?: string }) {
   const [, setLocation] = useLocation();
-  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, questions } = useQuestions();
+  const { createQuestion, updateQuestion, validateQuestion, factCheckQuestion, getQuestion } = useQuestions();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const [isFactChecking, setIsFactChecking] = useState(false);
+  const [questionPackages, setQuestionPackages] = useState<Array<{
+    id: number;
+    title: string;
+    playDate: string | null;
+  }>>([]);
   const { tags } = useTags();
 
   const form = useForm<FormData>({
     defaultValues: {
       content: {},
-      topic: "",
       difficulty: "1",
-      answer: "",
       tags: [],
-      comment: "", // Added default value for comment
+      comment: "",
     },
   });
 
   useEffect(() => {
-    if (id) {
-      const question = questions.find(q => q.id === parseInt(id));
-      if (question) {
-        form.reset({
-          content: question.content,
-          topic: question.topic,
-          difficulty: question.difficulty.toString(),
-          answer: question.answer || "",
-          tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
-          comment: question.comment || "", // Added comment reset
-        });
+    const loadQuestion = async () => {
+      if (id) {
+        try {
+          const question = await getQuestion(parseInt(id));
+          form.reset({
+            content: question.content,
+            difficulty: question.difficulty.toString(),
+            tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
+            comment: question.comment || "",
+          });
+          if (question.packages) {
+            setQuestionPackages(question.packages);
+          }
+        } catch (error: any) {
+          toast({
+            title: "Ошибка",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
       }
-    }
-  }, [id, questions, form]);
+    };
+
+    loadQuestion();
+  }, [id, form]);
 
   const handleCancel = () => {
     setLocation("/questions");
@@ -91,7 +92,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       const result = await validateQuestion({
         title: "Временный заголовок",
         content: data.content,
-        topic: data.topic,
+        topic: "", // We still need to pass topic but it can be empty
       });
 
       form.setValue("content", result.correctedContent, { shouldValidate: true });
@@ -148,7 +149,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
       const result = await factCheckQuestion({
         title: "Временный заголовок",
         content: data.content,
-        topic: data.topic,
+        topic: "",
         id: id ? parseInt(id) : undefined,
       });
 
@@ -175,6 +176,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
         ...data,
         title: "Вопрос",
         difficulty: parseInt(data.difficulty),
+        topic: "", // We still need to pass topic but it can be empty
       };
 
       if (id) {
@@ -225,6 +227,24 @@ export default function QuestionEditor({ id }: { id?: string }) {
         </p>
       </div>
 
+      {questionPackages.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Используется в пакетах</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {questionPackages.map((pkg) => (
+                <Badge key={pkg.id} variant="secondary">
+                  {pkg.title}
+                  {pkg.playDate && ` (${format(new Date(pkg.playDate), "PP")})`}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -244,69 +264,7 @@ export default function QuestionEditor({ id }: { id?: string }) {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="answer"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Ответ</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Введите правильный ответ"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="comment"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Комментарий</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Введите комментарий к вопросу"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <div className="grid gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="topic"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Тема</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите тему" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic} value={topic}>
-                          {topic}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="difficulty"
@@ -359,6 +317,23 @@ export default function QuestionEditor({ id }: { id?: string }) {
                     </Badge>
                   ))}
                 </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="comment"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Комментарий</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Введите комментарий к вопросу"
+                    {...field}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
