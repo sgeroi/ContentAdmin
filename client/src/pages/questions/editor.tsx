@@ -54,13 +54,26 @@ export default function QuestionEditor({ id }: { id?: string }) {
 
   useEffect(() => {
     if (question) {
-      console.log('Updating form with question data:', question);
-      form.reset({
-        content: question.content || { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "" }] }] },
+      console.log('Question data loaded:', question);
+      const defaultContent = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "" }]
+          }
+        ]
+      };
+
+      const resetData = {
+        content: question.content || defaultContent,
         difficulty: question.difficulty?.toString() || "1",
         tags: question.questionTags?.map(qt => qt.tag.id.toString()) || [],
         comment: question.comment || "",
-      });
+      };
+
+      console.log('Resetting form with data:', resetData);
+      form.reset(resetData, { keepDefaultValues: false });
     }
   }, [question, form]);
 
