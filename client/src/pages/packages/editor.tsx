@@ -1,8 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Plus, ChevronRight, Search, Edit2, Pencil, Sparkles, Trash2, CalendarIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  Plus,
+  ChevronRight,
+  Search,
+  Edit2,
+  Pencil,
+  Sparkles,
+  Trash2,
+  CalendarIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Package, Question } from "@db/schema";
 import { WysiwygEditor } from "@/components/wysiwyg-editor";
@@ -38,21 +48,44 @@ import debounce from "lodash/debounce";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useUsers } from "@/hooks/use-users"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
+} from "@/components/ui/select";
+import { useUsers } from "@/hooks/use-users";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  closestCorners,
+  DndContext,
+  DragEndEvent,
+  DragMoveEvent,
+  DragStartEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { UniqueIdentifier } from "@dnd-kit/core";
+import { GripVertical } from "lucide-react";
 
 type PackageQuestion = Question & {
-  author: { username: string; };
+  author: { username: string };
 };
 
 type Round = {
@@ -77,6 +110,10 @@ type QuestionSearchFilters = {
   query: string;
 };
 
+type DNDType = {
+  id: UniqueIdentifier;
+};
+
 interface QuestionItemProps {
   question: PackageQuestion;
   index: number;
@@ -86,6 +123,82 @@ interface QuestionItemProps {
   handleDelete: (roundId: number, questionId: number) => Promise<void>;
   form: any;
   packageData: PackageWithRounds;
+}
+
+function Question({
+  tempId,
+  questionId,
+  roundId,
+  questionContent,
+  onQuestionClick,
+  activeQuestionId,
+  orderNumber,
+  index,
+}: any) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({
+      id: questionId,
+      data: {
+        type: "question",
+      },
+    });
+
+  const style = {
+    transition,
+    transform: CSS.Transform.toString(transform),
+  };
+
+  return (
+    <div className="flex flex-row items-center">
+      <div className="w-[10px] flex items-center">
+        <span className="text-muted-foreground text-sm">{index}</span>
+      </div>
+      <div
+        ref={setNodeRef}
+        {...attributes}
+        style={style}
+        key={questionId}
+        className={cn(
+          "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2 w-full",
+          activeQuestionId === `${roundId}-${tempId}` && "bg-accent"
+        )}
+        onClick={() => onQuestionClick(`${roundId}-${tempId}`)}
+      >
+        <div className="flex flex-row w-full items-center">
+          <div {...listeners} className="w-[10%]">
+            <GripVertical size="16" />
+          </div>
+          <div className="w-[90%]">
+            <span className="truncate">
+              {getContentPreview(questionContent)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestionColumn({ round, onQuestionClick, activeQuestionId }: any) {
+  return (
+    <div>
+      <SortableContext items={round.roundQuestions.map(({ id }) => id)}>
+        {round.roundQuestions.map(({ id, orderIndex, question }, index) => (
+          <Question
+            activeQuestionId={activeQuestionId}
+            key={id}
+            tempId={question.id}
+            questionId={id}
+            roundId={round.id}
+            questionContent={question.content}
+            onQuestionClick={onQuestionClick}
+            orderNumber={orderIndex + 1}
+            index={index + 1}
+          />
+        ))}
+      </SortableContext>
+    </div>
+  );
 }
 
 function NavigationItem({
@@ -99,43 +212,67 @@ function NavigationItem({
 }) {
   const [isOpen, setIsOpen] = useState(true);
 
+  const {
+    attributes,
+    setNodeRef,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: round.id,
+    data: {
+      type: "round",
+    },
+  });
+
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
-        <div className="flex items-center gap-2">
-          <ChevronRight className={cn("h-4 w-4 transition-transform", isOpen && "rotate-90")} />
-          <span>Раунд {round.orderIndex + 1}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">{round.questions.length} / {round.questionCount}</Badge>
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pl-6 space-y-1">
-        {round.questions.map((question, index) => (
-          <div
-            key={question.id}
-            className={cn(
-              "py-1 px-2 rounded cursor-pointer text-sm flex items-center gap-2",
-              activeQuestionId === `${round.id}-${question.id}` && "bg-accent"
-            )}
-            onClick={() => onQuestionClick(`${round.id}-${question.id}`)}
-          >
-            <span className="text-muted-foreground">{index + 1}.</span>
-            <span className="truncate">{getContentPreview(question.content)}</span>
+    <div
+      {...attributes}
+      ref={setNodeRef}
+      style={{
+        transition,
+        transform: CSS.Translate.toString(transform),
+      }}
+    >
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="flex w-full items-center justify-between py-2 hover:bg-accent rounded px-2">
+          <div className="flex items-center gap-2">
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 transition-transform",
+                isOpen && "rotate-90"
+              )}
+            />
+            <span>Раунд {round.orderIndex + 1}</span>
           </div>
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">
+              {round.questions.length} / {round.questionCount}
+            </Badge>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pl-6 space-y-1">
+          <QuestionColumn
+            round={round}
+            onQuestionClick={onQuestionClick}
+            activeQuestionId={activeQuestionId}
+          />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
 function AutoSaveStatus({ saving }: { saving: boolean }) {
   return (
     <div className="fixed top-4 right-4 flex items-center gap-2 text-sm text-muted-foreground">
-      <div className={cn(
-        "h-2 w-2 rounded-full transition-colors",
-        saving ? "bg-yellow-500" : "bg-green-500"
-      )} />
+      <div
+        className={cn(
+          "h-2 w-2 rounded-full transition-colors",
+          saving ? "bg-yellow-500" : "bg-green-500"
+        )}
+      />
       {saving ? "Сохранение..." : "Все изменения сохранены"}
     </div>
   );
@@ -146,7 +283,10 @@ function RoundHeader({
   onSave,
 }: {
   round: Round;
-  onSave: (id: number, data: { name: string; description: string }) => Promise<void>;
+  onSave: (
+    id: number,
+    data: { name: string; description: string }
+  ) => Promise<void>;
 }) {
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState(round.name);
@@ -162,7 +302,7 @@ function RoundHeader({
     try {
       await onSave(round.id, {
         name: name || "Новый раунд",
-        description: description || "Описание раунда"
+        description: description || "Описание раунда",
       });
       setEditMode(false);
     } catch (error) {
@@ -271,7 +411,6 @@ function AddQuestionDialog({
   );
 }
 
-
 function GenerateQuestionsDialog({
   open,
   onOpenChange,
@@ -329,7 +468,11 @@ function GenerateQuestionsDialog({
               )}
             />
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Отмена
               </Button>
               <Button type="submit">Генерировать</Button>
@@ -356,7 +499,9 @@ function QuestionItem({
       <div className="flex justify-between items-start gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm text-muted-foreground">Вопрос {index + 1} из {roundQuestionCount}</span>
+            <span className="text-sm text-muted-foreground">
+              Вопрос {index + 1} из {roundQuestionCount}
+            </span>
             <Badge variant="outline">{question.author.username}</Badge>
           </div>
           <WysiwygEditor
@@ -378,24 +523,28 @@ function QuestionItem({
         <Label>Ответ</Label>
         <Input
           value={question.answer}
-          onChange={(e) => handleAutoSave(question.id, { answer: e.target.value })}
+          onChange={(e) =>
+            handleAutoSave(question.id, { answer: e.target.value })
+          }
         />
       </div>
     </div>
   );
 }
 
-function PackageHeader({ 
+function PackageHeader({
   packageData,
   onSave,
-}: { 
+}: {
   packageData: PackageWithRounds;
   onSave: (data: Partial<Package>) => Promise<void>;
 }) {
   const [editMode, setEditMode] = useState(false);
   const [title, setTitle] = useState(packageData.title);
   const [description, setDescription] = useState(packageData.description || "");
-  const [playDate, setPlayDate] = useState<Date | undefined>(packageData.playDate ? new Date(packageData.playDate) : undefined);
+  const [playDate, setPlayDate] = useState<Date | undefined>(
+    packageData.playDate ? new Date(packageData.playDate) : undefined
+  );
   const [authorId, setAuthorId] = useState<number>(packageData.authorId);
   const { users } = useUsers();
   const { toast } = useToast();
@@ -403,12 +552,15 @@ function PackageHeader({
   useEffect(() => {
     setTitle(packageData.title);
     setDescription(packageData.description || "");
-    setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
+    setPlayDate(
+      packageData.playDate ? new Date(packageData.playDate) : undefined
+    );
     setAuthorId(packageData.authorId);
   }, [packageData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
       await onSave({
         title,
@@ -422,7 +574,7 @@ function PackageHeader({
         description: "Пакет обновлен",
       });
     } catch (error: any) {
-      console.error('Error saving package:', error);
+      console.error("Error saving package:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -462,7 +614,11 @@ function PackageHeader({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {playDate ? format(playDate, "PPP") : <span>Выберите дату</span>}
+                {playDate ? (
+                  format(playDate, "PPP")
+                ) : (
+                  <span>Выберите дату</span>
+                )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
@@ -477,8 +633,8 @@ function PackageHeader({
         </div>
         <div className="space-y-2">
           <Label>Автор</Label>
-          <Select 
-            value={authorId.toString()} 
+          <Select
+            value={authorId.toString()}
             onValueChange={(value) => setAuthorId(parseInt(value))}
           >
             <SelectTrigger>
@@ -501,7 +657,11 @@ function PackageHeader({
               setEditMode(false);
               setTitle(packageData.title);
               setDescription(packageData.description || "");
-              setPlayDate(packageData.playDate ? new Date(packageData.playDate) : undefined);
+              setPlayDate(
+                packageData.playDate
+                  ? new Date(packageData.playDate)
+                  : undefined
+              );
               setAuthorId(packageData.authorId);
             }}
           >
@@ -517,7 +677,9 @@ function PackageHeader({
     <div className="flex justify-between items-start">
       <div>
         <h1 className="text-2xl font-bold">{title}</h1>
-        {description && <p className="text-muted-foreground mt-1">{description}</p>}
+        {description && (
+          <p className="text-muted-foreground mt-1">{description}</p>
+        )}
         <div className="flex gap-2 mt-2">
           {playDate && (
             <Badge variant="secondary">
@@ -542,7 +704,11 @@ function PackageHeader({
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
-  const [packageData, setPackageData] = useState<PackageWithRounds | null>(null);
+  const [packageData, setPackageData] = useState<PackageWithRounds | null>(
+    null
+  );
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
@@ -550,9 +716,11 @@ export default function PackageEditor() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = useState(false);
-  const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] = useState(false);
+  const [isGenerateQuestionsDialogOpen, setIsGenerateQuestionsDialogOpen] =
+    useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
   const questionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
   const form = useForm<QuestionFormData>({
     defaultValues: {
       content: {},
@@ -564,13 +732,24 @@ export default function PackageEditor() {
       query: "",
     },
   });
-  const createQuestionForm = useForm<{ content: any; answer: string; difficulty: number }>({
+  const createQuestionForm = useForm<{
+    content: any;
+    answer: string;
+    difficulty: number;
+  }>({
     defaultValues: {
       content: {},
       answer: "",
       difficulty: 1,
     },
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleQuestionClick = (id: string) => {
     setActiveQuestionId(id);
@@ -579,6 +758,43 @@ export default function PackageEditor() {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
+
+  const transformPackages = useCallback((data) => {
+    const newRounds = data.rounds.map((round) => {
+      return {
+        ...round,
+        id: `round-${round.id}`,
+        roundQuestions: round.roundQuestions.map((question) => ({
+          ...question,
+          id: `question-${question.id}`,
+        })),
+      };
+    });
+
+    return {
+      ...data,
+      rounds: newRounds,
+    };
+  }, []);
+
+  const removePrefixes = useCallback((rounds) => {
+    const newRounds = rounds.map((round) => {
+      const newRoundId = round.id.replace(/^round-/, "");
+
+      const newRoundQuestions = round.roundQuestions.map((question) => ({
+        ...question,
+        id: question.id.replace(/^question-/, ""),
+      }));
+
+      return {
+        ...round,
+        id: newRoundId,
+        roundQuestions: newRoundQuestions,
+      };
+    });
+
+    return newRounds;
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -590,7 +806,7 @@ export default function PackageEditor() {
           throw new Error("Failed to fetch package data");
         }
         const packageResult = await packageResponse.json();
-        setPackageData(packageResult);
+        setPackageData(transformPackages(packageResult));
 
         await fetchQuestions();
       } catch (error: any) {
@@ -608,85 +824,91 @@ export default function PackageEditor() {
     fetchData();
   }, [params.id]);
 
-  const handleUpdateRound = useCallback(async (id: number, data: { name: string; description: string }) => {
-    setIsSaving(true);
-    try {
-      console.log('Updating round:', id, data);
-
-      const response = await fetch(`/api/rounds/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          name: data.name,
-          description: data.description
-        }),
-      });
-
-      console.log('Update response status:', response.status);
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
-
-      let responseData;
+  const handleUpdateRound = useCallback(
+    async (id: number, data: { name: string; description: string }) => {
+      setIsSaving(true);
       try {
-        responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (e) {
-        console.error('Failed to parse response:', e);
-        throw new Error(`Invalid server response: ${responseText}`);
+        console.log("Updating round:", id, data);
+
+        const response = await fetch(`/api/rounds/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            name: data.name,
+            description: data.description,
+          }),
+        });
+
+        console.log("Update response status:", response.status);
+        const responseText = await response.text();
+        console.log("Raw response:", responseText);
+
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log("Parsed response data:", responseData);
+        } catch (e) {
+          console.error("Failed to parse response:", e);
+          throw new Error(`Invalid server response: ${responseText}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            responseData?.error ||
+              `Failed to update round: ${response.statusText}`
+          );
+        }
+
+        const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!updatedResponse.ok) {
+          throw new Error("Failed to fetch updated package data");
+        }
+
+        const updatedText = await updatedResponse.text();
+        console.log("Raw updated package response:", updatedText);
+
+        let updatedData;
+        try {
+          updatedData = JSON.parse(updatedText);
+          console.log("Parsed package data:", updatedData);
+        } catch (e) {
+          console.error("Failed to parse updated package data:", e);
+          throw new Error(`Invalid package response: ${updatedText}`);
+        }
+
+        setPackageData(transformPackages(updatedData));
+        toast({
+          title: "Успех",
+          description: "Раунд обновлен",
+        });
+      } catch (error: any) {
+        console.error("Error updating round:", error);
+        toast({
+          title: "Ошибка",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
       }
-
-      if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to update round: ${response.statusText}`);
-      }
-
-      const updatedResponse = await fetch(`/api/packages/${params.id}`, {
-        credentials: "include",
-        headers: {
-          "Accept": "application/json",
-        },
-      });
-
-      if (!updatedResponse.ok) {
-        throw new Error("Failed to fetch updated package data");
-      }
-
-      const updatedText = await updatedResponse.text();
-      console.log('Raw updated package response:', updatedText);
-
-      let updatedData;
-      try {
-        updatedData = JSON.parse(updatedText);
-        console.log('Parsed package data:', updatedData);
-      } catch (e) {
-        console.error('Failed to parse updated package data:', e);
-        throw new Error(`Invalid package response: ${updatedText}`);
-      }
-
-      setPackageData(updatedData);
-      toast({
-        title: "Успех",
-        description: "Раунд обновлен",
-      });
-    } catch (error: any) {
-      console.error('Error updating round:', error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [params.id, toast]);
+    },
+    [params.id, toast]
+  );
 
   const handleAddRound = async () => {
     try {
       const orderIndex = packageData?.rounds.length || 0;
-      console.log('Adding new round with index:', orderIndex);
+      console.log("Adding new round with index:", orderIndex);
 
       const roundData = {
         name: "Новый раунд",
@@ -700,33 +922,35 @@ export default function PackageEditor() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         credentials: "include",
         body: JSON.stringify(roundData),
       });
 
-      console.log('Round creation response status:', response.status);
+      console.log("Round creation response status:", response.status);
       const responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log("Raw response:", responseText);
 
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
+        console.log("Parsed response data:", responseData);
       } catch (e) {
-        console.error('Failed to parse response:', e);
+        console.error("Failed to parse response:", e);
         throw new Error(`Invalid server response: ${responseText}`);
       }
 
       if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to add round: ${response.statusText}`);
+        throw new Error(
+          responseData?.error || `Failed to add round: ${response.statusText}`
+        );
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       });
 
@@ -735,24 +959,24 @@ export default function PackageEditor() {
       }
 
       const updatedText = await updatedResponse.text();
-      console.log('Raw updated package response:', updatedText);
+      console.log("Raw updated package response:", updatedText);
 
       let updatedData;
       try {
         updatedData = JSON.parse(updatedText);
-        console.log('Parsed package data:', updatedData);
+        console.log("Parsed package data:", updatedData);
       } catch (e) {
-        console.error('Failed to parse updated package data:', e);
+        console.error("Failed to parse updated package data:", e);
         throw new Error(`Invalid package response: ${updatedText}`);
       }
 
-      setPackageData(updatedData);
+      setPackageData(transformPackages(updatedData));
       toast({
         title: "Успех",
         description: "Раунд добавлен",
       });
     } catch (error: any) {
-      console.error('Error adding round:', error);
+      console.error("Error adding round:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -761,43 +985,59 @@ export default function PackageEditor() {
     }
   };
 
-  const handleAutoSave = useCallback(
-    debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
+  const handleAutoSaveQuestionsOrder = useCallback(
+    debounce(async (rounds: any) => {
       setIsSaving(true);
-      try {
-        console.log('Auto-saving question:', questionId, data);
+      console.log("Auto-saving questions order:", rounds);
 
-        const response = await fetch(`/api/questions/${questionId}`, {
-          method: "PUT",
+      const data = {
+        rounds: rounds.map((round: any) => {
+          return {
+            ...round,
+            roundQuestions: round.roundQuestions.map(
+              (roundQuestion: any, index: number) => ({
+                ...roundQuestion,
+                orderIndex: index,
+              })
+            ),
+          };
+        }),
+      };
+
+      try {
+        const response = await fetch(`/api/round-questions/save-order`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            Accept: "application/json",
           },
-          credentials: "include",
           body: JSON.stringify(data),
         });
 
-        console.log('Question update response status:', response.status);
+        console.log("Questions order update response status:", response.status);
         const responseText = await response.text();
-        console.log('Raw response:', responseText);
+        console.log("Raw response:", responseText);
 
         let responseData;
         try {
           responseData = JSON.parse(responseText);
-          console.log('Parsed response data:', responseData);
+          console.log("Parsed response data:", responseData);
         } catch (e) {
-          console.error('Failed to parse response:', e);
+          console.error("Failed to parse response:", e);
           throw new Error(`Invalid server response: ${responseText}`);
         }
 
         if (!response.ok) {
-          throw new Error(responseData?.error || `Failed to save question: ${response.statusText}`);
+          throw new Error(
+            responseData?.error ||
+              `Failed to save question: ${response.statusText}`
+          );
         }
 
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
           headers: {
-            "Accept": "application/json",
+            Accept: "application/json",
           },
         });
 
@@ -806,20 +1046,20 @@ export default function PackageEditor() {
         }
 
         const updatedText = await updatedResponse.text();
-        console.log('Raw updated package response:', updatedText);
+        console.log("Raw updated package response:", updatedText);
 
         let updatedData;
         try {
           updatedData = JSON.parse(updatedText);
-          console.log('Parsed package data:', updatedData);
+          console.log("Parsed package data:", updatedData);
         } catch (e) {
-          console.error('Failed to parse updated package data:', e);
+          console.error("Failed to parse updated package data:", e);
           throw new Error(`Invalid package response: ${updatedText}`);
         }
 
-        setPackageData(updatedData);
+        setPackageData(transformPackages(updatedData));
       } catch (error: any) {
-        console.error('Error auto-saving:', error);
+        console.error("Error auto-saving:", error);
         toast({
           title: "Ошибка автосохранения",
           description: error.message,
@@ -832,13 +1072,91 @@ export default function PackageEditor() {
     [params.id, toast]
   );
 
-  const handleAddQuestion = async (roundId: number, questionId: number, position: number) => {
+  const handleAutoSave = useCallback(
+    debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
+      setIsSaving(true);
+      try {
+        console.log("Auto-saving question:", questionId, data);
+
+        const response = await fetch(`/api/questions/${questionId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+
+        console.log("Question update response status:", response.status);
+        const responseText = await response.text();
+        console.log("Raw response:", responseText);
+
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log("Parsed response data:", responseData);
+        } catch (e) {
+          console.error("Failed to parse response:", e);
+          throw new Error(`Invalid server response: ${responseText}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            responseData?.error ||
+              `Failed to save question: ${response.statusText}`
+          );
+        }
+
+        const updatedResponse = await fetch(`/api/packages/${params.id}`, {
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!updatedResponse.ok) {
+          throw new Error("Failed to fetch updated package data");
+        }
+
+        const updatedText = await updatedResponse.text();
+        console.log("Raw updated package response:", updatedText);
+
+        let updatedData;
+        try {
+          updatedData = JSON.parse(updatedText);
+          console.log("Parsed package data:", updatedData);
+        } catch (e) {
+          console.error("Failed to parse updated package data:", e);
+          throw new Error(`Invalid package response: ${updatedText}`);
+        }
+
+        setPackageData(transformPackages(updatedData));
+      } catch (error: any) {
+        console.error("Error auto-saving:", error);
+        toast({
+          title: "Ошибка автосохранения",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000),
+    [params.id, toast]
+  );
+
+  const handleAddQuestion = async (
+    roundId: number,
+    questionId: number,
+    position: number
+  ) => {
     try {
       const response = await fetch(`/api/rounds/${roundId}/questions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
@@ -847,27 +1165,30 @@ export default function PackageEditor() {
         }),
       });
 
-      console.log('Add question response status:', response.status);
+      console.log("Add question response status:", response.status);
       const responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log("Raw response:", responseText);
 
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
+        console.log("Parsed response data:", responseData);
       } catch (e) {
-        console.error('Failed to parse response:', e);
+        console.error("Failed to parse response:", e);
         throw new Error(`Invalid server response: ${responseText}`);
       }
 
       if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to add question to round: ${response.statusText}`);
+        throw new Error(
+          responseData?.error ||
+            `Failed to add question to round: ${response.statusText}`
+        );
       }
 
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       });
 
@@ -876,18 +1197,18 @@ export default function PackageEditor() {
       }
 
       const updatedText = await updatedResponse.text();
-      console.log('Raw updated package response:', updatedText);
+      console.log("Raw updated package response:", updatedText);
 
       let updatedData;
       try {
         updatedData = JSON.parse(updatedText);
-        console.log('Parsed package data:', updatedData);
+        console.log("Parsed package data:", updatedData);
       } catch (e) {
-        console.error('Failed to parse updated package data:', e);
+        console.error("Failed to parse updated package data:", e);
         throw new Error(`Invalid package response: ${updatedText}`);
       }
 
-      setPackageData(updatedData);
+      setPackageData(transformPackages(updatedData));
       setIsSearchDialogOpen(false);
 
       toast({
@@ -908,7 +1229,9 @@ export default function PackageEditor() {
     fetchQuestions(data);
   }, []);
 
-  const fetchQuestions = async (filters: QuestionSearchFilters = { query: "" }) => {
+  const fetchQuestions = async (
+    filters: QuestionSearchFilters = { query: "" }
+  ) => {
     try {
       const queryParams = new URLSearchParams();
       if (filters.query) queryParams.append("q", filters.query);
@@ -945,13 +1268,17 @@ export default function PackageEditor() {
     }
   };
 
-  const handleCreateQuestion = async (data: { content: any; answer: string; difficulty: number }) => {
+  const handleCreateQuestion = async (data: {
+    content: any;
+    answer: string;
+    difficulty: number;
+  }) => {
     try {
-      const response = await fetch('/api/questions', {
+      const response = await fetch("/api/questions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         credentials: "include",
         body: JSON.stringify({
@@ -960,21 +1287,24 @@ export default function PackageEditor() {
         }),
       });
 
-      console.log('Create question response status:', response.status);
+      console.log("Create question response status:", response.status);
       const responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log("Raw response:", responseText);
 
       let responseData;
       try {
         responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
+        console.log("Parsed response data:", responseData);
       } catch (e) {
-        console.error('Failed to parse response:', e);
+        console.error("Failed to parse response:", e);
         throw new Error(`Invalid server response: ${responseText}`);
       }
 
       if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to create question: ${response.statusText}`);
+        throw new Error(
+          responseData?.error ||
+            `Failed to create question: ${response.statusText}`
+        );
       }
 
       // Add the new question to the current round
@@ -983,9 +1313,16 @@ export default function PackageEditor() {
         if (round) {
           const questionId = responseData.id || responseData.data?.id;
           if (!questionId) {
-            throw new Error('No question ID in response');
+            throw new Error("No question ID in response");
           }
-          await handleAddQuestion(currentRoundId, questionId, round.questions?.length || 0);
+          const roundId = Number(
+            currentRoundId.toString().replace(/^round-/, "")
+          );
+          await handleAddQuestion(
+            roundId,
+            questionId,
+            round.questions?.length || 0
+          );
         }
       }
 
@@ -996,7 +1333,7 @@ export default function PackageEditor() {
         description: "Вопрос создан",
       });
     } catch (error: any) {
-      console.error('Error creating question:', error);
+      console.error("Error creating question:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -1005,7 +1342,10 @@ export default function PackageEditor() {
     }
   };
 
-  const handleGenerateQuestions = async (data: { prompt: string; count: number }) => {
+  const handleGenerateQuestions = async (data: {
+    prompt: string;
+    count: number;
+  }) => {
     if (!currentRoundId) {
       toast({
         title: "Ошибка",
@@ -1020,12 +1360,12 @@ export default function PackageEditor() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: data.prompt,
-          count: data.count
+          count: data.count,
         }),
       });
 
@@ -1039,17 +1379,21 @@ export default function PackageEditor() {
       for (const question of generatedQuestions) {
         const round = packageData?.rounds.find((r) => r.id === currentRoundId);
         if (round) {
-          await handleAddQuestion(currentRoundId, question.id, round.questions?.length || 0);
+          await handleAddQuestion(
+            currentRoundId,
+            question.id,
+            round.questions?.length || 0
+          );
         }
       }
 
       setIsGenerateQuestionsDialogOpen(false);
       toast({
         title: "Успех",
-        description: `Сгенерировано ${generatedQuestions.length} новых вопросов`
+        description: `Сгенерировано ${generatedQuestions.length} новых вопросов`,
       });
     } catch (error: any) {
-      console.error('Error generating questions:', error);
+      console.error("Error generating questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -1058,15 +1402,23 @@ export default function PackageEditor() {
     }
   };
 
-  const handleDeleteQuestion = async (roundId: number, questionId: number) => {
+  const handleDeleteQuestion = async (
+    roundId: number | string,
+    questionId: number
+  ) => {
     try {
-      const response = await fetch(`/api/rounds/${roundId}/questions/${questionId}`, {
-        method: "DELETE",
-        headers: {
-          "Accept": "application/json",
-        },
-        credentials: "include",
-      });
+      if (roundId.toString().includes("round"))
+        roundId = roundId.toString().replace(/^round-/, "");
+      const response = await fetch(
+        `/api/rounds/${roundId}/questions/${questionId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+          },
+          credentials: "include",
+        }
+      );
 
       if (!response.ok) {
         const text = await response.text();
@@ -1077,7 +1429,7 @@ export default function PackageEditor() {
       const updatedResponse = await fetch(`/api/packages/${params.id}`, {
         credentials: "include",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       });
 
@@ -1086,14 +1438,15 @@ export default function PackageEditor() {
       }
 
       const updatedData = await updatedResponse.json();
-      setPackageData(updatedData);
+
+      setPackageData(transformPackages(updatedData));
 
       toast({
         title: "Успех",
         description: "Вопрос удален из раунда",
       });
     } catch (error: any) {
-      console.error('Error deleting question:', error);
+      console.error("Error deleting question:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -1108,7 +1461,7 @@ export default function PackageEditor() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         credentials: "include",
         body: JSON.stringify(data),
@@ -1119,7 +1472,7 @@ export default function PackageEditor() {
       }
 
       const updatedPackage = await response.json();
-      setPackageData(updatedPackage);
+      setPackageData(transformPackages(updatedPackage));
     } catch (error: any) {
       console.error("Error updating package:", error);
       toast({
@@ -1143,7 +1496,9 @@ export default function PackageEditor() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Пакет не найден</h2>
-          <p className="text-muted-foreground mt-2">Возможно, он был удален или у вас нет к нему доступа</p>
+          <p className="text-muted-foreground mt-2">
+            Возможно, он был удален или у вас нет к нему доступа
+          </p>
           <Link href="/packages">
             <Button variant="link" className="mt-4">
               <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1154,6 +1509,250 @@ export default function PackageEditor() {
       </div>
     );
   }
+
+  //UniqueIdentifier
+  const findValueOfItems = (id: any, type: string) => {
+    if (type === "round") {
+      return packageData.rounds.find((round) => round.id === id);
+    }
+    if (type === "question") {
+      return packageData.rounds.find((round) =>
+        round.roundQuestions.find((question) => question.id === id)
+      );
+    }
+  };
+
+  const orderRounds = (rounds) => {
+    const orderedRoundQuestions = rounds.map((round) => {
+      return {
+        ...round,
+        roundQuestions: round.roundQuestions.map((roundQuestion, index) => ({
+          ...roundQuestion,
+          orderIndex: index,
+        })),
+      };
+    });
+    return orderedRoundQuestions;
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const { id } = active;
+    setActiveId(id);
+  };
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    const { active, over } = event;
+
+    if (
+      active.id.toString().includes("question") &&
+      over?.id.toString().includes("question") &&
+      over &&
+      active.id !== over.id
+    ) {
+      const activeRound = findValueOfItems(active.id, "question");
+      const overRound = findValueOfItems(over.id, "question");
+
+      if (!activeRound || !overRound) return;
+
+      const activeRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === activeRound.id
+      );
+      const overRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === overRound.id
+      );
+      const activeQuestionIndex = activeRound.roundQuestions.findIndex(
+        (question) => question.id === active.id
+      );
+      const overQuestionIndex = overRound.roundQuestions.findIndex(
+        (question) => question.id === over.id
+      );
+
+      if (activeRoundIndex === overRoundIndex) {
+        let newRoundQuestions = [...packageData.rounds];
+        newRoundQuestions[activeRoundIndex].roundQuestions = arrayMove(
+          newRoundQuestions[activeRoundIndex].roundQuestions,
+          activeQuestionIndex,
+          overQuestionIndex
+        );
+
+        setPackageData({ ...packageData, rounds: newRoundQuestions });
+        handleAutoSaveQuestionsOrder(
+          removePrefixes(orderRounds(newRoundQuestions))
+        );
+      } else {
+        let newRoundQuestions = [...packageData.rounds];
+        const [removedItem] = newRoundQuestions[
+          activeRoundIndex
+        ].roundQuestions.splice(activeQuestionIndex, 1);
+        newRoundQuestions[overRoundIndex].roundQuestions.splice(
+          overQuestionIndex,
+          0,
+          removedItem
+        );
+        setPackageData({ ...packageData, rounds: newRoundQuestions });
+        handleAutoSaveQuestionsOrder(
+          removePrefixes(orderRounds(newRoundQuestions))
+        );
+      }
+    }
+
+    if (
+      active.id.toString().includes("question") &&
+      over?.id.toString().includes("round") &&
+      active &&
+      over &&
+      active.id !== over.id
+    ) {
+      const activeRound = findValueOfItems(active.id, "question");
+      const overRound = findValueOfItems(over.id, "round");
+
+      if (!activeRound || !overRound) return;
+
+      const activeRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === activeRound.id
+      );
+
+      const overRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === overRound.id
+      );
+
+      const activeQuestionIndex = activeRound.roundQuestions.findIndex(
+        (question) => question.id === active.id
+      );
+
+      let newRoundQuestions = [...packageData.rounds];
+      const [removedQuestion] = newRoundQuestions[
+        activeRoundIndex
+      ].roundQuestions.splice(activeQuestionIndex, 1);
+      newRoundQuestions[overRoundIndex].roundQuestions.push(removedQuestion);
+
+      setPackageData({ ...packageData, rounds: newRoundQuestions });
+      handleAutoSaveQuestionsOrder(
+        removePrefixes(orderRounds(newRoundQuestions))
+      );
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (
+      active.id.toString().includes("round") &&
+      over?.id.toString().includes("round") &&
+      active &&
+      over
+    ) {
+      const activeRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === active.id
+      );
+      const overRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === over.id
+      );
+
+      let newRoundQuestions = [...packageData.rounds];
+      newRoundQuestions = arrayMove(
+        newRoundQuestions,
+        activeRoundIndex,
+        overRoundIndex
+      );
+      setPackageData({ ...packageData, rounds: newRoundQuestions });
+      handleAutoSaveQuestionsOrder(
+        removePrefixes(orderRounds(newRoundQuestions))
+      );
+    }
+
+    if (
+      active.id.toString().includes("question") &&
+      over?.id.toString().includes("question") &&
+      active &&
+      over &&
+      active.id !== over.id
+    ) {
+      const activeRound = findValueOfItems(active.id, "question");
+      const overRound = findValueOfItems(over.id, "question");
+
+      // If the active or over container is not found, return
+      if (!activeRound || !overRound) return;
+      // Find the index of the active and over container
+      const activeRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === activeRound.id
+      );
+      const overRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === overRound.id
+      );
+      // Find the index of the active and over item
+      const activeQuestionIndex = activeRound.roundQuestions.findIndex(
+        (question) => question.id === active.id
+      );
+      const overQuestionIndex = overRound.roundQuestions.findIndex(
+        (question) => question.id === over.id
+      );
+
+      if (activeRoundIndex === overRoundIndex) {
+        let newRoundQuestions = [...packageData.rounds];
+        newRoundQuestions[activeRoundIndex].roundQuestions = arrayMove(
+          newRoundQuestions[activeRoundIndex].roundQuestions,
+          activeQuestionIndex,
+          overQuestionIndex
+        );
+        setPackageData({ ...packageData, rounds: newRoundQuestions });
+        handleAutoSaveQuestionsOrder(
+          removePrefixes(orderRounds(newRoundQuestions))
+        );
+      } else {
+        let newRoundQuestions = [...packageData.rounds];
+        const [removedQuestion] = newRoundQuestions[
+          activeRoundIndex
+        ].roundQuestions.splice(activeQuestionIndex, 1);
+        newRoundQuestions[overQuestionIndex].roundQuestions.splice(
+          overQuestionIndex,
+          0,
+          removedQuestion
+        );
+
+        setPackageData({ ...packageData, rounds: newRoundQuestions });
+        handleAutoSaveQuestionsOrder(
+          removePrefixes(orderRounds(newRoundQuestions))
+        );
+      }
+    }
+
+    if (
+      active.id.toString().includes("question") &&
+      over?.id.toString().includes("round") &&
+      active &&
+      over &&
+      active.id !== over.id
+    ) {
+      const activeRound = findValueOfItems(active.id, "question");
+      const overRound = findValueOfItems(over.id, "round");
+
+      if (!activeRound || !overRound) return;
+
+      const activeRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === activeRound.id
+      );
+      const overRoundIndex = packageData.rounds.findIndex(
+        (round) => round.id === overRound.id
+      );
+
+      const activeQuestionIndex = activeRound.roundQuestions.findIndex(
+        (question) => question.id === active.id
+      );
+      let newRoundQuestions = [...packageData.rounds];
+      const [removedQuestion] = newRoundQuestions[
+        activeRoundIndex
+      ].roundQuestions.splice(activeQuestionIndex, 1);
+      newRoundQuestions[overRoundIndex].roundQuestions.push(removedQuestion);
+      setPackageData({ ...packageData, rounds: newRoundQuestions });
+      handleAutoSaveQuestionsOrder(
+        removePrefixes(orderRounds(newRoundQuestions))
+      );
+    }
+
+    setActiveId(null);
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -1183,14 +1782,26 @@ export default function PackageEditor() {
           <div className="h-full border-r flex flex-col container">
             <ScrollArea className="flex-1">
               <div className="space-y-4 py-4">
-                {packageData.rounds.map((round) => (
-                  <NavigationItem
-                    key={round.id}
-                    round={round}
-                    activeQuestionId={activeQuestionId}
-                    onQuestionClick={handleQuestionClick}
-                  />
-                ))}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCorners}
+                  onDragStart={handleDragStart}
+                  onDragMove={handleDragMove}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={packageData.rounds.map((round) => round.id)}
+                  >
+                    {packageData.rounds.map((round) => (
+                      <NavigationItem
+                        key={round.id}
+                        round={round}
+                        activeQuestionId={activeQuestionId}
+                        onQuestionClick={handleQuestionClick}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </ScrollArea>
             <div className="py-4 border-t">
@@ -1207,23 +1818,25 @@ export default function PackageEditor() {
             <div className="container py-6 space-y-8 pl-12 pr-16">
               {packageData.rounds.map((round) => (
                 <div key={round.id} className="space-y-4">
-                  <RoundHeader
-                    round={round}
-                    onSave={handleUpdateRound}
-                  />
+                  <RoundHeader round={round} onSave={handleUpdateRound} />
                   <div className="space-y-4">
                     {round.questions.map((question, index) => (
                       <div
                         key={`${round.id}-${question.id}`}
-                        ref={(el) => (questionRefs.current[`${round.id}-${question.id}`] = el)}
+                        ref={(el) =>
+                          (questionRefs.current[`${round.id}-${question.id}`] =
+                            el)
+                        }
                         className={cn(
                           "rounded-lg border bg-card p-4",
-                          activeQuestionId === `${round.id}-${question.id}` && "ring-2 ring-primary"
+                          activeQuestionId === `${round.id}-${question.id}` &&
+                            "ring-2 ring-primary"
                         )}
                       >
+                        <div>{`${round.id}-${question.id}`}</div>
                         <QuestionItem
                           question={question}
-                          index={index}
+                          index={question.id}
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
@@ -1236,7 +1849,12 @@ export default function PackageEditor() {
                     {isCreatingQuestion && currentRoundId === round.id && (
                       <div className="rounded-lg border bg-card p-4">
                         <Form {...createQuestionForm}>
-                          <form onSubmit={createQuestionForm.handleSubmit(handleCreateQuestion)} className="space-y-4">
+                          <form
+                            onSubmit={createQuestionForm.handleSubmit(
+                              handleCreateQuestion
+                            )}
+                            className="space-y-4"
+                          >
                             <FormField
                               control={createQuestionForm.control}
                               name="content"
@@ -1267,14 +1885,19 @@ export default function PackageEditor() {
                                 </FormItem>
                               )}
                             />
-                             <FormField
+                            <FormField
                               control={createQuestionForm.control}
                               name="difficulty"
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Сложность</FormLabel>
                                   <FormControl>
-                                    <Input type="number" min={1} max={5} {...field} />
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={5}
+                                      {...field}
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -1332,7 +1955,10 @@ export default function PackageEditor() {
             </DialogDescription>
           </DialogHeader>
           <Form {...searchForm}>
-            <form onSubmit={searchForm.handleSubmit(handleSearch)} className="space-y-4">
+            <form
+              onSubmit={searchForm.handleSubmit(handleSearch)}
+              className="space-y-4"
+            >
               <FormField
                 control={searchForm.control}
                 name="query"
@@ -1359,17 +1985,26 @@ export default function PackageEditor() {
                   className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
                   onClick={() => {
                     if (currentRoundId) {
-                      const round = packageData.rounds.find((r) => r.id === currentRoundId);
+                      const round = packageData.rounds.find(
+                        (r) => r.id === currentRoundId
+                      );
                       if (round) {
-                        handleAddQuestion(currentRoundId, question.id, round.questions.length);
+                        const roundId = Number(
+                          currentRoundId.toString().replace(/^round-/, "")
+                        );
+                        handleAddQuestion(
+                          roundId,
+                          question.id,
+                          round.questions.length
+                        );
                       }
                     }
                   }}
                 >
                   <div>{getContentPreview(question.content)}</div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    Автор: {question.author.username} •
-                    Создан: {new Date(question.createdAt).toLocaleDateString()}
+                    Автор: {question.author.username} • Создан:{" "}
+                    {new Date(question.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               ))}
