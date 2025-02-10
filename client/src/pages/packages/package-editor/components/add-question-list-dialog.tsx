@@ -13,14 +13,14 @@ import { getContentPreview } from "@/lib/utils";
 import { Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { Question } from "@db/schema";
+import { useQuestions } from "@/hooks/use-questions";
 
 // ----------------------------------------------------------------------
 
 interface AddQuestionListDialog {
   open: boolean;
-  availableQuestions: Question[];
-  handleSearch: any;
-  onQuestionClick: any;
+  roundId: number;
+  onQuestionClick: (questionId: number) => void;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -29,9 +29,8 @@ type QuestionSearchFilters = {
 };
 
 export function AddQuestionListDialog({
-  handleSearch,
+  roundId,
   onQuestionClick,
-  availableQuestions,
   open,
   onOpenChange,
 }: AddQuestionListDialog) {
@@ -40,6 +39,17 @@ export function AddQuestionListDialog({
       query: "",
     },
   });
+
+  const { questions: availableQuestions, isLoading } = useQuestions({
+    roundId,
+    limit: 100, // Show more questions in the dialog
+  });
+
+  const handleSearch = (data: QuestionSearchFilters) => {
+    // Implement search functionality if needed
+    console.log("Search query:", data.query);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -74,19 +84,29 @@ export function AddQuestionListDialog({
         </Form>
         <ScrollArea className="h-[400px] mt-4">
           <div className="space-y-2">
-            {availableQuestions.map((question) => (
-              <div
-                key={question.id}
-                className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
-                onClick={() => onQuestionClick(question.id)}
-              >
-                <div>{getContentPreview(question.content)}</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Автор: {question?.author?.username} • Создан:{" "}
-                  {new Date(question.createdAt).toLocaleDateString()}
-                </div>
+            {isLoading ? (
+              <div className="text-center p-4 text-muted-foreground">
+                Загрузка...
               </div>
-            ))}
+            ) : availableQuestions.length === 0 ? (
+              <div className="text-center p-4 text-muted-foreground">
+                Нет доступных вопросов
+              </div>
+            ) : (
+              availableQuestions.map((question) => (
+                <div
+                  key={question.id}
+                  className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
+                  onClick={() => onQuestionClick(question.id)}
+                >
+                  <div>{getContentPreview(question.content)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Автор: {question?.author?.username} • Создан:{" "}
+                    {new Date(question.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </ScrollArea>
       </DialogContent>
