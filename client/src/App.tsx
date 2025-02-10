@@ -10,7 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Questions from "@/pages/questions";
 import QuestionEditor from "@/pages/questions/editor";
 import Packages from "@/pages/packages";
-import PackageEditor from "@/pages/packages/editor";
+import PackageEditor from "@/pages/packages/package-editor";
 import Tags from "@/pages/tags";
 import Layout from "@/components/layout";
 import GenerateQuestions from "@/pages/questions/generate";
@@ -41,9 +41,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/questions" component={Questions} />
-        <Route path="/questions/new">
-          {() => <QuestionEditor />}
-        </Route>
+        <Route path="/questions/new">{() => <QuestionEditor />}</Route>
         <Route path="/questions/generate" component={GenerateQuestions} />
         <Route path="/questions/:id">
           {(params) => <QuestionEditor id={params.id} />}
@@ -56,9 +54,7 @@ function Router() {
         <Route path="/rounds" component={Rounds} />
         <Route path="/templates" component={Templates} />
         <Route path="/verify" component={VerifyContent} />
-        {user.role === "admin" && (
-          <Route path="/users" component={Users} />
-        )}
+        {user.role === "admin" && <Route path="/users" component={Users} />}
         <Route component={NotFound} />
       </Switch>
     </Layout>

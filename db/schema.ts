@@ -1,4 +1,12 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  boolean,
+  timestamp,
+  json,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
 
@@ -6,7 +14,9 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").unique().notNull(),
   password: text("password").notNull(),
-  role: text("role", { enum: ["admin", "editor", "author"] }).default("author").notNull(),
+  role: text("role", { enum: ["admin", "editor", "author"] })
+    .default("author")
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -18,7 +28,9 @@ export const questions = pgTable("questions", {
   answer: text("answer"),
   topic: text("topic"),
   difficulty: integer("difficulty").notNull(),
-  authorId: integer("author_id").references(() => users.id).notNull(),
+  authorId: integer("author_id")
+    .references(() => users.id)
+    .notNull(),
   factChecked: boolean("fact_checked").default(false),
   factCheckDate: timestamp("fact_check_date"),
   isGenerated: boolean("is_generated").default(false),
@@ -31,7 +43,9 @@ export const packages = pgTable("packages", {
   title: text("title").notNull(),
   description: text("description"),
   templateId: integer("template_id").references(() => templates.id),
-  authorId: integer("author_id").references(() => users.id).notNull(),
+  authorId: integer("author_id")
+    .references(() => users.id)
+    .notNull(),
   playDate: timestamp("play_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -43,8 +57,12 @@ export const rounds = pgTable("rounds", {
   description: text("description"),
   questionCount: integer("question_count").default(0),
   orderIndex: integer("order_index").notNull(),
-  templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }),
-  packageId: integer("package_id").references(() => packages.id, { onDelete: 'cascade' }),
+  templateId: integer("template_id").references(() => templates.id, {
+    onDelete: "cascade",
+  }),
+  packageId: integer("package_id").references(() => packages.id, {
+    onDelete: "cascade",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -53,22 +71,32 @@ export const templates = pgTable("templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  authorId: integer("author_id").references(() => users.id).notNull(),
+  authorId: integer("author_id")
+    .references(() => users.id)
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const roundQuestions = pgTable("round_questions", {
   id: serial("id").primaryKey(),
-  roundId: integer("round_id").references(() => rounds.id, { onDelete: 'cascade' }).notNull(),
-  questionId: integer("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
+  roundId: integer("round_id")
+    .references(() => rounds.id, { onDelete: "cascade" })
+    .notNull(),
+  questionId: integer("question_id")
+    .references(() => questions.id, { onDelete: "cascade" })
+    .notNull(),
   orderIndex: integer("order_index").notNull(),
 });
 
 export const templateRoundSettings = pgTable("template_round_settings", {
   id: serial("id").primaryKey(),
-  templateId: integer("template_id").references(() => templates.id, { onDelete: 'cascade' }).notNull(),
-  roundId: integer("round_id").references(() => rounds.id, { onDelete: 'cascade' }).notNull(),
+  templateId: integer("template_id")
+    .references(() => templates.id, { onDelete: "cascade" })
+    .notNull(),
+  roundId: integer("round_id")
+    .references(() => rounds.id, { onDelete: "cascade" })
+    .notNull(),
   name: text("name"),
   description: text("description"),
   questionCount: integer("question_count").default(0),
@@ -87,8 +115,12 @@ export const tags = pgTable("tags", {
 
 export const questionTags = pgTable("question_tags", {
   id: serial("id").primaryKey(),
-  questionId: integer("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
-  tagId: integer("tag_id").references(() => tags.id, { onDelete: 'cascade' }).notNull(),
+  questionId: integer("question_id")
+    .references(() => questions.id, { onDelete: "cascade" })
+    .notNull(),
+  tagId: integer("tag_id")
+    .references(() => tags.id, { onDelete: "cascade" })
+    .notNull(),
 });
 
 // Relations
@@ -152,16 +184,19 @@ export const roundQuestionsRelations = relations(roundQuestions, ({ one }) => ({
   }),
 }));
 
-export const templateRoundSettingsRelations = relations(templateRoundSettings, ({ one }) => ({
-  template: one(templates, {
-    fields: [templateRoundSettings.templateId],
-    references: [templates.id],
-  }),
-  round: one(rounds, {
-    fields: [templateRoundSettings.roundId],
-    references: [rounds.id],
-  }),
-}));
+export const templateRoundSettingsRelations = relations(
+  templateRoundSettings,
+  ({ one }) => ({
+    template: one(templates, {
+      fields: [templateRoundSettings.templateId],
+      references: [templates.id],
+    }),
+    round: one(rounds, {
+      fields: [templateRoundSettings.roundId],
+      references: [rounds.id],
+    }),
+  })
+);
 
 export const tagsRelations = relations(tags, ({ many }) => ({
   questionTags: many(questionTags),
@@ -191,8 +226,12 @@ export const insertRoundSchema = createInsertSchema(rounds);
 export const selectRoundSchema = createSelectSchema(rounds);
 export const insertPackageSchema = createInsertSchema(packages);
 export const selectPackageSchema = createSelectSchema(packages);
-export const insertTemplateRoundSettingsSchema = createInsertSchema(templateRoundSettings);
-export const selectTemplateRoundSettingsSchema = createSelectSchema(templateRoundSettings);
+export const insertTemplateRoundSettingsSchema = createInsertSchema(
+  templateRoundSettings
+);
+export const selectTemplateRoundSettingsSchema = createSelectSchema(
+  templateRoundSettings
+);
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -221,4 +260,5 @@ export type Package = typeof packages.$inferSelect & {
 };
 export type InsertPackage = typeof packages.$inferInsert;
 export type TemplateRoundSettings = typeof templateRoundSettings.$inferSelect;
-export type InsertTemplateRoundSettings = typeof templateRoundSettings.$inferInsert;
+export type InsertTemplateRoundSettings =
+  typeof templateRoundSettings.$inferInsert;
