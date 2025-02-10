@@ -38,7 +38,7 @@ const crypto = {
     const suppliedPasswordBuf = (await scryptAsync(
       suppliedPassword,
       salt,
-      64
+      64,
     )) as Buffer;
     return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
   },
@@ -149,7 +149,7 @@ export function registerRoutes(app: Express): Server {
           .select()
           .from(users)
           .where(
-            and(eq(users.username, username), sql`${users.id} != ${userId}`)
+            and(eq(users.username, username), sql`${users.id} != ${userId}`),
           )
           .limit(1);
 
@@ -629,7 +629,7 @@ export function registerRoutes(app: Express): Server {
       const validation = await validateQuestion(
         question.title,
         question.content,
-        question.topic
+        question.topic,
       );
 
       if (validation.isValid) {
@@ -774,8 +774,8 @@ export function registerRoutes(app: Express): Server {
           .where(
             and(
               eq(roundQuestions.roundId, roundId),
-              eq(roundQuestions.questionId, questionId)
-            )
+              eq(roundQuestions.questionId, questionId),
+            ),
           );
 
         res.json({ success: true });
@@ -783,7 +783,7 @@ export function registerRoutes(app: Express): Server {
         console.error("Error removing question from round:", error);
         res.status(500).json({ error: error.message });
       }
-    }
+    },
   );
 
   app.put("/api/questions/:id", requireAuth, async (req, res) => {
@@ -890,7 +890,7 @@ export function registerRoutes(app: Express): Server {
         console.error("Error adding round to template:", error);
         res.status(500).json({ error: error.message });
       }
-    }
+    },
   );
 
   app.delete("/api/rounds/:id", requireAuth, async (req, res) => {
@@ -938,7 +938,7 @@ export function registerRoutes(app: Express): Server {
       const generatedQuestions = await generateQuizQuestions(
         count,
         topic,
-        prompt
+        prompt,
       );
       console.log("Questions generated successfully:", generatedQuestions);
 

@@ -4,8 +4,9 @@ import { toast } from "@/hooks/use-toast";
 // Determine if we're running in Replit
 const isReplit = Boolean(import.meta.env.REPL_ID || import.meta.env.REPL_OWNER);
 
-// Set the base URL based on environment
-const baseURL = isReplit ? "" : "http://localhost:5000";
+// For Replit, we don't need a base URL since the backend is served from the same origin
+// For local development, we need to point to the Express server
+const baseURL = isReplit ? "" : "http://0.0.0.0:5000";
 
 const axiosClient = axios.create({
   baseURL,
@@ -17,9 +18,9 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
-    // Ensure API prefix is added
-    if (config.url && !config.url.startsWith('http')) {
-      config.url = `/api${config.url.startsWith('/') ? config.url : `/${config.url}`}`;
+    // Add /api prefix only when using relative URLs and when not already prefixed
+    if (!config.url?.startsWith('http') && !config.url?.startsWith('/api')) {
+      config.url = `/api${config.url?.startsWith('/') ? config.url : `/${config.url}`}`;
     }
     return config;
   },
