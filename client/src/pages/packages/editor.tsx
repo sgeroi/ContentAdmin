@@ -95,7 +95,6 @@ type Round = {
   questionCount: number;
   questions: PackageQuestion[];
   orderIndex: number;
-  roundQuestions: {questionId: number, orderIndex: number}[]
 };
 
 type PackageWithRounds = Package & {
@@ -1105,7 +1104,7 @@ export default function PackageEditor() {
         if (!response.ok) {
           throw new Error(
             responseData?.error ||
-              `Failed to save question:${response.statusText}`
+              `Failed to save question: ${response.statusText}`
           );
         }
 
@@ -1226,11 +1225,13 @@ export default function PackageEditor() {
     }
   };
 
-  const handleSearch = useCallback((filters: QuestionSearchFilters) => {
-    fetchQuestions(filters);
-  }, [fetchQuestions]);
+  const handleSearch = useCallback((data: QuestionSearchFilters) => {
+    fetchQuestions(data);
+  }, []);
 
-  const fetchQuestions = useCallback(async (filters: QuestionSearchFilters = { query: "" }) => {
+  const fetchQuestions = async (
+    filters: QuestionSearchFilters = { query: "" }
+  ) => {
     try {
       const queryParams = new URLSearchParams();
       if (filters.query) queryParams.append("q", filters.query);
@@ -1241,44 +1242,16 @@ export default function PackageEditor() {
       if (!response.ok) {
         throw new Error("Failed to fetch questions");
       }
-      const { questions } = await response.json();
-
-      // Get all assigned question IDs from roundQuestions in all rounds
-      const assignedQuestionIds = new Set();
-      packageData?.rounds.forEach(round => {
-        // Use roundQuestions instead of questions
-        if (round.roundQuestions) {
-          round.roundQuestions.forEach(rq => {
-            assignedQuestionIds.add(rq.questionId);
-          });
-        }
-      });
-
-      console.log('Assigned question IDs:', Array.from(assignedQuestionIds));
-      console.log('All questions:', questions.map(q => q.id));
-
-      // Filter out questions that are already assigned to any round in this package
-      const availableQuestions = questions.filter(
-        question => !assignedQuestionIds.has(question.id)
-      );
-
-      console.log('Available questions after filtering:', availableQuestions.map(q => q.id));
-
-      setAvailableQuestions(availableQuestions);
+      const result = await response.json();
+      setAvailableQuestions(result.questions);
     } catch (error: any) {
-      console.error("Error fetching questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
     }
-  }, [packageData, toast]);
-
-  useEffect(() => {
-    const data = { query: searchForm.getValues("query") };
-    fetchQuestions(data);
-  }, [fetchQuestions, searchForm]);
+  };
 
   const handleAddQuestionSelect = (type: "manual" | "search" | "generate") => {
     setIsAddQuestionDialogOpen(false);
@@ -1509,10 +1482,6 @@ export default function PackageEditor() {
       });
     }
   };
-
-  useEffect(() => {
-    fetchQuestions();
-  }, [fetchQuestions])
 
   if (isLoading) {
     return (
@@ -1867,7 +1836,7 @@ export default function PackageEditor() {
                         <div>{`${round.id}-${question.id}`}</div>
                         <QuestionItem
                           question={question}
-                          index={index}
+                          index={question.id}
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
