@@ -1,7 +1,14 @@
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 
+// Determine if we're running in Replit
+const isReplit = Boolean(import.meta.env.REPL_ID || import.meta.env.REPL_OWNER);
+
+// Set the base URL based on environment
+const baseURL = isReplit ? "" : "http://localhost:5000";
+
 const axiosClient = axios.create({
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -10,7 +17,7 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
-    // Ensure the URL is relative to the current origin
+    // Ensure API prefix is added
     if (config.url && !config.url.startsWith('http')) {
       config.url = `/api${config.url.startsWith('/') ? config.url : `/${config.url}`}`;
     }
@@ -18,7 +25,7 @@ axiosClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 axiosClient.interceptors.response.use(
@@ -50,7 +57,7 @@ axiosClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosClient;
