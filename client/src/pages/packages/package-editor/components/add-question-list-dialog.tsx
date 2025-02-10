@@ -14,11 +14,13 @@ import { Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { Question } from "@db/schema";
 
+// ----------------------------------------------------------------------
+
 interface AddQuestionListDialog {
   open: boolean;
   availableQuestions: Question[];
-  handleSearch: (data: { query: string }) => void;
-  onQuestionClick: (id: number) => void;
+  handleSearch: any;
+  onQuestionClick: any;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -29,7 +31,7 @@ type QuestionSearchFilters = {
 export function AddQuestionListDialog({
   handleSearch,
   onQuestionClick,
-  availableQuestions = [], // Add default empty array
+  availableQuestions,
   open,
   onOpenChange,
 }: AddQuestionListDialog) {
@@ -38,7 +40,6 @@ export function AddQuestionListDialog({
       query: "",
     },
   });
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -73,7 +74,7 @@ export function AddQuestionListDialog({
         </Form>
         <ScrollArea className="h-[400px] mt-4">
           <div className="space-y-2">
-            {Array.isArray(availableQuestions) && availableQuestions.map((question) => (
+            {availableQuestions.map((question) => (
               <div
                 key={question.id}
                 className="p-3 rounded-lg border cursor-pointer hover:bg-accent"
@@ -81,7 +82,7 @@ export function AddQuestionListDialog({
               >
                 <div>{getContentPreview(question.content)}</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  Автор: {question.author?.username || 'Неизвестный'} • Создан:{" "}
+                  Автор: {question?.author?.username} • Создан:{" "}
                   {new Date(question.createdAt).toLocaleDateString()}
                 </div>
               </div>
