@@ -261,13 +261,14 @@ export default function PackageEditor() {
     filters: QuestionSearchFilters = { query: "" },
   ) => {
     try {
-      const params = filters.query ? { q: filters.query } : {};
+      const queryParams = filters.query ? { q: filters.query } : {};
       const response = await axiosClient.get(`/packages/${params.id}/available-questions`, {
-        params,
+        params: queryParams,
         paramsSerializer: (params) => qs.stringify(params),
       });
       setAvailableQuestions(response.data.questions);
     } catch (error: any) {
+      console.error("Error fetching available questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
