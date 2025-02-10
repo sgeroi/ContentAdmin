@@ -90,10 +90,14 @@ export default function PackageEditor() {
 
   const fetchPackage = useCallback(async () => {
     try {
-      const response = await axiosClient.get(`/api/packages/${params.id}`);
+      const response = await axiosClient.get(`/packages/${params.id}`);
+      console.log("Package response:", response.data); // Add logging
+      if (!response.data) {
+        throw new Error("Не удалось загрузить данные пакета");
+      }
       const newData = {
         ...response.data,
-        rounds: transformPackages(response.data.rounds),
+        rounds: transformPackages(response.data.rounds || []),
       };
       setPackageData(newData);
       await fetchQuestions();
@@ -123,7 +127,7 @@ export default function PackageEditor() {
       try {
         console.log("Updating round:", id, data);
         await axiosClient.put(
-          `/api/rounds/${id.toString().replace(/^round-/, "")}`,
+          `/rounds/${id.toString().replace(/^round-/, "")}`,
           {
             name: data.name,
             description: data.description,
@@ -162,7 +166,7 @@ export default function PackageEditor() {
         packageId: parseInt(params.id),
       };
 
-      await axiosClient.post("/api/rounds", roundData);
+      await axiosClient.post("/rounds", roundData);
       await fetchPackage();
 
       toast({
@@ -189,7 +193,7 @@ export default function PackageEditor() {
       };
 
       try {
-        await axiosClient.post(`/api/round-questions/save-order`, payload);
+        await axiosClient.post(`/round-questions/save-order`, payload);
         await fetchPackage();
       } catch (error: any) {
         console.error("Error auto-saving:", error);
@@ -210,7 +214,7 @@ export default function PackageEditor() {
       setIsSaving(true);
       try {
         console.log("Auto-saving question:", questionId, data);
-        await axiosClient.put(`/api/questions/${questionId}`, data);
+        await axiosClient.put(`/questions/${questionId}`, data);
         fetchPackage();
       } catch (error: any) {
         console.error("Error auto-saving:", error);
@@ -232,7 +236,7 @@ export default function PackageEditor() {
     position: number
   ) => {
     try {
-      await axiosClient.post(`/api/rounds/${roundId}/questions`, {
+      await axiosClient.post(`/rounds/${roundId}/questions`, {
         questionId,
         orderIndex: position,
       });
@@ -252,16 +256,16 @@ export default function PackageEditor() {
     }
   };
 
-  const handleSearch = useCallback((data: QuestionSearchFilters) => {
-    fetchQuestions(data);
-  }, []);
+  const handleSearch = useCallback((data: { query: string }) => {
+    fetchQuestions({ query: data.query });
+  }, [fetchQuestions]);
 
   const fetchQuestions = async (
     filters: QuestionSearchFilters = { query: "" }
   ) => {
     try {
       const params = filters.query ? { q: filters.query } : {};
-      const response = await axiosClient.get("/api/questions", {
+      const response = await axiosClient.get("/questions", {
         params,
         paramsSerializer: (params) => qs.stringify(params),
       });
@@ -292,7 +296,7 @@ export default function PackageEditor() {
 
   const handleCreateQuestion: HandleCreateQuestion = async (data) => {
     try {
-      const response = await axiosClient.post(`/api/questions`, {
+      const response = await axiosClient.post(`/questions`, {
         title: "Вопрос",
         ...data,
       });
@@ -346,7 +350,7 @@ export default function PackageEditor() {
     }
 
     try {
-      const response = await axiosClient.post(`/api/questions/generate`, {
+      const response = await axiosClient.post(`/questions/generate`, {
         prompt: data.prompt,
         count: data.count,
       });
@@ -385,7 +389,7 @@ export default function PackageEditor() {
       if (roundId.toString().includes("round"))
         roundId = roundId.toString().replace(/^round-/, "");
 
-      await axiosClient.delete(`api/rounds/${roundId}/questions/${questionId}`);
+      await axiosClient.delete(`/rounds/${roundId}/questions/${questionId}`);
       await fetchPackage();
       toast({
         title: "Успех",
@@ -404,7 +408,7 @@ export default function PackageEditor() {
   const handleUpdatePackage = async (data: Partial<Package>) => {
     try {
       const response = await axiosClient.put(
-        `/api/packages/${params.id}`,
+        `/packages/${params.id}`,
         data
       );
       const newPackageData = {
@@ -618,7 +622,7 @@ export default function PackageEditor() {
         const [removedQuestion] = newRoundQuestions[
           activeRoundIndex
         ].roundQuestions.splice(activeQuestionIndex, 1);
-        newRoundQuestions[overQuestionIndex].roundQuestions.splice(
+        newRoundQuestions[overRoundIndex].roundQuestions.splice(
           overQuestionIndex,
           0,
           removedQuestion
@@ -706,31 +710,34 @@ export default function PackageEditor() {
 
       <AutoSaveStatus saving={isSaving} />
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
-        <PackageEditorSidebar
-          activeQuestionId={activeQuestionId}
-          rounds={packageData.rounds}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-          onQuestionClick={handleQuestionClick}
-          onAddRound={handleAddRound}
-        />
-        <ResizableHandle />
-        <PackageEditorContent
-          questionRefs={questionRefs}
-          rounds={packageData.rounds}
-          activeQuestionId={activeQuestionId}
-          currentRoundId={currentRoundId}
-          isCreatingQuestion={isCreatingQuestion}
-          handleUpdateRound={handleUpdateRound}
-          handleAutoSave={handleAutoSave}
-          handleCreateQuestion={handleCreateQuestion}
-          handleDeleteQuestion={handleDeleteQuestion}
-          onCreatingQuestionCancel={handleCreatingQuestionCancel}
-          onQuestionAdd={handleQuestionAdd}
-        />
-      </ResizablePanelGroup>
+      {packageData && packageData.rounds && (
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          <PackageEditorSidebar
+            activeQuestionId={activeQuestionId}
+            rounds={packageData.rounds}
+            onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+            onQuestionClick={handleQuestionClick}
+            onAddRound={handleAddRound}
+          />
+          <ResizableHandle />
+          <PackageEditorContent
+            questionRefs={questionRefs}
+            rounds={packageData.rounds}
+            activeQuestionId={activeQuestionId}
+            currentRoundId={currentRoundId}
+            isCreatingQuestion={isCreatingQuestion}
+            handleUpdateRound={handleUpdateRound}
+            handleAutoSave={handleAutoSave}
+            handleCreateQuestion={handleCreateQuestion}
+            handleDeleteQuestion={handleDeleteQuestion}
+            onCreatingQuestionCancel={handleCreatingQuestionCancel}
+            onQuestionAdd={handleQuestionAdd}
+          />
+        </ResizablePanelGroup>
+      )}
+
       <AddQuestionDialog
         open={isAddQuestionDialogOpen}
         onOpenChange={setIsAddQuestionDialogOpen}
