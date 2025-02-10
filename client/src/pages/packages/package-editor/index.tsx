@@ -261,10 +261,7 @@ export default function PackageEditor() {
     filters: QuestionSearchFilters = { query: "" },
   ) => {
     try {
-      const params = {
-        ...filters.query ? { q: filters.query } : {},
-        roundId: currentRoundId, // Add roundId to filter out assigned questions
-      };
+      const params = filters.query ? { q: filters.query } : {};
       const response = await axiosClient.get("/questions", {
         params,
         paramsSerializer: (params) => qs.stringify(params),
@@ -535,6 +532,7 @@ export default function PackageEditor() {
       const activeRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === activeRound.id,
       );
+
       const overRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === overRound.id,
       );

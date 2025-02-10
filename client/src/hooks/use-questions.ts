@@ -21,27 +21,14 @@ interface QuestionsResponse {
   limit: number;
 }
 
-interface UseQuestionsOptions {
-  page?: number;
-  limit?: number;
-  roundId?: number;
-}
-
-export function useQuestions(options: UseQuestionsOptions = {}) {
-  const { page = 1, limit = 10, roundId } = options;
+export function useQuestions(page: number = 1, limit: number = 10) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery<QuestionsResponse>({
-    queryKey: ["/api/questions", page, limit, roundId],
+    queryKey: ["/api/questions", page, limit],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        ...(roundId && { roundId: roundId.toString() }),
-      });
-
-      const response = await fetch(`/api/questions?${params}`, {
+      const response = await fetch(`/api/questions?page=${page}&limit=${limit}`, {
         credentials: 'include'
       });
       if (!response.ok) {

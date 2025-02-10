@@ -521,60 +521,39 @@ export function registerRoutes(app: Express): Server {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
-    const roundId = req.query.roundId ? parseInt(req.query.roundId as string) : null;
 
-    try {
-      // Build base conditions
-      let conditions = sql`1=1`;
-
-      // If roundId is provided, exclude questions already in that round
-      if (roundId) {
-        conditions = sql`${questions.id} NOT IN (
-          SELECT "questionId" FROM ${roundQuestions}
-          WHERE "roundId" = ${roundId}
-        )`;
-      }
-
-      const [result, total] = await Promise.all([
-        db.query.questions.findMany({
-          where: conditions,
-          with: {
-            author: true,
-            questionTags: {
-              with: {
-                tag: true,
-              },
+    const [result, total] = await Promise.all([
+      db.query.questions.findMany({
+        with: {
+          author: true,
+          questionTags: {
+            with: {
+              tag: true,
             },
-            roundQuestions: {
-              with: {
-                round: {
-                  with: {
-                    package: true,
-                  },
+          },
+          roundQuestions: {
+            with: {
+              round: {
+                with: {
+                  package: true,
                 },
               },
             },
           },
-          orderBy: desc(questions.createdAt),
-          limit,
-          offset,
-        }),
-        db
-          .select({ count: sql<number>`count(*)` })
-          .from(questions)
-          .where(conditions),
-      ]);
-
-      res.json({
-        questions: result,
-        total: total[0].count,
-        page,
+        },
+        orderBy: desc(questions.createdAt),
         limit,
-      });
-    } catch (error: any) {
-      console.error("Error fetching questions:", error);
-      res.status(500).json({ error: error.message });
-    }
+        offset,
+      }),
+      db.select({ count: sql<number>`count(*)` }).from(questions),
+    ]);
+
+    res.json({
+      questions: result,
+      total: total[0].count,
+      page,
+      limit,
+    });
   });
 
   app.post("/api/questions/validate", requireAuth, async (req, res) => {
