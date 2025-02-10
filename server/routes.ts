@@ -12,7 +12,7 @@ import {
   templateRoundSettings,
   roundQuestions,
 } from "@db/schema";
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, not } from "drizzle-orm";
 import {
   validateQuestion,
   factCheckQuestion,
@@ -809,6 +809,39 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
+  // Add this route after other questions routes
+  app.get("/api/packages/:id/available-questions", requireAuth, async (req, res) => {
+    try {
+      const packageId = parseInt(req.params.id);
+      console.log("Fetching available questions for package:", packageId);
+
+      const availableQuestions = await db.query.questions.findMany({
+        where: not(
+          questions.id,
+          db.select({ value: roundQuestions.questionId })
+            .from(roundQuestions)
+            .innerJoin(rounds, eq(rounds.id, roundQuestions.roundId))
+            .where(eq(rounds.packageId, packageId))
+        ),
+        with: {
+          author: true,
+          questionTags: {
+            with: {
+              tag: true,
+            },
+          },
+        },
+        orderBy: desc(questions.createdAt),
+      });
+
+      res.json(availableQuestions);
+    } catch (error: any) {
+      console.error("Error fetching available questions:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
 
   // Template management routes
   app.get("/api/templates", requireAuth, async (req, res) => {
