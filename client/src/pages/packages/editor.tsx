@@ -1225,42 +1225,53 @@ export default function PackageEditor() {
     }
   };
 
-  const handleSearch = useCallback((data: QuestionSearchFilters) => {
-    fetchQuestions(data);
-  }, []);
+  const handleSearch = useCallback((filters: QuestionSearchFilters) => {
+    fetchQuestions(filters);
+  }, [fetchQuestions]);
 
-  const fetchQuestions = useCallback(async () => {
+  const fetchQuestions = useCallback(async (filters: QuestionSearchFilters = { query: "" }) => {
     try {
-      const response = await fetch('/api/questions', {
-        credentials: 'include'
+      const queryParams = new URLSearchParams();
+      if (filters.query) queryParams.append("q", filters.query);
+
+      const response = await fetch(`/api/questions?${queryParams}`, {
+        credentials: "include",
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch questions');
+        throw new Error("Failed to fetch questions");
       }
       const { questions } = await response.json();
 
-      // Get all question IDs that are already in any round of the current package
-      const assignedQuestionIds = new Set(
-        packageData?.rounds.flatMap(round => 
-          round.questions.map(q => q.id)
-        ) || []
-      );
+      // Get all question IDs from all rounds in the current package
+      const assignedQuestionIds = new Set();
+      packageData?.rounds.forEach(round => {
+        if (round.questions) {
+          round.questions.forEach(question => {
+            assignedQuestionIds.add(question.id);
+          });
+        }
+      });
 
       // Filter out questions that are already assigned to any round in this package
-      const unassignedQuestions = questions.filter(
+      const availableQuestions = questions.filter(
         question => !assignedQuestionIds.has(question.id)
       );
 
-      setAvailableQuestions(unassignedQuestions);
+      setAvailableQuestions(availableQuestions);
     } catch (error: any) {
-      console.error('Error fetching questions:', error);
+      console.error("Error fetching questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
     }
-  }, [packageData]);
+  }, [packageData, toast]);
+
+  useEffect(() => {
+    const data = { query: searchForm.getValues("query") };
+    fetchQuestions(data);
+  }, [fetchQuestions, searchForm]);
 
   const handleAddQuestionSelect = (type: "manual" | "search" | "generate") => {
     setIsAddQuestionDialogOpen(false);
