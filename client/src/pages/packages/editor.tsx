@@ -1104,7 +1104,7 @@ export default function PackageEditor() {
         if (!response.ok) {
           throw new Error(
             responseData?.error ||
-              `Failed to save question: ${response.statusText}`
+              `Failed to save question:${response.statusText}`
           );
         }
 
@@ -1229,29 +1229,38 @@ export default function PackageEditor() {
     fetchQuestions(data);
   }, []);
 
-  const fetchQuestions = async (
-    filters: QuestionSearchFilters = { query: "" }
-  ) => {
+  const fetchQuestions = useCallback(async () => {
     try {
-      const queryParams = new URLSearchParams();
-      if (filters.query) queryParams.append("q", filters.query);
-
-      const response = await fetch(`/api/questions?${queryParams}`, {
-        credentials: "include",
+      const response = await fetch('/api/questions', {
+        credentials: 'include'
       });
       if (!response.ok) {
-        throw new Error("Failed to fetch questions");
+        throw new Error('Failed to fetch questions');
       }
-      const result = await response.json();
-      setAvailableQuestions(result.questions);
+      const { questions } = await response.json();
+
+      // Get all question IDs that are already in any round of the current package
+      const assignedQuestionIds = new Set(
+        packageData?.rounds.flatMap(round => 
+          round.questions.map(q => q.id)
+        ) || []
+      );
+
+      // Filter out questions that are already assigned to any round in this package
+      const unassignedQuestions = questions.filter(
+        question => !assignedQuestionIds.has(question.id)
+      );
+
+      setAvailableQuestions(unassignedQuestions);
     } catch (error: any) {
+      console.error('Error fetching questions:', error);
       toast({
         title: "Ошибка",
         description: error.message,
         variant: "destructive",
       });
     }
-  };
+  }, [packageData]);
 
   const handleAddQuestionSelect = (type: "manual" | "search" | "generate") => {
     setIsAddQuestionDialogOpen(false);
@@ -1482,6 +1491,10 @@ export default function PackageEditor() {
       });
     }
   };
+
+  useEffect(() => {
+    fetchQuestions();
+  }, [fetchQuestions])
 
   if (isLoading) {
     return (
@@ -1836,7 +1849,7 @@ export default function PackageEditor() {
                         <div>{`${round.id}-${question.id}`}</div>
                         <QuestionItem
                           question={question}
-                          index={question.id}
+                          index={index}
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}
