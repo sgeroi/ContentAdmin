@@ -1,10 +1,7 @@
-// src/api/axiosClient.ts
 import axios from "axios";
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://0.0.0.0:5000";
+import { toast } from "@/hooks/use-toast";
 
 const axiosClient = axios.create({
-  baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -13,6 +10,10 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
+    // Ensure the URL is relative to the current origin
+    if (config.url && !config.url.startsWith('http')) {
+      config.url = `/api${config.url.startsWith('/') ? config.url : `/${config.url}`}`;
+    }
     return config;
   },
   (error) => {
@@ -23,6 +24,31 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle different types of errors
+    if (error.response) {
+      // Server returned an error response (4xx, 5xx)
+      const message = error.response.data || "Произошла ошибка при выполнении запроса";
+      toast({
+        title: "Ошибка",
+        description: message,
+        variant: "destructive",
+      });
+    } else if (error.request) {
+      // Request was made but no response received
+      toast({
+        title: "Ошибка сети",
+        description: "Не удалось связаться с сервером",
+        variant: "destructive",
+      });
+    } else {
+      // Something else happened while setting up the request
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+
     return Promise.reject(error);
   }
 );
