@@ -95,6 +95,7 @@ type Round = {
   questionCount: number;
   questions: PackageQuestion[];
   orderIndex: number;
+  roundQuestions: {questionId: number, orderIndex: number}[]
 };
 
 type PackageWithRounds = Package & {
@@ -1242,20 +1243,26 @@ export default function PackageEditor() {
       }
       const { questions } = await response.json();
 
-      // Get all question IDs from all rounds in the current package
+      // Get all assigned question IDs from roundQuestions in all rounds
       const assignedQuestionIds = new Set();
       packageData?.rounds.forEach(round => {
-        if (round.questions) {
-          round.questions.forEach(question => {
-            assignedQuestionIds.add(question.id);
+        // Use roundQuestions instead of questions
+        if (round.roundQuestions) {
+          round.roundQuestions.forEach(rq => {
+            assignedQuestionIds.add(rq.questionId);
           });
         }
       });
+
+      console.log('Assigned question IDs:', Array.from(assignedQuestionIds));
+      console.log('All questions:', questions.map(q => q.id));
 
       // Filter out questions that are already assigned to any round in this package
       const availableQuestions = questions.filter(
         question => !assignedQuestionIds.has(question.id)
       );
+
+      console.log('Available questions after filtering:', availableQuestions.map(q => q.id));
 
       setAvailableQuestions(availableQuestions);
     } catch (error: any) {
