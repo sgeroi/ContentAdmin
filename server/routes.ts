@@ -974,61 +974,30 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add this new endpoint before the httpServer creation
-  app.get("/api/packages/:packageId/available-questions", requireAuth, async (req, res) => {
-    try {
-      const packageId = parseInt(req.params.packageId);
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
-      const offset = (page - 1) * limit;
-
-      // First get all question IDs that are already assigned to this package
-      const assignedQuestions = await db
-        .select({ questionId: roundQuestions.questionId })
-        .from(roundQuestions)
-        .innerJoin(rounds, eq(rounds.id, roundQuestions.roundId))
-        .where(eq(rounds.packageId, packageId));
-
-      const assignedQuestionIds = assignedQuestions.map(q => q.questionId);
-
-      // Then get available questions (not in assignedQuestionIds)
-      const [availableQuestions, total] = await Promise.all([
-        db.query.questions.findMany({
-          where: assignedQuestionIds.length > 0 
-            ? sql`${questions.id} NOT IN (${sql.join(assignedQuestionIds, sql`, `)})`
-            : undefined,
-          with: {
-            author: true,
-            questionTags: {
-              with: {
-                tag: true,
-              },
-            },
-          },
-          orderBy: desc(questions.createdAt),
-          limit,
-          offset,
-        }),
-        db
-          .select({ count: sql<number>`count(*)` })
-          .from(questions)
-          .where(
-            assignedQuestionIds.length > 0
-              ? sql`id NOT IN (${sql.join(assignedQuestionIds, sql`, `)}))})`
-              : undefined
-          ),
-      ]);
-
-      res.json({
-        questions: availableQuestions,
-        total: total[0].count,
-        page,
-        limit,
-      });
-    } catch (error: any) {
-      console.error("Error fetching available questions:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/packages/:packageId/available-questions",
+    requireAuth,
+    async (req, res) => {
+      const { packageId } = req.params;
+      try {
+        // Find question IDs that are already assigned to the given packageId
+        const assignedQuestions = await db
+          .select(roundQuestions.questionId)
+          .from(roundQuestions)
+          .where(eq(roundQuestions.packageId, packageId));
+        const assignedQuestionIds = assignedQuestions.map((q) => q.questionId);
+        // Find all questions that are not assigned to the given packageId
+        const availableQuestions = await db
+          .select(questions)
+          .where(eq(questions.id, null)) // To avoid matching
+          .orNotIn(assignedQuestionIds); // Assuming `id` field in questions matches `questionId`
+        res.json(availableQuestions);
+      } catch (error: any) {
+        console.error("Error fetching available questions:", error);
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   const httpServer = createServer(app);
   return httpServer;
