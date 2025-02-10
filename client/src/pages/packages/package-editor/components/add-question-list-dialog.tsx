@@ -18,10 +18,9 @@ import type { Question } from "@db/schema";
 
 interface AddQuestionListDialog {
   open: boolean;
-  packageId: number;
   availableQuestions: Question[];
-  handleSearch: (data: QuestionSearchFilters) => void;
-  onQuestionClick: (questionId: number) => void;
+  handleSearch: any;
+  onQuestionClick: any;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -35,14 +34,12 @@ export function AddQuestionListDialog({
   availableQuestions,
   open,
   onOpenChange,
-  packageId,
 }: AddQuestionListDialog) {
   const searchForm = useForm<QuestionSearchFilters>({
     defaultValues: {
       query: "",
     },
   });
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>

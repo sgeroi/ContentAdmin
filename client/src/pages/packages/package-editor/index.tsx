@@ -261,14 +261,13 @@ export default function PackageEditor() {
     filters: QuestionSearchFilters = { query: "" },
   ) => {
     try {
-      const queryParams = filters.query ? { q: filters.query } : {};
-      const response = await axiosClient.get(`/packages/${params.id}/available-questions`, {
-        params: queryParams,
+      const params = filters.query ? { q: filters.query } : {};
+      const response = await axiosClient.get("/questions", {
+        params,
         paramsSerializer: (params) => qs.stringify(params),
       });
       setAvailableQuestions(response.data.questions);
     } catch (error: any) {
-      console.error("Error fetching available questions:", error);
       toast({
         title: "Ошибка",
         description: error.message,
@@ -533,6 +532,7 @@ export default function PackageEditor() {
       const activeRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === activeRound.id,
       );
+
       const overRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === overRound.id,
       );
@@ -735,7 +735,6 @@ export default function PackageEditor() {
         onSelect={handleAddQuestionSelect}
       />
       <AddQuestionListDialog
-        packageId={parseInt(params.id)}
         availableQuestions={availableQuestions}
         open={isSearchDialogOpen}
         handleSearch={handleSearch}

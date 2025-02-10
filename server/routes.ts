@@ -973,32 +973,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this new endpoint before the httpServer creation
-  app.get(
-    "/api/packages/:packageId/available-questions",
-    requireAuth,
-    async (req, res) => {
-      const { packageId } = req.params;
-      try {
-        // Find question IDs that are already assigned to the given packageId
-        const assignedQuestions = await db
-          .select(roundQuestions.questionId)
-          .from(roundQuestions)
-          .where(eq(roundQuestions.packageId, packageId));
-        const assignedQuestionIds = assignedQuestions.map((q) => q.questionId);
-        // Find all questions that are not assigned to the given packageId
-        const availableQuestions = await db
-          .select(questions)
-          .where(eq(questions.id, null)) // To avoid matching
-          .orNotIn(assignedQuestionIds); // Assuming `id` field in questions matches `questionId`
-        res.json(availableQuestions);
-      } catch (error: any) {
-        console.error("Error fetching available questions:", error);
-        res.status(500).json({ error: error.message });
-      }
-    },
-  );
-
   const httpServer = createServer(app);
   return httpServer;
 }
