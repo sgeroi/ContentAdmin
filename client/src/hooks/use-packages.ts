@@ -47,10 +47,7 @@ export function usePackages() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      ...pkg
-    }: CreatePackageData & { id: number }) => {
+    mutationFn: async ({ id, ...pkg }: CreatePackageData & { id: number }) => {
       const response = await fetch(`/api/packages/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
