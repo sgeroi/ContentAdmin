@@ -8,6 +8,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -32,6 +39,9 @@ const difficultyColors: Record<number, string> = {
   4: "bg-orange-500",
   5: "bg-red-500",
 };
+
+// Available records per page options
+const RECORDS_PER_PAGE_OPTIONS = [10, 50, 100, 200];
 
 function getContentPreview(content: any): string {
   try {
@@ -62,7 +72,8 @@ function getContentPreview(content: any): string {
 
 export default function Questions() {
   const [currentPage, setCurrentPage] = useState(1);
-  const { questions, total, limit, deleteQuestion, isLoading } = useQuestions(currentPage);
+  const [recordsPerPage, setRecordsPerPage] = useState(10);
+  const { questions, total, limit, deleteQuestion, isLoading } = useQuestions(currentPage, recordsPerPage);
   const [, setLocation] = useLocation();
 
   const totalPages = Math.ceil(total / limit);
@@ -74,6 +85,11 @@ export default function Questions() {
 
   const handleRowClick = (id: number) => {
     setLocation(`/questions/${id}`);
+  };
+
+  const handleRecordsPerPageChange = (value: string) => {
+    setRecordsPerPage(Number(value));
+    setCurrentPage(1); // Reset to first page when changing records per page
   };
 
   return (
@@ -234,26 +250,47 @@ export default function Questions() {
       </div>
 
       {total > 0 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="text-sm text-muted-foreground">
-            Страница {currentPage} из {totalPages}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">Записей на странице:</p>
+            <Select
+              value={recordsPerPage.toString()}
+              onValueChange={handleRecordsPerPageChange}
+            >
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="10" />
+              </SelectTrigger>
+              <SelectContent>
+                {RECORDS_PER_PAGE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option.toString()}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              Страница {currentPage} из {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

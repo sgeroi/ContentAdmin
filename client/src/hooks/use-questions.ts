@@ -21,14 +21,14 @@ interface QuestionsResponse {
   limit: number;
 }
 
-export function useQuestions(page: number = 1) {
+export function useQuestions(page: number = 1, limit: number = 10) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery<QuestionsResponse>({
-    queryKey: ["/api/questions", page],
+    queryKey: ["/api/questions", page, limit],
     queryFn: async () => {
-      const response = await fetch(`/api/questions?page=${page}&limit=10`, {
+      const response = await fetch(`/api/questions?page=${page}&limit=${limit}`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -159,7 +159,7 @@ export function useQuestions(page: number = 1) {
     questions: data?.questions ?? [],
     total: data?.total ?? 0,
     currentPage: data?.page ?? page,
-    limit: data?.limit ?? 10,
+    limit: data?.limit ?? limit,
     isLoading,
     validateQuestion: validateMutation.mutateAsync,
     factCheckQuestion: factCheckMutation.mutateAsync,
