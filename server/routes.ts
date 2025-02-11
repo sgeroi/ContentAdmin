@@ -12,7 +12,18 @@ import {
   templateRoundSettings,
   roundQuestions,
 } from "@db/schema";
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  sql,
+  inArray,
+  not,
+  or,
+  ilike,
+  SQL,
+} from "drizzle-orm";
 import {
   validateQuestion,
   factCheckQuestion,
@@ -24,6 +35,7 @@ import fs from "fs";
 import express from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { PgColumn } from "drizzle-orm/pg-core";
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -216,6 +228,61 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).send(error.message);
+    }
+  });
+
+  app.get("/api/packages/:id/available-questions", async (req, res) => {
+    const packageId = parseInt(req.params.id, 10);
+    const page = parseInt(req.query.page as string) || 1;
+    console.log("limit", req.query.limit);
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+    const searchQuery = req.query.q as string | undefined;
+
+    try {
+      // Base condition: Exclude questions already in the package rounds.
+      const baseCondition: SQL<unknown> = not(
+        inArray(
+          questions.id,
+          db
+            .select({ questionId: roundQuestions.questionId })
+            .from(roundQuestions)
+            .innerJoin(rounds, eq(rounds.id, roundQuestions.roundId))
+            .where(eq(rounds.packageId, packageId))
+        )
+      );
+
+      let whereClause: SQL<unknown> = baseCondition;
+
+      if (searchQuery) {
+        whereClause = and(
+          whereClause,
+          or(
+            ilike(sql`${questions.title}::text`, `%${searchQuery}%`),
+            ilike(sql`${questions.content}::text`, `%${searchQuery}%`)
+          )
+        );
+      }
+
+      const availableQuestions = await db.query.questions.findMany({
+        where: whereClause,
+        with: {
+          author: true,
+          questionTags: {
+            with: {
+              tag: true,
+            },
+          },
+        },
+        limit,
+        offset,
+        orderBy: desc(questions.createdAt),
+      });
+
+      res.json(availableQuestions);
+    } catch (error) {
+      console.error("Error fetching available questions:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
@@ -975,4 +1042,40 @@ export function registerRoutes(app: Express): Server {
 
   const httpServer = createServer(app);
   return httpServer;
+}
+function cast(
+  title: PgColumn<
+    {
+      name: "title";
+      tableName: "questions";
+      dataType: "string";
+      columnType: "PgText";
+      data: string;
+      driverParam: string;
+      notNull: true;
+      hasDefault: false;
+      isPrimaryKey: false;
+      isAutoincrement: false;
+      hasRuntimeDefault: false;
+      enumValues: [string, ...string[]];
+      baseColumn: never;
+      identity: undefined;
+      generated: undefined;
+    },
+    {},
+    {}
+  >,
+  arg1: string
+):
+  | SQL<unknown>
+  | import("drizzle-orm").Column<
+      import("drizzle-orm").ColumnBaseConfig<
+        import("drizzle-orm").ColumnDataType,
+        string
+      >,
+      object,
+      object
+    >
+  | SQL.Aliased<unknown> {
+  throw new Error("Function not implemented.");
 }

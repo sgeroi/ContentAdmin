@@ -7,7 +7,6 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { DragEndEvent, DragMoveEvent, DragStartEvent } from "@dnd-kit/core";
 import { useForm } from "react-hook-form";
 import debounce from "lodash/debounce";
-import qs from "qs";
 // hooks
 import { useToast } from "@/hooks/use-toast";
 // ui
@@ -28,7 +27,7 @@ import { PackageEditorSidebar } from "./package-editor-sidebar";
 import { PackageEditorContent } from "./package-editor-content";
 import { AddQuestionDialog } from "./components/add-question-dialog";
 import { GenerateQuestionsDialog } from "./components/generate-question-dialog";
-import { AddQuestionListDialog } from "./components/add-question-list-dialog";
+import { AddQuestionSearchDialog } from "./components/add-question-search-dialog";
 import { AutoSaveStatus } from "./components/auto-save-status";
 // types
 import type { PackageWithRounds } from "../packages.types";
@@ -41,8 +40,6 @@ import type {
   OnCreatingQuestionCancel,
   OnQuestionAdd,
 } from "./package-editor.types";
-
-// ----------------------------------------------------------------------
 
 export type QuestionFormData = {
   content: any;
@@ -57,10 +54,10 @@ export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
   const [packageData, setPackageData] = useState<PackageWithRounds | null>(
-    null,
+    null
   );
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
+  // const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -88,28 +85,6 @@ export default function PackageEditor() {
     fetchPackage();
   }, [params.id]);
 
-  const fetchPackage = useCallback(async () => {
-    try {
-      const response = await axiosClient.get(`/packages/${params.id}`);
-      console.log("response", response);
-      const newData = {
-        ...response.data,
-        rounds: transformPackages(response.data.rounds),
-      };
-      setPackageData(newData);
-      await fetchQuestions();
-    } catch (error: any) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [params.id]);
-
   const handleQuestionClick = (id: string) => {
     setActiveQuestionId(id);
     const element = questionRefs.current[id];
@@ -117,38 +92,6 @@ export default function PackageEditor() {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
-
-  const handleUpdateRound: HandleUpdateRound = useCallback(
-    async (id: number, data: { name: string; description: string }) => {
-      setIsSaving(true);
-      try {
-        console.log("Updating round:", id, data);
-        await axiosClient.put(
-          `/rounds/${id.toString().replace(/^round-/, "")}`,
-          {
-            name: data.name,
-            description: data.description,
-          },
-        );
-
-        await fetchPackage();
-        toast({
-          title: "Успех",
-          description: "Раунд обновлен",
-        });
-      } catch (error: any) {
-        console.error("Error updating round:", error);
-        toast({
-          title: "Ошибка",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [params.id, toast, fetchPackage],
-  );
 
   const handleAddRound = async () => {
     try {
@@ -203,8 +146,54 @@ export default function PackageEditor() {
         setIsSaving(false);
       }
     }, 1000),
-    [params.id, toast],
+    [params.id, toast]
   );
+
+  const handleAddQuestion = async (
+    roundId: number,
+    questionId: number,
+    position: number
+  ) => {
+    try {
+      await axiosClient.post(`/api/rounds/${roundId}/questions`, {
+        questionId,
+        orderIndex: position,
+      });
+      fetchPackage();
+      setIsSearchDialogOpen(false);
+      toast({
+        title: "Успех",
+        description: "Вопрос добавлен в раунд",
+      });
+    } catch (error: any) {
+      console.error("Error adding question:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchPackage = useCallback(async () => {
+    try {
+      const response = await axiosClient.get(`/api/packages/${params.id}`);
+      const newData = {
+        ...response.data,
+        rounds: transformPackages(response.data.rounds),
+      };
+      setPackageData(newData);
+    } catch (error: any) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [params.id]);
 
   const handleAutoSave: HandleAutoSave = useCallback(
     debounce(async (questionId: number, data: Partial<QuestionFormData>) => {
@@ -224,57 +213,8 @@ export default function PackageEditor() {
         setIsSaving(false);
       }
     }, 1000),
-    [params.id, toast, fetchPackage],
+    [params.id, toast, fetchPackage]
   );
-
-  const handleAddQuestion = async (
-    roundId: number,
-    questionId: number,
-    position: number,
-  ) => {
-    try {
-      await axiosClient.post(`/rounds/${roundId}/questions`, {
-        questionId,
-        orderIndex: position,
-      });
-      await fetchPackage();
-      setIsSearchDialogOpen(false);
-      toast({
-        title: "Успех",
-        description: "Вопрос добавлен в раунд",
-      });
-    } catch (error: any) {
-      console.error("Error adding question:", error);
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSearch = useCallback((data: QuestionSearchFilters) => {
-    fetchQuestions(data);
-  }, []);
-
-  const fetchQuestions = async (
-    filters: QuestionSearchFilters = { query: "" },
-  ) => {
-    try {
-      const params = filters.query ? { q: filters.query } : {};
-      const response = await axiosClient.get("/questions", {
-        params,
-        paramsSerializer: (params) => qs.stringify(params),
-      });
-      setAvailableQuestions(response.data.questions);
-    } catch (error: any) {
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleAddQuestionSelect = (type: "manual" | "search" | "generate") => {
     setIsAddQuestionDialogOpen(false);
@@ -307,12 +247,12 @@ export default function PackageEditor() {
             throw new Error("No question ID in response");
           }
           const roundId = Number(
-            currentRoundId.toString().replace(/^round-/, ""),
+            currentRoundId.toString().replace(/^round-/, "")
           );
           await handleAddQuestion(
             roundId,
             questionId,
-            round.questions?.length || 0,
+            round.questions?.length || 0
           );
         }
       }
@@ -332,6 +272,38 @@ export default function PackageEditor() {
       });
     }
   };
+
+  const handleUpdateRound: HandleUpdateRound = useCallback(
+    async (id: number, data: { name: string; description: string }) => {
+      setIsSaving(true);
+      try {
+        console.log("Updating round:", id, data);
+        await axiosClient.put(
+          `/api/rounds/${id.toString().replace(/^round-/, "")}`,
+          {
+            name: data.name,
+            description: data.description,
+          }
+        );
+
+        await fetchPackage();
+        toast({
+          title: "Успех",
+          description: "Раунд обновлен",
+        });
+      } catch (error: any) {
+        console.error("Error updating round:", error);
+        toast({
+          title: "Ошибка",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [params.id, toast, fetchPackage]
+  );
 
   const handleGenerateQuestions = async (data: {
     prompt: string;
@@ -359,7 +331,7 @@ export default function PackageEditor() {
           await handleAddQuestion(
             currentRoundId,
             question.id,
-            round.questions?.length || 0,
+            round.questions?.length || 0
           );
         }
       }
@@ -380,7 +352,7 @@ export default function PackageEditor() {
 
   const handleDeleteQuestion: HandleDeleteQuestion = async (
     roundId,
-    questionId,
+    questionId
   ) => {
     try {
       if (roundId.toString().includes("round"))
@@ -454,7 +426,7 @@ export default function PackageEditor() {
     }
     if (type === "question") {
       return packageData.rounds.find((round) =>
-        round.roundQuestions.find((question) => question.id === id),
+        round.roundQuestions.find((question) => question.id === id)
       );
     }
   };
@@ -480,16 +452,16 @@ export default function PackageEditor() {
       if (!activeRound || !overRound) return;
 
       const activeRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === activeRound.id,
+        (round) => round.id === activeRound.id
       );
       const overRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === overRound.id,
+        (round) => round.id === overRound.id
       );
       const activeQuestionIndex = activeRound.roundQuestions.findIndex(
-        (question) => question.id === active.id,
+        (question) => question.id === active.id
       );
       const overQuestionIndex = overRound.roundQuestions.findIndex(
-        (question) => question.id === over.id,
+        (question) => question.id === over.id
       );
 
       if (activeRoundIndex === overRoundIndex) {
@@ -497,7 +469,7 @@ export default function PackageEditor() {
         newRoundQuestions[activeRoundIndex].roundQuestions = arrayMove(
           newRoundQuestions[activeRoundIndex].roundQuestions,
           activeQuestionIndex,
-          overQuestionIndex,
+          overQuestionIndex
         );
 
         setPackageData({ ...packageData, rounds: newRoundQuestions });
@@ -510,7 +482,7 @@ export default function PackageEditor() {
         newRoundQuestions[overRoundIndex].roundQuestions.splice(
           overQuestionIndex,
           0,
-          removedItem,
+          removedItem
         );
         setPackageData({ ...packageData, rounds: newRoundQuestions });
         handleAutoSaveQuestionsOrder(newRoundQuestions);
@@ -530,15 +502,15 @@ export default function PackageEditor() {
       if (!activeRound || !overRound) return;
 
       const activeRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === activeRound.id,
+        (round) => round.id === activeRound.id
       );
 
       const overRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === overRound.id,
+        (round) => round.id === overRound.id
       );
 
       const activeQuestionIndex = activeRound.roundQuestions.findIndex(
-        (question) => question.id === active.id,
+        (question) => question.id === active.id
       );
 
       let newRoundQuestions = [...packageData.rounds];
@@ -562,17 +534,17 @@ export default function PackageEditor() {
       over
     ) {
       const activeRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === active.id,
+        (round) => round.id === active.id
       );
       const overRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === over.id,
+        (round) => round.id === over.id
       );
 
       let newRoundQuestions = [...packageData.rounds];
       newRoundQuestions = arrayMove(
         newRoundQuestions,
         activeRoundIndex,
-        overRoundIndex,
+        overRoundIndex
       );
       setPackageData({ ...packageData, rounds: newRoundQuestions });
       handleAutoSaveQuestionsOrder(newRoundQuestions);
@@ -590,16 +562,16 @@ export default function PackageEditor() {
 
       if (!activeRound || !overRound) return;
       const activeRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === activeRound.id,
+        (round) => round.id === activeRound.id
       );
       const overRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === overRound.id,
+        (round) => round.id === overRound.id
       );
       const activeQuestionIndex = activeRound.roundQuestions.findIndex(
-        (question) => question.id === active.id,
+        (question) => question.id === active.id
       );
       const overQuestionIndex = overRound.roundQuestions.findIndex(
-        (question) => question.id === over.id,
+        (question) => question.id === over.id
       );
 
       if (activeRoundIndex === overRoundIndex) {
@@ -607,7 +579,7 @@ export default function PackageEditor() {
         newRoundQuestions[activeRoundIndex].roundQuestions = arrayMove(
           newRoundQuestions[activeRoundIndex].roundQuestions,
           activeQuestionIndex,
-          overQuestionIndex,
+          overQuestionIndex
         );
         setPackageData({ ...packageData, rounds: newRoundQuestions });
         handleAutoSaveQuestionsOrder(newRoundQuestions);
@@ -619,7 +591,7 @@ export default function PackageEditor() {
         newRoundQuestions[overQuestionIndex].roundQuestions.splice(
           overQuestionIndex,
           0,
-          removedQuestion,
+          removedQuestion
         );
 
         setPackageData({ ...packageData, rounds: newRoundQuestions });
@@ -640,14 +612,14 @@ export default function PackageEditor() {
       if (!activeRound || !overRound) return;
 
       const activeRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === activeRound.id,
+        (round) => round.id === activeRound.id
       );
       const overRoundIndex = packageData.rounds.findIndex(
-        (round) => round.id === overRound.id,
+        (round) => round.id === overRound.id
       );
 
       const activeQuestionIndex = activeRound.roundQuestions.findIndex(
-        (question) => question.id === active.id,
+        (question) => question.id === active.id
       );
       let newRoundQuestions = [...packageData.rounds];
       const [removedQuestion] = newRoundQuestions[
@@ -661,12 +633,12 @@ export default function PackageEditor() {
     setActiveId(null);
   };
 
-  const handleSearchDialogQuestionClick = (questionId: number) => {
+  const handleSearchQuestionAdd = (questionId: number) => {
     if (currentRoundId) {
       const round = packageData.rounds.find((r) => r.id === currentRoundId);
       if (round) {
         const roundId = Number(
-          currentRoundId.toString().replace(/^round-/, ""),
+          currentRoundId.toString().replace(/^round-/, "")
         );
         handleAddQuestion(roundId, questionId, round.questions.length);
       }
@@ -734,12 +706,10 @@ export default function PackageEditor() {
         onOpenChange={setIsAddQuestionDialogOpen}
         onSelect={handleAddQuestionSelect}
       />
-      <AddQuestionListDialog
-        availableQuestions={availableQuestions}
+      <AddQuestionSearchDialog
         open={isSearchDialogOpen}
-        handleSearch={handleSearch}
         onOpenChange={setIsSearchDialogOpen}
-        onQuestionClick={handleSearchDialogQuestionClick}
+        onQuestionAdd={handleSearchQuestionAdd}
       />
       <GenerateQuestionsDialog
         open={isGenerateQuestionsDialogOpen}
