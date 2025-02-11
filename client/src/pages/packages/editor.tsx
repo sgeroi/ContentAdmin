@@ -709,6 +709,7 @@ export default function PackageEditor() {
   );
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
 
+  const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -807,7 +808,7 @@ export default function PackageEditor() {
         const packageResult = await packageResponse.json();
         setPackageData(transformPackages(packageResult));
 
-        // Fetch available questions - REMOVED as it's handled elsewhere now.
+        await fetchQuestions();
       } catch (error: any) {
         console.error("Error fetching data:", error);
         toast({
@@ -1105,7 +1106,7 @@ export default function PackageEditor() {
             responseData?.error ||
               `Failed to save question: ${response.statusText}`
           );
-                }
+        }
 
         const updatedResponse = await fetch(`/api/packages/${params.id}`, {
           credentials: "include",
@@ -1835,7 +1836,7 @@ export default function PackageEditor() {
                         <div>{`${round.id}-${question.id}`}</div>
                         <QuestionItem
                           question={question}
-                          index={index}
+                          index={question.id}
                           roundId={round.id}
                           roundQuestionCount={round.questionCount}
                           handleAutoSave={handleAutoSave}

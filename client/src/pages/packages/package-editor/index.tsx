@@ -262,11 +262,11 @@ export default function PackageEditor() {
   ) => {
     try {
       const params = filters.query ? { q: filters.query } : {};
-      const response = await axiosClient.get(`/packages/${params.id}/available-questions`, {
+      const response = await axiosClient.get("/questions", {
         params,
         paramsSerializer: (params) => qs.stringify(params),
       });
-      setAvailableQuestions(response.data);
+      setAvailableQuestions(response.data.questions);
     } catch (error: any) {
       toast({
         title: "Ошибка",
@@ -532,6 +532,7 @@ export default function PackageEditor() {
       const activeRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === activeRound.id,
       );
+
       const overRoundIndex = packageData.rounds.findIndex(
         (round) => round.id === overRound.id,
       );
