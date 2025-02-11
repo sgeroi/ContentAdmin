@@ -46,10 +46,6 @@ export type QuestionFormData = {
   answer: string;
 };
 
-type QuestionSearchFilters = {
-  query: string;
-};
-
 export default function PackageEditor() {
   const params = useParams();
   const { toast } = useToast();
@@ -57,7 +53,6 @@ export default function PackageEditor() {
     null
   );
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  // const [availableQuestions, setAvailableQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentRoundId, setCurrentRoundId] = useState<number | null>(null);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -155,7 +150,7 @@ export default function PackageEditor() {
     position: number
   ) => {
     try {
-      await axiosClient.post(`/api/rounds/${roundId}/questions`, {
+      await axiosClient.post(`/rounds/${roundId}/questions`, {
         questionId,
         orderIndex: position,
       });
@@ -177,7 +172,7 @@ export default function PackageEditor() {
 
   const fetchPackage = useCallback(async () => {
     try {
-      const response = await axiosClient.get(`/api/packages/${params.id}`);
+      const response = await axiosClient.get(`/packages/${params.id}`);
       const newData = {
         ...response.data,
         rounds: transformPackages(response.data.rounds),
@@ -279,7 +274,7 @@ export default function PackageEditor() {
       try {
         console.log("Updating round:", id, data);
         await axiosClient.put(
-          `/api/rounds/${id.toString().replace(/^round-/, "")}`,
+          `/rounds/${id.toString().replace(/^round-/, "")}`,
           {
             name: data.name,
             description: data.description,

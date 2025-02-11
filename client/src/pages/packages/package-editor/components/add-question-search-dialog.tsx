@@ -65,7 +65,7 @@ export function AddQuestionSearchDialog({
       try {
         console.log("fetching");
         setIsLoading(true);
-        const url = `/api/packages/${packageId}/available-questions`;
+        const url = `/packages/${packageId}/available-questions`;
         const response = await axiosClient.get(url, {
           params: {
             ...filters,
